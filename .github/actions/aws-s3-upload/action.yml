@@ -1,0 +1,26 @@
+name: AWS S3 Upload
+description: Upload file to AWS S3
+inputs:
+  file:
+    description: "Local file path"
+    required: true
+  dest:
+    description: "Destination path in bucket"
+    required: true
+  bucket:
+    description: "S3 bucket name"
+    required: true
+  aws_key:
+    description: "AWS access key"
+    required: true
+  aws_secret:
+    description: "AWS secret key"
+    required: true
+runs:
+  using: composite
+  steps:
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws_key }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws_secret }}
+      run: |
+        run: aws s3 cp "${{ inputs.file }}" "s3://${{ inputs.bucket }}/${{ inputs.dest }}"

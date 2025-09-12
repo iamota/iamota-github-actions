@@ -1,0 +1,17 @@
+name: GitHub Artifact Upload
+description: Upload artifact to GitHub Actions
+inputs:
+  name:
+    description: "Artifact name"
+    required: true
+  path:
+    description: "File or directory path"
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: error

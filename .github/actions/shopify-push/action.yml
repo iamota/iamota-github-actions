@@ -1,0 +1,43 @@
+name: Shopify Push
+description: Push theme using Shopify CLI or Theme Kit
+inputs:
+  use_themekit:
+    description: "Use Theme Kit instead of Shopify CLI"
+    required: false
+    default: "false"
+  store:
+    required: true
+  theme_id:
+    required: true
+  token:
+    required: true
+  path:
+    required: true
+  ignore:
+    required: false
+  allow_live:
+    required: false
+    default: ""
+  nodelete:
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - run: chmod +x $GITHUB_ACTION_PATH/*.sh
+      shell: bash
+    - run: |
+        if [ "${{ inputs.use_themekit }}" = "true" ]; then
+          $GITHUB_ACTION_PATH/push_themekit.sh
+        else
+          $GITHUB_ACTION_PATH/push_shopifycli.sh
+        fi
+      shell: bash
+      env:
+        SHOPIFY_FLAG_STORE: ${{ inputs.store }}
+        SHOPIFY_FLAG_THEME_ID: ${{ inputs.theme_id }}
+        SHOPIFY_CLI_THEME_TOKEN: ${{ inputs.token }}
+        SHOPIFY_FLAG_PATH: ${{ inputs.path }}
+        SHOPIFY_FLAG_IGNORE: ${{ inputs.ignore }}
+        SHOPIFY_FLAG_ALLOW_LIVE: ${{ inputs.allow_live }}
+        NODELETE_FLAG: ${{ inputs.nodelete }}
