@@ -1,10 +1,6 @@
-name: Shopify Push
-description: Push theme using Shopify CLI or Theme Kit
+name: "Shopify Theme Push"
+description: "Push theme to Shopify"
 inputs:
-  use_themekit:
-    description: "Use Theme Kit instead of Shopify CLI"
-    required: false
-    default: "false"
   store:
     required: true
   theme_id:
@@ -12,32 +8,20 @@ inputs:
   token:
     required: true
   path:
-    required: true
-  ignore:
-    required: false
+    default: ./dist
   allow_live:
-    required: false
-    default: ""
+    default: "false"
   nodelete:
-    required: false
-    default: ""
+    default: "true"
 runs:
-  using: composite
+  using: "composite"
   steps:
-    - run: chmod +x $GITHUB_ACTION_PATH/*.sh
-      shell: bash
     - run: |
-        if [ "${{ inputs.use_themekit }}" = "true" ]; then
-          $GITHUB_ACTION_PATH/push_themekit.sh
-        else
-          $GITHUB_ACTION_PATH/push_shopifycli.sh
-        fi
+        shopify theme push \
+          --store "${{ inputs.store }}" \
+          --theme "${{ inputs.theme_id }}" \
+          --password "${{ inputs.token }}" \
+          --path "${{ inputs.path }}" \
+          $([ "${{ inputs.allow_live }}" == "true" ] && echo "--allow-live") \
+          $([ "${{ inputs.nodelete }}" == "true" ] && echo "--nodelete")
       shell: bash
-      env:
-        SHOPIFY_FLAG_STORE: ${{ inputs.store }}
-        SHOPIFY_FLAG_THEME_ID: ${{ inputs.theme_id }}
-        SHOPIFY_CLI_THEME_TOKEN: ${{ inputs.token }}
-        SHOPIFY_FLAG_PATH: ${{ inputs.path }}
-        SHOPIFY_FLAG_IGNORE: ${{ inputs.ignore }}
-        SHOPIFY_FLAG_ALLOW_LIVE: ${{ inputs.allow_live }}
-        NODELETE_FLAG: ${{ inputs.nodelete }}

@@ -1,0 +1,71 @@
+name: Shopify Deploy Workflow (iTF)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+    secrets:
+      SHOPIFY_CLI_THEME_TOKEN:
+        required: true
+    vars:
+      SHOPIFY_FLAG_STORE: {}
+      SHOPIFY_FLAG_THEME_ID: {}
+      DEPLOY_TARGETS: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    strategy:
+      matrix:
+        target: ${{ fromJSON(vars.DEPLOY_TARGETS || '["DEFAULT"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.1
+          bundler: latest
+      - run: npm install -g "@shopify/cli@latest"
+
+      - name: Resolve store and theme ID
+        run: |
+          if [ "${{ matrix.target }}" != "DEFAULT" ]; then
+            echo "SHOPIFY_FLAG_STORE=${{ vars[format('SHOPIFY_FLAG_STORE_{0}', matrix.target)] }}" >> $GITHUB_ENV
+            echo "SHOPIFY_FLAG_THEME_ID=${{ vars[format('SHOPIFY_FLAG_THEME_ID_{0}', matrix.target)] }}" >> $GITHUB_ENV
+          else
+            echo "SHOPIFY_FLAG_STORE=${{ vars.SHOPIFY_FLAG_STORE }}" >> $GITHUB_ENV
+            echo "SHOPIFY_FLAG_THEME_ID=${{ vars.SHOPIFY_FLAG_THEME_ID }}" >> $GITHUB_ENV
+          fi
+
+      - name: Install & Build
+        run: |
+          npm install
+          npm run build --env target=${{ github.ref_name }}
+
+      - name: Set deploy flags
+        run: |
+          if [[ "${{ github.ref_name }}" =~ ^[Pp]roduction$ || "${{ github.ref_name }}" =~ ^[Pp]rod$ ]]; then
+            echo "SHOPIFY_FLAG_ALLOW_LIVE=true" >> $GITHUB_ENV
+          else
+            echo "SHOPIFY_FLAG_ALLOW_LIVE=false" >> $GITHUB_ENV
+          fi
+
+          if git log -1 --pretty=%B | grep -q '\[Allow Delete\]'; then
+            echo "SHOPIFY_FLAG_NODELETE=false" >> $GITHUB_ENV
+          else
+            echo "SHOPIFY_FLAG_NODELETE=true" >> $GITHUB_ENV
+          fi
+
+      - uses: ./.github/actions/shopify-push
+        with:
+          store: ${{ env.SHOPIFY_FLAG_STORE }}
+          theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
+          token: ${{ matrix.target != 'DEFAULT' && secrets[format('SHOPIFY_CLI_THEME_TOKEN_{0}', matrix.target)] || secrets.SHOPIFY_CLI_THEME_TOKEN }}
+          path: ./dist
+          allow_live: ${{ env.SHOPIFY_FLAG_ALLOW_LIVE }}
+          nodelete: ${{ env.SHOPIFY_FLAG_NODELETE }}
