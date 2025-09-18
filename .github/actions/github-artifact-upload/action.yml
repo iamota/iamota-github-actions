@@ -1,14 +1,12 @@
-name: GitHub Artifact Upload
-description: Upload artifact to GitHub Actions
+name: "Upload Artifact"
+description: "Upload a folder or file as GitHub Action artifact"
 inputs:
   name:
-    description: "Artifact name"
     required: true
   path:
-    description: "File or directory path"
     required: true
 runs:
-  using: composite
+  using: "composite"
   steps:
     - uses: actions/upload-artifact@v4
       with:
