@@ -75,7 +75,7 @@ jobs:
                       echo "SHOPIFY_FLAG_NODELETE=1" >> $GITHUB_ENV
                   fi
 
-            - name: Debug: Deploy environment variables
+            - name: "Debug: Deploy environment variables"
               run: |
                   echo "=== DEPLOY DEBUG ==="
                   echo "TARGET     : ${{ matrix.target }}"
