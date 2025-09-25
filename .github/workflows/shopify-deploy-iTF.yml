@@ -9,10 +9,6 @@ on:
         secrets:
             SHOPIFY_CLI_THEME_TOKEN:
                 required: true
-        vars:
-            SHOPIFY_FLAG_STORE: {}
-            SHOPIFY_FLAG_THEME_ID: {}
-            DEPLOY_TARGETS: {}
 
 jobs:
     deploy:
