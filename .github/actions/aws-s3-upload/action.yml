@@ -1,14 +1,14 @@
 name: "AWS S3 Upload"
 description: "Upload file to AWS S3"
 inputs:
-  file:
-    required: true
-  bucket:
-    required: true
-  dest_path:
-    required: true
+    file:
+        required: true
+    bucket:
+        required: true
+    dest_path:
+        required: true
 runs:
-  using: "composite"
-  steps:
-    - run: aws s3 cp "${{ inputs.file }}" "s3://${{ inputs.bucket }}/${{ inputs.dest_path }}"
-      shell: bash
+    using: "composite"
+    steps:
+        - run: aws s3 cp "${{ inputs.file }}" "s3://${{ inputs.bucket }}/${{ inputs.dest_path }}"
+          shell: bash

@@ -1,12 +1,15 @@
 name: "Zip Folder"
 description: "Zip a folder into an archive"
 inputs:
-  folder:
-    required: true
-  output:
-    required: true
+    folder:
+        required: true
+    output:
+        required: true
 runs:
-  using: "composite"
-  steps:
-    - run: zip -r "${{ inputs.output }}" "${{ inputs.folder }}"
-      shell: bash
+    using: "composite"
+    steps:
+        - run: |
+              cd "${{ inputs.folder }}"
+              zip -r "../${{ inputs.output }}" .
+              cd ..
+          shell: bash

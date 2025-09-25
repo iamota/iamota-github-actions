@@ -1,23 +1,23 @@
 name: "Shopify Theme Pull"
 description: "Pulls theme files from Shopify"
 inputs:
-  store:
-    required: true
-  theme_id:
-    required: true
-  token:
-    required: true
-  path:
-    default: ./backup
+    store:
+        required: true
+    theme_id:
+        required: true
+    token:
+        required: true
+    path:
+        default: ./backup
 runs:
-  using: "composite"
-  steps:
-    - run: |
-        mkdir -p "${{ inputs.path }}"
-        shopify theme pull \
-          --store "${{ inputs.store }}" \
-          --theme "${{ inputs.theme_id }}" \
-          --password "${{ inputs.token }}" \
-          --path "${{ inputs.path }}" \
-          --nodelete
-      shell: bash
+    using: "composite"
+    steps:
+        - run: |
+              mkdir -p "${{ inputs.path }}"
+              shopify theme pull \
+                --store "${{ inputs.store }}" \
+                --theme "${{ inputs.theme_id }}" \
+                --password "${{ inputs.token }}" \
+                --path "${{ inputs.path }}" \
+                --nodelete
+          shell: bash

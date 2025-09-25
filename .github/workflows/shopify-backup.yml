@@ -1,87 +1,136 @@
 name: Shopify Backup Workflow
 
 on:
-  workflow_call:
-    inputs:
-      environment:
-        required: true
-        type: string
-    secrets:
-      SHOPIFY_CLI_THEME_TOKEN:
-        required: true
-      AWS_ACCESS_KEY_ID:
-        required: false
-      AWS_SECRET_ACCESS_KEY:
-        required: false
-    vars:
-      SHOPIFY_FLAG_STORE: {}
-      SHOPIFY_FLAG_THEME_ID: {}
-      AWS_S3_BUCKET_SHOPIFY_BACKUPS: {}
-      DEPLOY_TARGETS: {}
+    workflow_call:
+        inputs:
+            environment:
+                required: true
+                type: string
+        secrets:
+            SHOPIFY_CLI_THEME_TOKEN:
+                required: true
+            AWS_ACCESS_KEY_ID:
+                required: false
+            AWS_SECRET_ACCESS_KEY:
+                required: false
+        vars:
+            SHOPIFY_FLAG_STORE: {}
+            SHOPIFY_FLAG_THEME_ID: {}
+            AWS_S3_BUCKET_SHOPIFY_BACKUPS: {}
+            DEPLOY_TARGETS: {}
 
 jobs:
-  backup:
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    strategy:
-      matrix:
-        target: ${{ fromJSON(vars.DEPLOY_TARGETS || '["DEFAULT"]') }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.1
-          bundler: latest
-      - run: npm install -g "@shopify/cli@latest"
+    backup:
+        name: Shopify Theme Backup
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                target: ${{ fromJSON(vars.DEPLOY_TARGETS || '["DEFAULT"]') }}
+        environment: ${{ inputs.environment }}
+        env:
+            GITHUB_REPOSITORY    : ${{ github.repository }}
+            GITHUB_BRANCH        : ${{ github.ref_name }}
+            GITHUB_SHA           : ${{ github.sha }}
+            AWS_ACCESS_KEY_ID    : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_S3_BUCKET        : ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS }}
 
-      - name: Resolve store and theme ID
-        run: |
-          if [ "${{ matrix.target }}" != "DEFAULT" ]; then
-            echo "SHOPIFY_FLAG_STORE=${{ vars[format('SHOPIFY_FLAG_STORE_{0}', matrix.target)] }}" >> $GITHUB_ENV
-            echo "SHOPIFY_FLAG_THEME_ID=${{ vars[format('SHOPIFY_FLAG_THEME_ID_{0}', matrix.target)] }}" >> $GITHUB_ENV
-          else
-            echo "SHOPIFY_FLAG_STORE=${{ vars.SHOPIFY_FLAG_STORE }}" >> $GITHUB_ENV
-            echo "SHOPIFY_FLAG_THEME_ID=${{ vars.SHOPIFY_FLAG_THEME_ID }}" >> $GITHUB_ENV
-          fi
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Pull theme
-        uses: ./.github/actions/shopify-pull
-        with:
-          store: ${{ env.SHOPIFY_FLAG_STORE }}
-          theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
-          token: ${{ matrix.target != 'DEFAULT' && secrets[format('SHOPIFY_CLI_THEME_TOKEN_{0}', matrix.target)] || secrets.SHOPIFY_CLI_THEME_TOKEN }}
-          path: ./backup
+            - name: Resolve store and theme ID
+              run: |
+                  echo "Resolving STORE + THEME_ID for target: ${{ matrix.target }}"
+                  if [ "${{ matrix.target }}" != "DEFAULT" ]; then
+                      echo "SHOPIFY_FLAG_STORE=${{ vars[format('SHOPIFY_FLAG_STORE_{0}', matrix.target)] }}" >> $GITHUB_ENV
+                      echo "SHOPIFY_FLAG_THEME_ID=${{ vars[format('SHOPIFY_FLAG_THEME_ID_{0}', matrix.target)] }}" >> $GITHUB_ENV
+                  else
+                      echo "SHOPIFY_FLAG_STORE=${{ vars.SHOPIFY_FLAG_STORE }}" >> $GITHUB_ENV
+                      echo "SHOPIFY_FLAG_THEME_ID=${{ vars.SHOPIFY_FLAG_THEME_ID }}" >> $GITHUB_ENV
+                  fi
+                  echo "STORE   = ${{ matrix.target != 'DEFAULT' && vars[format('SHOPIFY_FLAG_STORE_{0}', matrix.target)] || vars.SHOPIFY_FLAG_STORE }}"
+                  echo "THEMEID = ${{ matrix.target != 'DEFAULT' && vars[format('SHOPIFY_FLAG_THEME_ID_{0}', matrix.target)] || vars.SHOPIFY_FLAG_THEME_ID }}"
 
-      - uses: ./.github/actions/zip-folder
-        with:
-          folder: ./backup
-          output: theme-backup.zip
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 18
+            - uses: ruby/setup-ruby@v1
+              with:
+                  ruby-version: 3.1
+                  bundler: latest
 
-      - name: Set backup file path
-        run: |
-          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
-          YEAR=$(date +%Y)
-          DATETIME=$(date +%Y-%m-%d_%H%M%S)
-          SANITIZED_BRANCH=$(echo "$GITHUB_BRANCH" | tr '/' '_')
-          FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${SHOPIFY_FLAG_THEME_ID}__${GITHUB_SHA}"
-          ZIP_NAME="${FILE_NAME}.zip"
-          DEST_PATH="${YEAR}/${REPO_NAME}/${ZIP_NAME}"
-          mv theme-backup.zip "$ZIP_NAME"
-          echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
-          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-          echo "DEST_PATH=$DEST_PATH" >> $GITHUB_ENV
+            - name: Install Shopify CLI
+              run: npm install -g "@shopify/cli@${SHOPIFY_CLI_VERSION:-latest}"
 
-      - uses: ./.github/actions/aws-s3-upload
-        if: ${{ env.AWS_S3_BUCKET != '' }}
-        with:
-          file: ${{ env.ZIP_NAME }}
-          bucket: ${{ env.AWS_S3_BUCKET }}
-          dest_path: ${{ env.DEST_PATH }}
+            - name: Debug: Shopify theme pull env
+              run: |
+                  echo "=== THEME PULL DEBUG ==="
+                  echo "TARGET    : ${{ matrix.target }}"
+                  echo "STORE     : $SHOPIFY_FLAG_STORE"
+                  echo "THEME_ID  : $SHOPIFY_FLAG_THEME_ID"
+                  echo "BRANCH    : $GITHUB_BRANCH"
+                  echo "COMMIT    : $GITHUB_SHA"
 
-      - uses: ./.github/actions/github-artifact-upload
-        with:
-          name: ${{ env.FILE_NAME }}
-          path: ./backup
+            - name: Debug Shopify CLI Theme Token name
+              run: |
+                  if [ "${{ matrix.target }}" != "DEFAULT" ]; then
+                      echo "Expecting secret: SHOPIFY_CLI_THEME_TOKEN_${{ matrix.target }}"
+                  else
+                      echo "Expecting secret: SHOPIFY_CLI_THEME_TOKEN"
+                  fi
+
+            - name: Shopify theme pull (backup)
+              uses: ./.github/actions/shopify-pull
+              with:
+                  store: ${{ env.SHOPIFY_FLAG_STORE }}
+                  theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
+                  token: ${{ matrix.target != 'DEFAULT' && secrets[format('SHOPIFY_CLI_THEME_TOKEN_{0}', matrix.target)] || secrets.SHOPIFY_CLI_THEME_TOKEN }}
+                  path: ./backup
+
+            - uses: ./.github/actions/zip-folder
+              with:
+                  folder: ./backup
+                  output: theme-backup.zip
+
+            - name: Set backup file path
+              run: |
+                  REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+                  YEAR=$(date +%Y)
+                  DATETIME=$(date +%Y-%m-%d_%H%M%S)
+                  SANITIZED_BRANCH=$(echo "$GITHUB_BRANCH" | tr '/' '_')
+                  FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${SHOPIFY_FLAG_THEME_ID}__${GITHUB_SHA}"
+                  ZIP_NAME="${FILE_NAME}.zip"
+                  DEST_PATH="${YEAR}/${REPO_NAME}/${ZIP_NAME}"
+                  mv theme-backup.zip "$ZIP_NAME"
+                  echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
+                  echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+                  echo "DEST_PATH=$DEST_PATH" >> $GITHUB_ENV
+
+            - name: Debug: S3 upload and backup artifact env
+              run: |
+                  echo "=== S3 UPLOAD & ARTIFACT DEBUG ==="
+                  echo "FILE_NAME : $FILE_NAME"
+                  echo "ZIP_NAME  : $ZIP_NAME"
+                  echo "DEST_PATH : $DEST_PATH"
+                  echo "AWS_BUCKET: $AWS_S3_BUCKET"
+
+            - uses: ./.github/actions/aws-s3-upload
+              if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
+              with:
+                  file: ${{ env.ZIP_NAME }}
+                  bucket: ${{ env.AWS_S3_BUCKET }}
+                  dest_path: ${{ env.DEST_PATH }}
+
+            - name: Debug: Check if S3 upload was skipped
+              if: ${{ env.AWS_S3_BUCKET == '' || env.AWS_ACCESS_KEY_ID == '' || env.AWS_SECRET_ACCESS_KEY == '' }}
+              run: echo "S3 upload skipped: bucket or AWS keys not set."
+
+            - name: Debug: List files before artifact upload
+              run: |
+                  pwd
+                  ls -l
+
+            - uses: ./.github/actions/github-artifact-upload
+              with:
+                  name: ${{ env.FILE_NAME }}
+                  path: ./backup
