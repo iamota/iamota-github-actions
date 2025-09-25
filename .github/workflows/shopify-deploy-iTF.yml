@@ -52,7 +52,8 @@ jobs:
                   bundler: latest
 
             - name: Install Shopify CLI
-              run: npm install -g "@shopify/cli@${SHOPIFY_CLI_VERSION:-latest}"
+              run: |
+                  npm install -g "@shopify/cli@${SHOPIFY_CLI_VERSION:-latest}"
 
             - name: Install and Build
               run: |
