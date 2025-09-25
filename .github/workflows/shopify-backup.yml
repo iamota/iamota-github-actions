@@ -60,7 +60,8 @@ jobs:
                   bundler: latest
 
             - name: Install Shopify CLI
-              run: npm install -g "@shopify/cli@${SHOPIFY_CLI_VERSION:-latest}"
+              run: |
+                  npm install -g "@shopify/cli@${SHOPIFY_CLI_VERSION:-latest}"
 
             - name: "Debug: Shopify theme pull env"
               run: |
@@ -123,7 +124,8 @@ jobs:
 
             - name: "Debug: Check if S3 upload was skipped"
               if: ${{ env.AWS_S3_BUCKET == '' || env.AWS_ACCESS_KEY_ID == '' || env.AWS_SECRET_ACCESS_KEY == '' }}
-              run: echo "S3 upload skipped: bucket or AWS keys not set."
+              run: |
+                  echo "S3 upload skipped: bucket or AWS keys not set."
 
             - name: "Debug: List files before artifact upload"
               run: |
