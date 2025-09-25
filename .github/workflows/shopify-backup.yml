@@ -13,11 +13,6 @@ on:
                 required: false
             AWS_SECRET_ACCESS_KEY:
                 required: false
-        vars:
-            SHOPIFY_FLAG_STORE: {}
-            SHOPIFY_FLAG_THEME_ID: {}
-            AWS_S3_BUCKET_SHOPIFY_BACKUPS: {}
-            DEPLOY_TARGETS: {}
 
 jobs:
     backup:
