@@ -83,7 +83,7 @@ jobs:
                   echo "ALLOW_LIVE : $SHOPIFY_FLAG_ALLOW_LIVE"
                   echo "NODELETE   : $SHOPIFY_FLAG_NODELETE"
 
-            - uses: ./.github/actions/shopify-push
+            - uses: iamota/iamota-github-actions/.github/actions/shopify-push@main
               with:
                   store: ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
