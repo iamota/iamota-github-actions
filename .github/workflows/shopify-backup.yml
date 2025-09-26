@@ -76,14 +76,14 @@ jobs:
                   fi
 
             - name: Shopify theme pull (backup)
-              uses: ./.github/actions/shopify-pull
+              uses: iamota/iamota-github-actions/.github/actions/shopify-pull@main
               with:
                   store: ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
                   token: ${{ matrix.target != 'DEFAULT' && secrets[format('SHOPIFY_CLI_THEME_TOKEN_{0}', matrix.target)] || secrets.SHOPIFY_CLI_THEME_TOKEN }}
                   path: ./backup
 
-            - uses: ./.github/actions/zip-folder
+            - uses: iamota/iamota-github-actions/.github/actions/zip-folder@main
               with:
                   folder: ./backup
                   output: theme-backup.zip
@@ -110,7 +110,7 @@ jobs:
                   echo "DEST_PATH : $DEST_PATH"
                   echo "AWS_BUCKET: $AWS_S3_BUCKET"
 
-            - uses: ./.github/actions/aws-s3-upload
+            - uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@main
               if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
               with:
                   file: ${{ env.ZIP_NAME }}
@@ -127,7 +127,7 @@ jobs:
                   pwd
                   ls -l
 
-            - uses: ./.github/actions/github-artifact-upload
+            - uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@main
               with:
                   name: ${{ env.FILE_NAME }}
                   path: ./backup
