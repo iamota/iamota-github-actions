@@ -54,7 +54,16 @@ jobs:
             - name: Install and Build
               run: |
                   npm install
-                  npm run build --env target=$GITHUB_BRANCH
+                  npm run build --env target=$GITHUB_BRANCH                  
+            
+            - name: "Debug: .shopifyignore file content"
+              run: |
+                  echo "=== .shopifyignore CONTENT ==="
+                  if [ -f ".shopifyignore" ]; then
+                    cat .shopifyignore
+                  else
+                    echo "No .shopifyignore file found in workspace."
+                  fi
 
             - name: Set SHOPIFY_FLAG_ALLOW_LIVE based on branch
               run: |
