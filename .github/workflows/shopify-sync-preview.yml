@@ -80,7 +80,7 @@ permissions:
 jobs:
     json_sync_production:
         if: github.event_name != 'pull_request'
-        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-production.yml@v1
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-production.yml@main
         with:
             production_branch: ${{ inputs.production_branch }}
             theme_src: ${{ inputs.theme_src }}
@@ -93,14 +93,14 @@ jobs:
     json_sync_dev:
         if: github.event_name != 'pull_request'
         needs: [json_sync_production]
-        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-dev.yml@v1
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-dev.yml@main
         with:
             production_branch: ${{ inputs.production_branch }}
             default_branch: ${{ inputs.default_branch }}
 
     pr_preview:
         if: github.event_name == 'pull_request'
-        uses: iamota/iamota-github-actions/.github/workflows/shopify-pr-preview.yml@v1
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-pr-preview.yml@main
         with:
             theme_src: ${{ inputs.theme_src }}
             theme_dist: ${{ inputs.theme_dist }}

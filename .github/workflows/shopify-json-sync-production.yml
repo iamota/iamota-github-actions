@@ -55,13 +55,13 @@ jobs:
                   fetch-depth: 0
 
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   workflow_ref: ${{ github.workflow_ref }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
             - name: Reset pulled theme directory
               run: |
@@ -69,7 +69,7 @@ jobs:
                   rm -rf "${THEME_PULL_DIR}"
 
             - name: Pull theme into temp directory (json-oriented pull)
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
                   store     : ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id  : ${{ env.SHOPIFY_FLAG_THEME_ID }}

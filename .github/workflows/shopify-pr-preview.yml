@@ -106,13 +106,13 @@ jobs:
                   fetch-depth: 0
 
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   workflow_ref: ${{ github.workflow_ref }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
             - name: Fetch base branch
               run: |
@@ -148,7 +148,7 @@ jobs:
 
             - name: Pull full remote theme into temp directory
               if: steps.mergecheck.outputs.has_conflicts == 'false'
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
                   store: ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
@@ -181,7 +181,7 @@ jobs:
 
             - name: NPM install (self-aware)
               if: steps.mergecheck.outputs.has_conflicts == 'false'
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@main
               with:
                   working_directory: "."
                   install_command: ${{ env.BUILD_INSTALL_COMMAND }}
@@ -190,7 +190,7 @@ jobs:
             - name: Webpack build (self-aware)
               if: steps.mergecheck.outputs.has_conflicts == 'false'
               id: webpack
-              uses: iamota/iamota-github-actions/.github/actions/webpack-build@v1
+              uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
               env:
                   GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
               with:
@@ -324,7 +324,7 @@ jobs:
 
             - name: Pull existing preview theme for backup
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
                   store: ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id: ${{ steps.themeid.outputs.theme_id }}
@@ -333,7 +333,7 @@ jobs:
 
             - name: Zip preview backup
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/zip-folder@v1
+              uses: iamota/iamota-github-actions/.github/actions/zip-folder@main
               with:
                   folder: ${{ env.PREVIEW_BACKUP_DIR }}
                   output: ${{ env.PREVIEW_BACKUP_ZIP }}
@@ -348,7 +348,7 @@ jobs:
 
             - name: Upload preview backup zip to S3 (optional)
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
-              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@v1
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@main
               with:
                   file: ${{ env.PREVIEW_BACKUP_ZIP }}
                   bucket: ${{ env.AWS_S3_BUCKET }}
@@ -356,7 +356,7 @@ jobs:
 
             - name: Upload preview backup artifact (optional)
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@main
               with:
                   name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}
                   path: ${{ env.PREVIEW_BACKUP_ZIP }}
@@ -540,13 +540,13 @@ jobs:
 
         steps:
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   workflow_ref: ${{ github.workflow_ref }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
             - name: Find preview theme id from marker
               id: themeid

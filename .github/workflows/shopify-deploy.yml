@@ -56,7 +56,7 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
             - name: Resolve theme source and dist inputs
               run: |
@@ -78,7 +78,7 @@ jobs:
                   echo "DIST_INPUT=${DIST_IN}" >> "$GITHUB_ENV"
 
             - name: NPM install (self-aware)
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@main
               with:
                   working_directory: "."
                   install_command: ${{ env.BUILD_INSTALL_COMMAND }}
@@ -86,7 +86,7 @@ jobs:
 
             - name: Webpack build (self-aware)
               id: webpack
-              uses: iamota/iamota-github-actions/.github/actions/webpack-build@v1
+              uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
@@ -141,7 +141,7 @@ jobs:
                   fi
 
             - name: Deploy
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-push@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-push@main
               with:
                   store: ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}

@@ -48,10 +48,10 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
             - name: Shopify theme pull (backup)
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
                   store   : ${{ env.SHOPIFY_FLAG_STORE }}
                   theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
@@ -60,7 +60,7 @@ jobs:
                   nodelete: "1"
 
             - name: Zip theme files
-              uses: iamota/iamota-github-actions/.github/actions/zip-folder@v1
+              uses: iamota/iamota-github-actions/.github/actions/zip-folder@main
               with:
                   folder: ./backup
                   output: theme-backup.zip
@@ -93,14 +93,14 @@ jobs:
 
             - name: Upload backup zip to S3 (optional)
               if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
-              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@v1
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@main
               with:
                   file     : ${{ env.ZIP_NAME }}
                   bucket   : ${{ env.AWS_S3_BUCKET }}
                   dest_path: ${{ env.DEST_PATH }}
 
             - name: Upload backup to GitHub Actions Artifacts
-              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@main
               with:
                   name: ${{ env.FILE_NAME }}
                   path: ./backup
