@@ -41,10 +41,10 @@ jobs:
         runs-on: ubuntu-latest
 
         env:
-            PRODUCTION_BRANCH: ${{ inputs.production_branch }}
-            DEFAULT_BRANCH   : ${{ inputs.default_branch != '' && inputs.default_branch || github.event.repository.default_branch }}
-            SHOPIFY_STORE    : ${{ inputs.shopify_store }}
-            SHOPIFY_THEME_ID : ${{ inputs.shopify_theme_id }}
+            PRODUCTION_BRANCH : ${{ inputs.production_branch }}
+            DEFAULT_BRANCH    : ${{ inputs.default_branch != '' && inputs.default_branch || github.event.repository.default_branch }}
+            SHOPIFY_STORE     : ${{ inputs.shopify_store }}
+            SHOPIFY_THEME_ID  : ${{ inputs.shopify_theme_id }}
             SHOPIFY_THEME_NAME: ${{ inputs.shopify_theme_name }}
 
         steps:

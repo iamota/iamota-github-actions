@@ -92,7 +92,7 @@ jobs:
                   rm -rf "${THEME_PULL_DIR}"
 
             - name: Pull theme into temp directory (json-oriented pull)
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@main
               with:
                   store     : ${{ env.SHOPIFY_STORE }}
                   theme_id  : ${{ env.SHOPIFY_THEME_ID }}

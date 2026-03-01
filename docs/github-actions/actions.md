@@ -9,7 +9,7 @@ Inputs:
 - `node_version` (default `20`)
 - `cli_version` (default `latest`)
 
-## `.github/actions/shopify-cli-pull/action.yml`
+## `.github/actions/shopify-theme-pull/action.yml`
 
 Pulls theme files from Shopify.
 
@@ -26,7 +26,7 @@ Behavior:
 
 - Runs `shopify theme pull ... --nodelete` into the provided path.
 
-## `.github/actions/shopify-cli-push/action.yml`
+## `.github/actions/shopify-theme-push/action.yml`
 
 Pushes a theme build to Shopify.
 
@@ -44,6 +44,44 @@ Behavior:
 
 - Adds `--allow-live` only when `allow_live == 1`.
 - Adds `--nodelete` only when `nodelete == 1`.
+
+
+## `.github/actions/shopify-theme-backup/action.yml`
+
+Backs up a Shopify theme into a local folder and optionally zips it.
+
+Inputs:
+
+- `store` (required)
+- `theme_id` (required)
+- `token` (required)
+- `output_dir` (default `./backup`)
+- `zip_output` (optional zip filename)
+
+## `.github/actions/shopify-theme-create/action.yml`
+
+Creates a new unpublished Shopify theme by duplicating a base theme.
+
+Inputs:
+
+- `store` (required)
+- `base_theme_id` (required)
+- `token` (required)
+- `name` (required)
+
+Outputs:
+
+- `theme_id` (newly created theme id)
+
+## `.github/actions/shopify-theme-delete/action.yml`
+
+Deletes a Shopify theme by id.
+
+Inputs:
+
+- `store` (required)
+- `theme_id` (required)
+- `token` (required)
 
 ## `.github/actions/iamota-helper-checkout/action.yml`
 

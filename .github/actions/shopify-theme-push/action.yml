@@ -1,5 +1,5 @@
-name: "Shopify CLI Pull"
-description: "Pulls theme files from Shopify via Shopify CLI"
+name: "Shopify Theme Push"
+description: "Pushes theme files to Shopify via Shopify CLI"
 inputs:
     store:
         required: true
@@ -8,11 +8,12 @@ inputs:
     token:
         required: true
     path:
-        default: ./backup
+        default: ./dist
+    allow_live:
+        default: "0"
     nodelete:
         default: "1"
-    ignore_csv:
-        description: "Comma-separated --ignore globs"
+    ignore:
         default: ""
 runs:
     using: "composite"
@@ -20,26 +21,22 @@ runs:
         - run: |
               set -euo pipefail
               ARGS=(
-                theme pull
+                theme push
                 --store "${{ inputs.store }}"
                 --theme "${{ inputs.theme_id }}"
                 --password "${{ inputs.token }}"
                 --path "${{ inputs.path }}"
                 --no-color
               )
+              if [ "${{ inputs.allow_live }}" = "1" ]; then
+                ARGS+=(--allow-live)
+              fi
               if [ "${{ inputs.nodelete }}" = "1" ]; then
                 ARGS+=(--nodelete)
               fi
-
-              IFS=',' read -r -a IG <<< "${{ inputs.ignore_csv }}"
-              for g in "${IG[@]}"; do
-                g_trim="$(echo "${g}" | xargs)"
-                if [ -n "${g_trim}" ]; then
-                  ARGS+=(--ignore "${g_trim}")
-                fi
-              done
-
-              mkdir -p "${{ inputs.path }}"
+              if [ -n "${{ inputs.ignore }}" ]; then
+                ARGS+=(--ignore "${{ inputs.ignore }}")
+              fi
               command -v shopify >/dev/null
               shopify "${ARGS[@]}"
           shell: bash

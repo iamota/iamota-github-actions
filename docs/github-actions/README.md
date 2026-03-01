@@ -6,12 +6,12 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 
 ### Reusable Workflows
 
-- `.github/workflows/shopify-backup.yml`
-- `.github/workflows/shopify-deploy.yml`
-- `.github/workflows/shopify-backup-deploy.yml`
+- `.github/workflows/shopify-theme-backup.yml`
+- `.github/workflows/shopify-theme-deploy.yml`
+- `.github/workflows/shopify-theme-backup-deploy.yml`
 - `.github/workflows/shopify-json-sync-production.yml`
 - `.github/workflows/shopify-json-sync-dev.yml`
-- `.github/workflows/shopify-pr-preview.yml`
+- `.github/workflows/shopify-theme-preview-pr.yml`
 - `.github/workflows/shopify-sync-preview.yml` (legacy orchestration wrapper)
 - `.github/workflows/shopify-warn-locale-edits.yml`
 - `.github/workflows/shopify-warn-theme-settings-edits.yml`
@@ -23,8 +23,11 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 ### Composite Actions
 
 - `.github/actions/shopify-cli-install/action.yml`
-- `.github/actions/shopify-cli-pull/action.yml`
-- `.github/actions/shopify-cli-push/action.yml`
+- `.github/actions/shopify-theme-pull/action.yml`
+- `.github/actions/shopify-theme-push/action.yml`
+- `.github/actions/shopify-theme-backup/action.yml`
+- `.github/actions/shopify-theme-create/action.yml`
+- `.github/actions/shopify-theme-delete/action.yml`
 - `.github/actions/iamota-helper-checkout/action.yml`
 - `.github/actions/npm-install/action.yml`
 - `.github/actions/webpack-build/action.yml`

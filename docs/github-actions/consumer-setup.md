@@ -17,7 +17,7 @@ on:
 
 jobs:
   run:
-    uses: iamota/iamota-github-actions/.github/workflows/shopify-backup-deploy.yml@v1
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-backup-deploy.yml@v1
     with:
       branch: ${{ github.ref_name }}
       theme_src: ${{ vars.THEME_SRC || '.' }}
@@ -82,7 +82,7 @@ on:
 
 jobs:
   run:
-    uses: iamota/iamota-github-actions/.github/workflows/shopify-pr-preview.yml@v1
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-preview-pr.yml@v1
     with:
       theme_src: ${{ vars.THEME_SRC || 'src' }}
       theme_dist: ${{ vars.THEME_DIST || '' }}

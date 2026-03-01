@@ -2,7 +2,7 @@
 
 ## Reusable Workflows
 
-### `.github/workflows/shopify-backup.yml`
+### `.github/workflows/shopify-theme-backup.yml`
 
 Purpose:
 
@@ -23,7 +23,7 @@ Secrets:
 - `AWS_ACCESS_KEY_ID` (optional)
 - `AWS_SECRET_ACCESS_KEY` (optional)
 
-### `.github/workflows/shopify-deploy.yml`
+### `.github/workflows/shopify-theme-deploy.yml`
 
 Purpose:
 
@@ -51,7 +51,7 @@ Notes:
 - `--allow-live` is enabled only on production/prod branch names.
 - Deletes are blocked by default and enabled only when commit message contains `[Allow Delete]`.
 
-### `.github/workflows/shopify-backup-deploy.yml`
+### `.github/workflows/shopify-theme-backup-deploy.yml`
 
 Purpose:
 
@@ -78,8 +78,8 @@ Secrets:
 Notes:
 
 - Thin orchestration layer that delegates to:
-  - `shopify-backup.yml`
-  - `shopify-deploy.yml`
+  - `shopify-theme-backup.yml`
+  - `shopify-theme-deploy.yml`
 
 ### `.github/workflows/shopify-json-sync-production.yml`
 
@@ -106,7 +106,8 @@ Notes:
 Purpose:
 
 - Monitors divergence between `production_branch` and `default_branch`
-- Closes any prior generated `Shopify JSON Sync` PR first, then creates a fresh PR when needed
+- Reuses and refreshes an existing generated `Shopify JSON Sync` PR when present
+- Creates a new PR only when none exists for the branch pair
 - Enables auto-merge on that PR
 
 Inputs:
@@ -118,7 +119,7 @@ Notes:
 - No Shopify credentials required.
 - Safe to run on a schedule and/or manually.
 
-### `.github/workflows/shopify-pr-preview.yml`
+### `.github/workflows/shopify-theme-preview-pr.yml`
 
 Purpose:
 
@@ -161,7 +162,7 @@ Notes:
 - Composes:
   - `shopify-json-sync-production.yml`
   - `shopify-json-sync-dev.yml`
-  - `shopify-pr-preview.yml`
+  - `shopify-theme-preview-pr.yml`
 
 ### `.github/workflows/shopify-warn-locale-edits.yml`
 
@@ -189,11 +190,11 @@ Inputs:
 
 Use these workflows for all integrations:
 
-- `shopify-backup.yml` (backup-only entry point)
-- `shopify-deploy.yml` (deploy-only entry point)
-- `shopify-backup-deploy.yml`
+- `shopify-theme-backup.yml` (backup-only entry point)
+- `shopify-theme-deploy.yml` (deploy-only entry point)
+- `shopify-theme-backup-deploy.yml`
 - `shopify-json-sync-production.yml`
 - `shopify-json-sync-dev.yml`
-- `shopify-pr-preview.yml`
+- `shopify-theme-preview-pr.yml`
 - `shopify-warn-locale-edits.yml`
 - `shopify-warn-theme-settings-edits.yml`

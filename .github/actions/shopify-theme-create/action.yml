@@ -1,0 +1,42 @@
+name: "Shopify Theme Create"
+description: "Creates an unpublished Shopify theme by duplicating a base theme"
+inputs:
+    store:
+        required: true
+    base_theme_id:
+        required: true
+    token:
+        required: true
+    name:
+        required: true
+outputs:
+    theme_id:
+        description: "Created theme id"
+        value: ${{ steps.create.outputs.theme_id }}
+runs:
+    using: "composite"
+    steps:
+        - id: create
+          run: |
+              set -euo pipefail
+
+              OUT="$(
+                  shopify theme duplicate \
+                      --store "${{ inputs.store }}" \
+                      --theme "${{ inputs.base_theme_id }}" \
+                      --name "${{ inputs.name }}" \
+                      --password "${{ inputs.token }}" \
+                      --force \
+                      --json \
+                      --no-color
+              )"
+
+              THEME_ID="$(echo "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.stdout.write(String(j.theme?.id||''));});")"
+              if [ -z "${THEME_ID}" ]; then
+                  echo "${OUT}"
+                  echo "Failed to parse theme id from theme duplicate JSON."
+                  exit 1
+              fi
+
+              echo "theme_id=${THEME_ID}" >> "$GITHUB_OUTPUT"
+          shell: bash

@@ -1,4 +1,4 @@
-name: Shopify Theme Backup + Deploy
+name: Shopify Theme Backup + Deploy (Canonical)
 
 on:
     workflow_call:
@@ -55,29 +55,29 @@ concurrency:
 
 jobs:
     backup:
-        uses: ./.github/workflows/shopify-backup.yml
+        uses: ./.github/workflows/shopify-theme-backup.yml
         with:
-            branch: ${{ inputs.branch }}
-            aws_region: ${{ inputs.aws_region }}
-            aws_s3_bucket: ${{ inputs.aws_s3_bucket }}
+            branch                    : ${{ inputs.branch }}
+            aws_region                : ${{ inputs.aws_region }}
+            aws_s3_bucket             : ${{ inputs.aws_s3_bucket }}
         secrets:
-            SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_STORE             : ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ secrets.SHOPIFY_THEME_ID }}
             SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_ACCESS_KEY_ID         : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY     : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     deploy:
         needs: [backup]
-        uses: ./.github/workflows/shopify-deploy.yml
+        uses: ./.github/workflows/shopify-theme-deploy.yml
         with:
-            branch: ${{ inputs.branch }}
-            theme_src: ${{ inputs.theme_src }}
-            theme_dist: ${{ inputs.theme_dist }}
-            theme_path: ${{ inputs.theme_path }}
-            build_install_command: ${{ inputs.build_install_command }}
-            build_command: ${{ inputs.build_command }}
+            branch                    : ${{ inputs.branch }}
+            theme_src                 : ${{ inputs.theme_src }}
+            theme_dist                : ${{ inputs.theme_dist }}
+            theme_path                : ${{ inputs.theme_path }}
+            build_install_command     : ${{ inputs.build_install_command }}
+            build_command             : ${{ inputs.build_command }}
         secrets:
-            SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_STORE             : ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ secrets.SHOPIFY_THEME_ID }}
             SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}

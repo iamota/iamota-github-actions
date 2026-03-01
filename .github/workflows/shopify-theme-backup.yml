@@ -1,4 +1,4 @@
-name: Shopify Theme Backup
+name: Shopify Theme Backup (Canonical)
 
 on:
     workflow_call:
@@ -33,16 +33,16 @@ jobs:
     backup:
         runs-on: ubuntu-latest
         env:
-            GITHUB_REPOSITORY      : ${{ github.repository }}
-            GITHUB_BRANCH          : ${{ inputs.branch }}
-            GITHUB_SHA             : ${{ github.sha }}
-            SHOPIFY_STORE     : ${{ secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID  : ${{ secrets.SHOPIFY_THEME_ID }}
+            GITHUB_REPOSITORY         : ${{ github.repository }}
+            GITHUB_BRANCH             : ${{ inputs.branch }}
+            GITHUB_SHA                : ${{ github.sha }}
+            SHOPIFY_STORE             : ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ secrets.SHOPIFY_THEME_ID }}
             SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-            AWS_REGION             : ${{ inputs.aws_region }}
-            AWS_S3_BUCKET          : ${{ inputs.aws_s3_bucket }}
-            AWS_ACCESS_KEY_ID      : ${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY  : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_REGION                : ${{ inputs.aws_region }}
+            AWS_S3_BUCKET             : ${{ inputs.aws_s3_bucket }}
+            AWS_ACCESS_KEY_ID         : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY     : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
         steps:
             - uses: actions/checkout@v4
@@ -50,22 +50,7 @@ jobs:
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
-            - name: Shopify theme pull (backup)
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
-              with:
-                  store   : ${{ env.SHOPIFY_STORE }}
-                  theme_id: ${{ env.SHOPIFY_THEME_ID }}
-                  token   : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
-                  path    : ./backup
-                  nodelete: "1"
-
-            - name: Zip theme files
-              uses: iamota/iamota-github-actions/.github/actions/zip-folder@main
-              with:
-                  folder: ./backup
-                  output: theme-backup.zip
-
-            - name: Set backup file path
+            - name: Set backup file metadata
               run: |
                   set -euo pipefail
                   REPO_NAME="$(basename "${GITHUB_REPOSITORY}")"
@@ -77,11 +62,18 @@ jobs:
                   ZIP_NAME="${FILE_NAME}.zip"
                   DEST_PATH="${YEAR}/${REPO_NAME}/${ZIP_NAME}"
 
-                  mv theme-backup.zip "${ZIP_NAME}"
-
                   echo "FILE_NAME=${FILE_NAME}" >> "$GITHUB_ENV"
                   echo "ZIP_NAME=${ZIP_NAME}"   >> "$GITHUB_ENV"
                   echo "DEST_PATH=${DEST_PATH}" >> "$GITHUB_ENV"
+
+            - name: Backup and zip theme files
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@main
+              with:
+                  store     : ${{ env.SHOPIFY_STORE }}
+                  theme_id  : ${{ env.SHOPIFY_THEME_ID }}
+                  token     : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  output_dir: ./backup
+                  zip_output: ${{ env.ZIP_NAME }}
 
             - name: Configure AWS credentials (optional)
               if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
