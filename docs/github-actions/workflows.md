@@ -19,7 +19,7 @@ Secrets:
 
 - `SHOPIFY_STORE` (required)
 - `SHOPIFY_THEME_ID` (required)
-- `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `AWS_ACCESS_KEY_ID` (optional)
 - `AWS_SECRET_ACCESS_KEY` (optional)
 
@@ -41,7 +41,7 @@ Secrets:
 
 - `SHOPIFY_STORE` (required)
 - `SHOPIFY_THEME_ID` (required)
-- `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 
 Notes:
 
@@ -71,7 +71,7 @@ Secrets:
 
 - `SHOPIFY_STORE` (required)
 - `SHOPIFY_THEME_ID` (required)
-- `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `AWS_ACCESS_KEY_ID` (optional)
 - `AWS_SECRET_ACCESS_KEY` (optional)
 
@@ -95,7 +95,7 @@ Inputs:
 
 Secrets:
 
-- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 
 Notes:
 
@@ -135,7 +135,7 @@ Inputs:
 
 Secrets:
 
-- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `SHOPIFY_PREVIEW_BASE_THEME_ID` (required)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (optional)
 

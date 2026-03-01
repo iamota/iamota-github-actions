@@ -105,13 +105,13 @@ jobs:
             AWS_ACCESS_KEY_ID       : ${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY   : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-            SHOPIFY_IGNORE     : ${{ inputs.shopify_ignore }}
+            SHOPIFY_IGNORE          : ${{ inputs.shopify_ignore }}
 
-            SHOPIFY_STORE      : ${{ inputs.SHOPIFY_STORE != '' && inputs.SHOPIFY_STORE || secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID   : ${{ inputs.SHOPIFY_THEME_ID != '' && inputs.SHOPIFY_THEME_ID || secrets.SHOPIFY_THEME_ID }}
-            SHOPIFY_PREVIEW_BASE_ID : ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID != '' && inputs.SHOPIFY_PREVIEW_BASE_THEME_ID || secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
-            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
-            SHOPIFY_CLI_TTY         : "0"
+            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE != '' && inputs.SHOPIFY_STORE || secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID != '' && inputs.SHOPIFY_THEME_ID || secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_PREVIEW_BASE_ID   : ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID != '' && inputs.SHOPIFY_PREVIEW_BASE_THEME_ID || secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+            SHOPIFY_CLI_TTY           : "0"
 
         steps:
             - name: Checkout PR head

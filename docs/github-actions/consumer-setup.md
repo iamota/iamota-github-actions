@@ -29,7 +29,7 @@ jobs:
     secrets:
       SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
       SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
-      SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+      SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
@@ -54,7 +54,7 @@ jobs:
     secrets:
       SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
       SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
-      SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+      SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 ```
 
 ```yaml
@@ -96,7 +96,7 @@ jobs:
     secrets:
       SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
       SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
-      SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+      SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
       SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -108,7 +108,7 @@ Minimum Shopify secrets:
 
 - `SHOPIFY_STORE`
 - `SHOPIFY_THEME_ID`
-- `SHOPIFY_CLI_PARTNERS_TOKEN`
+- `SHOPIFY_THEME_ACCESS_TOKEN`
 
 Preview workflow additional secret:
 
