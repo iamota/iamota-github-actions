@@ -131,7 +131,17 @@ jobs:
                       --title "${TITLE}" \
                       --body "${BODY}"
 
-                  PR_URL="$(gh pr view --base "${DEFAULT_BRANCH}" --head "${PRODUCTION_BRANCH}" --json url --jq '.url')"
+                  PR_URL="$(
+                      gh pr list \
+                          --base "${DEFAULT_BRANCH}" \
+                          --head "${PRODUCTION_BRANCH}" \
+                          --json url \
+                          --jq '.[0].url'
+                  )"
+                  if [ -z "${PR_URL}" ]; then
+                      echo "Failed to resolve PR URL after creation."
+                      exit 1
+                  fi
 
                   gh pr merge "${PR_URL}" --rebase --auto || true
 
