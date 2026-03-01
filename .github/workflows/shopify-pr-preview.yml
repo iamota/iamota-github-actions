@@ -3,6 +3,11 @@ name: Shopify PR Preview
 on:
     workflow_call:
         inputs:
+            production_branch:
+                type: string
+                required: false
+                default: "production"
+
             theme_src:
                 type: string
                 required: false
@@ -55,6 +60,10 @@ on:
                 type: string
                 required: false
                 default: ""
+            SHOPIFY_PRODUCTION_THEME_ID:
+                type: string
+                required: false
+                default: ""
             SHOPIFY_PREVIEW_BASE_THEME_ID:
                 type: string
                 required: false
@@ -87,7 +96,7 @@ concurrency:
 
 jobs:
     pr_preview:
-        if: github.event_name == 'pull_request' && github.event.action != 'closed'
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main' && (inputs.SHOPIFY_PRODUCTION_THEME_ID == '' || inputs.SHOPIFY_THEME_ID == '' || inputs.SHOPIFY_THEME_ID != inputs.SHOPIFY_PRODUCTION_THEME_ID)
         runs-on: ubuntu-latest
 
         env:
@@ -563,7 +572,7 @@ jobs:
                   exit 1
 
     pr_cleanup:
-        if: github.event_name == 'pull_request' && github.event.action == 'closed'
+        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main' && (inputs.SHOPIFY_PRODUCTION_THEME_ID == '' || inputs.SHOPIFY_THEME_ID == '' || inputs.SHOPIFY_THEME_ID != inputs.SHOPIFY_PRODUCTION_THEME_ID)
         runs-on: ubuntu-latest
 
         env:

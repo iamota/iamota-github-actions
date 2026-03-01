@@ -65,6 +65,10 @@ on:
                 type: string
                 required: false
                 default: ""
+            SHOPIFY_PRODUCTION_THEME_ID:
+                type: string
+                required: false
+                default: ""
             SHOPIFY_PREVIEW_BASE_THEME_ID:
                 type: string
                 required: false
@@ -119,9 +123,10 @@ jobs:
             default_branch: ${{ inputs.default_branch }}
 
     pr_preview:
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main'
         uses: iamota/iamota-github-actions/.github/workflows/shopify-pr-preview.yml@main
         with:
+            production_branch: ${{ inputs.production_branch }}
             theme_src: ${{ inputs.theme_src }}
             theme_dist: ${{ inputs.theme_dist }}
             theme_pull_dir: ${{ inputs.theme_pull_dir }}
@@ -133,6 +138,7 @@ jobs:
             shopify_ignore: ${{ inputs.shopify_ignore }}
             SHOPIFY_STORE: ${{ inputs.SHOPIFY_STORE }}
             SHOPIFY_THEME_ID: ${{ inputs.SHOPIFY_THEME_ID }}
+            SHOPIFY_PRODUCTION_THEME_ID: ${{ inputs.SHOPIFY_PRODUCTION_THEME_ID }}
             SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID }}
         secrets:
             SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
