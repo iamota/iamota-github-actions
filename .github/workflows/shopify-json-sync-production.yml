@@ -56,6 +56,19 @@ jobs:
                   ref: ${{ env.PRODUCTION_BRANCH }}
                   fetch-depth: 0
 
+            - name: Validate required Shopify secrets
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store/SHOPIFY_STORE")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id/SHOPIFY_THEME_ID")
+                  [ -n "${SHOPIFY_CLI_THEME_TOKEN:-}" ] || MISSING+=("shopify_cli_theme_token/SHOPIFY_CLI_THEME_TOKEN")
+
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required Shopify secret values: ${MISSING[*]}"
+                      exit 1
+                  fi
+
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
