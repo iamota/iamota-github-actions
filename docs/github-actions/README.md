@@ -10,7 +10,7 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/workflows/shopify-deploy.yml`
 - `.github/workflows/shopify-backup-deploy.yml`
 - `.github/workflows/shopify-json-sync-production.yml`
-- `.github/workflows/shopify-json-sync-forward.yml`
+- `.github/workflows/shopify-json-sync-dev.yml`
 - `.github/workflows/shopify-pr-preview.yml`
 - `.github/workflows/shopify-sync-preview.yml` (legacy orchestration wrapper)
 - `.github/workflows/shopify-warn-locale-edits.yml`

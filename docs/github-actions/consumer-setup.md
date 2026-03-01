@@ -58,18 +58,16 @@ jobs:
 ```
 
 ```yaml
-name: Shopify JSON Sync Forward
+name: Shopify JSON Sync Dev
 
 on:
-  push:
-    branches: ["production"]
   schedule:
-    - cron: "15 10 * * 1-5"
+    - cron: "5 12 * * 1"
   workflow_dispatch: {}
 
 jobs:
   run:
-    uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-forward.yml@v1
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-dev.yml@v1
     with:
       production_branch: ${{ vars.PRODUCTION_BRANCH || 'production' }}
       default_branch: ${{ vars.DEFAULT_BRANCH || 'dev' }}

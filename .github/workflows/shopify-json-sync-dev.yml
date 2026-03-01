@@ -1,4 +1,4 @@
-name: Shopify JSON Sync - Forward PR
+name: Shopify JSON Sync - Dev Forward
 
 on:
     workflow_call:
@@ -18,11 +18,11 @@ permissions:
     pull-requests: write
 
 concurrency:
-    group: iamota-shopify-json-sync-forward
+    group: iamota-shopify-json-sync-dev
     cancel-in-progress: false
 
 jobs:
-    forward_sync:
+    sync_dev:
         runs-on: ubuntu-latest
 
         env:
@@ -30,6 +30,32 @@ jobs:
             DEFAULT_BRANCH   : ${{ inputs.default_branch != '' && inputs.default_branch || github.event.repository.default_branch }}
 
         steps:
+            - name: Close existing generated sync PRs (production -> default)
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  mapfile -t PR_NUMBERS < <(
+                      gh pr list \
+                          --base "${DEFAULT_BRANCH}" \
+                          --head "${PRODUCTION_BRANCH}" \
+                          --search "in:title Shopify JSON Sync" \
+                          --json number \
+                          --jq '.[].number' \
+                      || true
+                  )
+
+                  if [ "${#PR_NUMBERS[@]}" -eq 0 ]; then
+                      echo "No prior generated sync PR found."
+                      exit 0
+                  fi
+
+                  for PR in "${PR_NUMBERS[@]}"; do
+                      echo "Closing prior sync PR #${PR}"
+                      gh pr close "${PR}" --delete-branch=false >/dev/null || true
+                  done
+
             - name: Determine branch compare status
               id: compare
               env:
@@ -45,7 +71,7 @@ jobs:
 
                   echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
 
-            - name: Create or update sync PR production -> default, enable auto-merge
+            - name: Create sync PR production -> default, enable auto-merge
               if: steps.compare.outputs.status == 'ahead' || steps.compare.outputs.status == 'diverged'
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -56,27 +82,14 @@ jobs:
                   TITLE="Shopify JSON Sync ${TS}"
 
                   PR_URL="$(
-                      gh pr list \
+                      gh pr create \
                           --base "${DEFAULT_BRANCH}" \
                           --head "${PRODUCTION_BRANCH}" \
+                          --title "${TITLE}" \
+                          --body "Automated Shopify JSON sync from theme pull." \
                           --json url \
-                          --jq '.[0].url' \
-                      || true
+                          --jq '.url'
                   )"
-
-                  if [ -z "${PR_URL}" ]; then
-                      PR_URL="$(
-                          gh pr create \
-                              --base "${DEFAULT_BRANCH}" \
-                              --head "${PRODUCTION_BRANCH}" \
-                              --title "${TITLE}" \
-                              --body "Automated Shopify JSON sync from theme pull." \
-                              --json url \
-                              --jq '.url'
-                      )"
-                  else
-                      gh pr edit "${PR_URL}" --title "${TITLE}" >/dev/null
-                  fi
 
                   gh pr merge "${PR_URL}" --rebase --auto || true
 

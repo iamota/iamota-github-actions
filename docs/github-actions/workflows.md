@@ -101,12 +101,12 @@ Notes:
 
 - Uses `sync-shopify-json.mjs` auto-discovery of top-level folders in pulled remote theme.
 
-### `.github/workflows/shopify-json-sync-forward.yml`
+### `.github/workflows/shopify-json-sync-dev.yml`
 
 Purpose:
 
 - Monitors divergence between `production_branch` and `default_branch`
-- Creates/updates a PR from production -> default when production is ahead/diverged
+- Closes any prior generated `Shopify JSON Sync` PR first, then creates a fresh PR when needed
 - Enables auto-merge on that PR
 
 Inputs:
@@ -116,7 +116,7 @@ Inputs:
 Notes:
 
 - No Shopify credentials required.
-- Safe to run on a schedule and/or on pushes to production.
+- Safe to run on a schedule and/or manually.
 
 ### `.github/workflows/shopify-pr-preview.yml`
 
@@ -160,7 +160,7 @@ Notes:
 
 - Composes:
   - `shopify-json-sync-production.yml`
-  - `shopify-json-sync-forward.yml`
+  - `shopify-json-sync-dev.yml`
   - `shopify-pr-preview.yml`
 
 ### `.github/workflows/shopify-warn-locale-edits.yml`
@@ -193,7 +193,7 @@ Use these workflows for all integrations:
 - `shopify-deploy.yml` (deploy-only entry point)
 - `shopify-backup-deploy.yml`
 - `shopify-json-sync-production.yml`
-- `shopify-json-sync-forward.yml`
+- `shopify-json-sync-dev.yml`
 - `shopify-pr-preview.yml`
 - `shopify-warn-locale-edits.yml`
 - `shopify-warn-theme-settings-edits.yml`

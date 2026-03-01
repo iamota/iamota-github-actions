@@ -90,10 +90,10 @@ jobs:
             shopify_theme_id: ${{ secrets.shopify_theme_id }}
             shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}
 
-    json_sync_forward:
+    json_sync_dev:
         if: github.event_name != 'pull_request'
         needs: [json_sync_production]
-        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-forward.yml@v1
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-dev.yml@v1
         with:
             production_branch: ${{ inputs.production_branch }}
             default_branch: ${{ inputs.default_branch }}
