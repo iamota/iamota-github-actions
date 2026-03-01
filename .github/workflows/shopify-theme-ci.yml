@@ -200,9 +200,14 @@ jobs:
         id: prereq
         run: |
           set -euo pipefail
-          if [ -z "${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}" ] || [ -z "${{ inputs.shopify_store }}" ] || [ -z "${{ secrets.LHCI_GITHUB_APP_TOKEN }}" ]; then
+          MISSING=()
+          [ -n "${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
+          [ -n "${{ inputs.shopify_store }}" ] || MISSING+=("shopify_store input")
+          [ -n "${{ secrets.LHCI_GITHUB_APP_TOKEN }}" ] || MISSING+=("LHCI_GITHUB_APP_TOKEN")
+
+          if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Missing one or more lighthouse prerequisites; skipping."
+            echo "Skipping lighthouse: missing ${MISSING[*]}"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
