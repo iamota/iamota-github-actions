@@ -546,7 +546,11 @@ jobs:
               run: |
                   set -euo pipefail
                   PR_NUMBER="${{ github.event.pull_request.number }}"
-                  gh pr edit "${PR_NUMBER}" --remove-label "Sync JSON" >/dev/null 2>&1 || true
+                  if gh pr edit --help 2>/dev/null | grep -q -- "--remove-label"; then
+                      gh pr edit "${PR_NUMBER}" --remove-label "Sync JSON" >/dev/null 2>&1 || true
+                  else
+                      gh api -X DELETE "repos/${{ github.repository }}/issues/${PR_NUMBER}/labels/Sync%20JSON" >/dev/null 2>&1 || true
+                  fi
 
             - name: Fail job if drift detected (after preview/comment)
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.drift.outputs.changed_count != '0'
@@ -655,4 +659,8 @@ jobs:
               run: |
                   set -euo pipefail
                   PR_NUMBER="${{ github.event.pull_request.number }}"
-                  gh pr edit "${PR_NUMBER}" --remove-label "Sync JSON" >/dev/null 2>&1 || true
+                  if gh pr edit --help 2>/dev/null | grep -q -- "--remove-label"; then
+                      gh pr edit "${PR_NUMBER}" --remove-label "Sync JSON" >/dev/null 2>&1 || true
+                  else
+                      gh api -X DELETE "repos/${{ github.repository }}/issues/${PR_NUMBER}/labels/Sync%20JSON" >/dev/null 2>&1 || true
+                  fi
