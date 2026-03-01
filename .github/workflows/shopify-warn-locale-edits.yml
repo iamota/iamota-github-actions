@@ -1,0 +1,44 @@
+name: Shopify Locale Edit Guard
+
+on:
+    workflow_call:
+        inputs:
+            ack_label:
+                type: string
+                required: false
+                default: "I will manually deploy locales"
+
+permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+
+jobs:
+    locale-guard:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  workflow_ref: ${{ github.workflow_ref }}
+                  path: .iamota-actions
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: Run locale guard
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  node .iamota-actions/.github/scripts/github/github-pr-guard-shopify-locale.mjs \
+                      --repo "${{ github.repository }}" \
+                      --pr "${{ github.event.pull_request.number }}" \
+                      --event-action "${{ github.event.action }}" \
+                      --before "${{ github.event.before || '' }}" \
+                      --after "${{ github.event.pull_request.head.sha }}" \
+                      --ack-label "${{ inputs.ack_label }}"

@@ -1,0 +1,83 @@
+name: Shopify Theme Backup + Deploy
+
+on:
+    workflow_call:
+        inputs:
+            branch:
+                type: string
+                required: true
+            theme_src:
+                type: string
+                required: false
+                default: "."
+            theme_dist:
+                type: string
+                required: false
+                default: ""
+            theme_path:
+                type: string
+                required: false
+                default: ""
+            build_install_command:
+                type: string
+                required: false
+                default: "npm ci"
+            build_command:
+                type: string
+                required: false
+                default: "npx webpack --env target=${GITHUB_BRANCH}"
+            aws_region:
+                type: string
+                required: false
+                default: "us-west-2"
+            aws_s3_bucket:
+                type: string
+                required: false
+                default: ""
+        secrets:
+            shopify_store:
+                required: true
+            shopify_theme_id:
+                required: true
+            shopify_cli_theme_token:
+                required: true
+            aws_access_key_id:
+                required: false
+            aws_secret_access_key:
+                required: false
+
+permissions:
+    contents: read
+
+concurrency:
+    group: iamota-shopify-backup-deploy-${{ inputs.branch }}
+    cancel-in-progress: true
+
+jobs:
+    backup:
+        uses: ./.github/workflows/shopify-backup.yml
+        with:
+            branch: ${{ inputs.branch }}
+            aws_region: ${{ inputs.aws_region }}
+            aws_s3_bucket: ${{ inputs.aws_s3_bucket }}
+        secrets:
+            shopify_store: ${{ secrets.shopify_store }}
+            shopify_theme_id: ${{ secrets.shopify_theme_id }}
+            shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}
+            aws_access_key_id: ${{ secrets.aws_access_key_id }}
+            aws_secret_access_key: ${{ secrets.aws_secret_access_key }}
+
+    deploy:
+        needs: [backup]
+        uses: ./.github/workflows/shopify-deploy.yml
+        with:
+            branch: ${{ inputs.branch }}
+            theme_src: ${{ inputs.theme_src }}
+            theme_dist: ${{ inputs.theme_dist }}
+            theme_path: ${{ inputs.theme_path }}
+            build_install_command: ${{ inputs.build_install_command }}
+            build_command: ${{ inputs.build_command }}
+        secrets:
+            shopify_store: ${{ secrets.shopify_store }}
+            shopify_theme_id: ${{ secrets.shopify_theme_id }}
+            shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}

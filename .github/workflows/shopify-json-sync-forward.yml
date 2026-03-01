@@ -1,0 +1,87 @@
+name: Shopify JSON Sync - Forward PR
+
+on:
+    workflow_call:
+        inputs:
+            production_branch:
+                type: string
+                required: false
+                default: "production"
+
+            default_branch:
+                type: string
+                required: false
+                default: ""
+
+permissions:
+    contents: read
+    pull-requests: write
+
+concurrency:
+    group: iamota-shopify-json-sync-forward
+    cancel-in-progress: false
+
+jobs:
+    forward_sync:
+        runs-on: ubuntu-latest
+
+        env:
+            PRODUCTION_BRANCH: ${{ inputs.production_branch }}
+            DEFAULT_BRANCH   : ${{ inputs.default_branch != '' && inputs.default_branch || github.event.repository.default_branch }}
+
+        steps:
+            - name: Determine branch compare status
+              id: compare
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  STATUS="$({
+                      gh api \
+                        "repos/${{ github.repository }}/compare/${DEFAULT_BRANCH}...${PRODUCTION_BRANCH}" \
+                        --jq '.status'
+                  } || echo unknown)"
+
+                  echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+
+            - name: Create or update sync PR production -> default, enable auto-merge
+              if: steps.compare.outputs.status == 'ahead' || steps.compare.outputs.status == 'diverged'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
+                  TITLE="Shopify JSON Sync ${TS}"
+
+                  PR_URL="$(
+                      gh pr list \
+                          --base "${DEFAULT_BRANCH}" \
+                          --head "${PRODUCTION_BRANCH}" \
+                          --json url \
+                          --jq '.[0].url' \
+                      || true
+                  )"
+
+                  if [ -z "${PR_URL}" ]; then
+                      PR_URL="$(
+                          gh pr create \
+                              --base "${DEFAULT_BRANCH}" \
+                              --head "${PRODUCTION_BRANCH}" \
+                              --title "${TITLE}" \
+                              --body "Automated Shopify JSON sync from theme pull." \
+                              --json url \
+                              --jq '.url'
+                      )"
+                  else
+                      gh pr edit "${PR_URL}" --title "${TITLE}" >/dev/null
+                  fi
+
+                  gh pr merge "${PR_URL}" --rebase --auto || true
+
+            - name: No forward PR needed
+              if: steps.compare.outputs.status != 'ahead' && steps.compare.outputs.status != 'diverged'
+              run: |
+                  set -euo pipefail
+                  echo "No forward sync PR needed (compare status: ${{ steps.compare.outputs.status }})."

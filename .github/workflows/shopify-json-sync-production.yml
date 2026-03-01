@@ -1,0 +1,111 @@
+name: Shopify JSON Sync - Production
+
+on:
+    workflow_call:
+        inputs:
+            production_branch:
+                type: string
+                required: false
+                default: "production"
+
+            theme_src:
+                type: string
+                required: false
+                default: "."
+
+            theme_pull_dir:
+                type: string
+                required: false
+                default: "_remote_theme"
+
+        secrets:
+            shopify_store:
+                required: true
+            shopify_theme_id:
+                required: true
+            shopify_cli_theme_token:
+                required: true
+
+permissions:
+    contents: write
+
+concurrency:
+    group: iamota-shopify-json-sync-production
+    cancel-in-progress: false
+
+jobs:
+    sync_production:
+        runs-on: ubuntu-latest
+
+        env:
+            PRODUCTION_BRANCH       : ${{ inputs.production_branch }}
+            THEME_SRC               : ${{ inputs.theme_src }}
+            THEME_PULL_DIR          : ${{ inputs.theme_pull_dir }}
+
+            SHOPIFY_FLAG_STORE      : ${{ secrets.shopify_store }}
+            SHOPIFY_FLAG_THEME_ID   : ${{ secrets.shopify_theme_id }}
+            SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
+            SHOPIFY_CLI_TTY         : "0"
+
+        steps:
+            - name: Checkout production branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ env.PRODUCTION_BRANCH }}
+                  fetch-depth: 0
+
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  workflow_ref: ${{ github.workflow_ref }}
+                  path: .iamota-actions
+
+            - name: Setup Node + Install Shopify CLI
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+
+            - name: Reset pulled theme directory
+              run: |
+                  set -euo pipefail
+                  rm -rf "${THEME_PULL_DIR}"
+
+            - name: Pull theme into temp directory (json-oriented pull)
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@v1
+              with:
+                  store     : ${{ env.SHOPIFY_FLAG_STORE }}
+                  theme_id  : ${{ env.SHOPIFY_FLAG_THEME_ID }}
+                  token     : ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
+                  path      : ${{ env.THEME_PULL_DIR }}
+                  nodelete  : "1"
+                  ignore_csv: "*.liquid,*.css,*.scss,*.sass,*.js,*.png,*.jpg,*.jpeg,*.gif,*.svg,*.txt,*.md,*.map"
+
+            - name: Sync remote JSON into repo layout (writes report)
+              env:
+                  WRITE_REPORT: "true"
+                  REPORT_PATH: "/tmp/shopify-json-sync.report.json"
+              run: |
+                  set -euo pipefail
+                  node .iamota-actions/.github/scripts/shopify/sync-shopify-json.mjs
+                  test -f /tmp/shopify-json-sync.report.json && cat /tmp/shopify-json-sync.report.json || true
+
+            - name: Remove temp helper folders before git status/commit
+              run: |
+                  set -euo pipefail
+                  rm -rf .iamota-actions "${THEME_PULL_DIR}"
+
+            - name: Commit and push to production branch (if changed)
+              run: |
+                  set -euo pipefail
+
+                  if [ -z "$(git status --porcelain)" ]; then
+                      echo "No JSON sync changes to commit."
+                      exit 0
+                  fi
+
+                  git config user.name  "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  git add -A
+
+                  TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
+                  git commit -m "chore: Shopify JSON sync (${TS})"
+                  git push origin "${PRODUCTION_BRANCH}"

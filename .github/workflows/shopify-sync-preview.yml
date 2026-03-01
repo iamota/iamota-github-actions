@@ -1,0 +1,120 @@
+name: Shopify JSON Sync + PR Preview (Legacy Orchestration)
+
+on:
+    workflow_call:
+        inputs:
+            production_branch:
+                type: string
+                required: false
+                default: "production"
+
+            default_branch:
+                type: string
+                required: false
+                default: ""
+
+            theme_src:
+                type: string
+                required: false
+                default: "."
+
+            theme_dist:
+                type: string
+                required: false
+                default: ""
+
+            theme_pull_dir:
+                type: string
+                required: false
+                default: "_remote_theme"
+
+            build_install_command:
+                type: string
+                required: false
+                default: "npm ci"
+
+            build_command:
+                type: string
+                required: false
+                default: "npx webpack --env target=${GITHUB_BRANCH}"
+
+            enable_preview_backup:
+                type: string
+                required: false
+                default: "true"
+
+            aws_region:
+                type: string
+                required: false
+                default: "us-west-2"
+
+            aws_s3_bucket:
+                type: string
+                required: false
+                default: ""
+
+            shopify_flag_ignore:
+                type: string
+                required: false
+                default: ""
+
+        secrets:
+            shopify_store:
+                required: true
+            shopify_theme_id:
+                required: true
+            shopify_cli_theme_token:
+                required: true
+            shopify_preview_base_theme_id:
+                required: true
+
+            aws_access_key_id:
+                required: false
+            aws_secret_access_key:
+                required: false
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    json_sync_production:
+        if: github.event_name != 'pull_request'
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-production.yml@v1
+        with:
+            production_branch: ${{ inputs.production_branch }}
+            theme_src: ${{ inputs.theme_src }}
+            theme_pull_dir: ${{ inputs.theme_pull_dir }}
+        secrets:
+            shopify_store: ${{ secrets.shopify_store }}
+            shopify_theme_id: ${{ secrets.shopify_theme_id }}
+            shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}
+
+    json_sync_forward:
+        if: github.event_name != 'pull_request'
+        needs: [json_sync_production]
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-forward.yml@v1
+        with:
+            production_branch: ${{ inputs.production_branch }}
+            default_branch: ${{ inputs.default_branch }}
+
+    pr_preview:
+        if: github.event_name == 'pull_request'
+        uses: iamota/iamota-github-actions/.github/workflows/shopify-pr-preview.yml@v1
+        with:
+            theme_src: ${{ inputs.theme_src }}
+            theme_dist: ${{ inputs.theme_dist }}
+            theme_pull_dir: ${{ inputs.theme_pull_dir }}
+            build_install_command: ${{ inputs.build_install_command }}
+            build_command: ${{ inputs.build_command }}
+            enable_preview_backup: ${{ inputs.enable_preview_backup }}
+            aws_region: ${{ inputs.aws_region }}
+            aws_s3_bucket: ${{ inputs.aws_s3_bucket }}
+            shopify_flag_ignore: ${{ inputs.shopify_flag_ignore }}
+        secrets:
+            shopify_store: ${{ secrets.shopify_store }}
+            shopify_theme_id: ${{ secrets.shopify_theme_id }}
+            shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}
+            shopify_preview_base_theme_id: ${{ secrets.shopify_preview_base_theme_id }}
+            aws_access_key_id: ${{ secrets.aws_access_key_id }}
+            aws_secret_access_key: ${{ secrets.aws_secret_access_key }}

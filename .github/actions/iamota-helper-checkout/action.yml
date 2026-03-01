@@ -1,0 +1,31 @@
+name: "IAMOTA Helper Checkout"
+description: "Resolve current reusable workflow ref and checkout iamota helper repo"
+inputs:
+    workflow_ref:
+        description: "github.workflow_ref from caller"
+        required: true
+    repository:
+        description: "Helper repository"
+        default: "iamota/iamota-github-actions"
+    path:
+        description: "Destination path"
+        default: ".iamota-actions"
+outputs:
+    ref:
+        description: "Resolved git ref from workflow_ref"
+        value: ${{ steps.resolve.outputs.ref }}
+runs:
+    using: "composite"
+    steps:
+        - id: resolve
+          run: |
+              set -euo pipefail
+              WF_REF="${{ inputs.workflow_ref }}"
+              echo "ref=${WF_REF##*@}" >> "$GITHUB_OUTPUT"
+          shell: bash
+
+        - uses: actions/checkout@v4
+          with:
+              repository: ${{ inputs.repository }}
+              ref: ${{ steps.resolve.outputs.ref }}
+              path: ${{ inputs.path }}
