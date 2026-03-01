@@ -57,16 +57,28 @@ on:
                 type: string
                 required: false
                 default: ""
+            shopify_store:
+                type: string
+                required: false
+                default: ""
+            shopify_theme_id:
+                type: string
+                required: false
+                default: ""
+            shopify_preview_base_theme_id:
+                type: string
+                required: false
+                default: ""
 
         secrets:
             shopify_store:
-                required: true
+                required: false
             shopify_theme_id:
-                required: true
+                required: false
             shopify_cli_theme_token:
                 required: true
             shopify_preview_base_theme_id:
-                required: true
+                required: false
 
             aws_access_key_id:
                 required: false
@@ -87,6 +99,8 @@ jobs:
             production_branch: ${{ inputs.production_branch }}
             theme_src: ${{ inputs.theme_src }}
             theme_pull_dir: ${{ inputs.theme_pull_dir }}
+            shopify_store: ${{ inputs.shopify_store }}
+            shopify_theme_id: ${{ inputs.shopify_theme_id }}
         secrets:
             shopify_store: ${{ secrets.shopify_store }}
             shopify_theme_id: ${{ secrets.shopify_theme_id }}
@@ -114,6 +128,9 @@ jobs:
             aws_region: ${{ inputs.aws_region }}
             aws_s3_bucket: ${{ inputs.aws_s3_bucket }}
             shopify_ignore: ${{ inputs.shopify_ignore }}
+            shopify_store: ${{ inputs.shopify_store }}
+            shopify_theme_id: ${{ inputs.shopify_theme_id }}
+            shopify_preview_base_theme_id: ${{ inputs.shopify_preview_base_theme_id }}
         secrets:
             shopify_store: ${{ secrets.shopify_store }}
             shopify_theme_id: ${{ secrets.shopify_theme_id }}

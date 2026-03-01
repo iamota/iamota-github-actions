@@ -17,12 +17,20 @@ on:
                 type: string
                 required: false
                 default: "_remote_theme"
+            shopify_store:
+                type: string
+                required: false
+                default: ""
+            shopify_theme_id:
+                type: string
+                required: false
+                default: ""
 
         secrets:
             shopify_store:
-                required: true
+                required: false
             shopify_theme_id:
-                required: true
+                required: false
             shopify_cli_theme_token:
                 required: true
             iamota_actions_read_token:
@@ -44,8 +52,8 @@ jobs:
             THEME_SRC               : ${{ inputs.theme_src }}
             THEME_PULL_DIR          : ${{ inputs.theme_pull_dir }}
 
-            SHOPIFY_STORE      : ${{ secrets.shopify_store }}
-            SHOPIFY_THEME_ID   : ${{ secrets.shopify_theme_id }}
+            SHOPIFY_STORE      : ${{ inputs.shopify_store != '' && inputs.shopify_store || secrets.shopify_store }}
+            SHOPIFY_THEME_ID   : ${{ inputs.shopify_theme_id != '' && inputs.shopify_theme_id || secrets.shopify_theme_id }}
             SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
             SHOPIFY_CLI_TTY         : "0"
 
@@ -56,16 +64,16 @@ jobs:
                   ref: ${{ env.PRODUCTION_BRANCH }}
                   fetch-depth: 0
 
-            - name: Validate required Shopify secrets
+            - name: Validate required Shopify values
               run: |
                   set -euo pipefail
                   MISSING=()
-                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store/SHOPIFY_STORE")
-                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id/SHOPIFY_THEME_ID")
-                  [ -n "${SHOPIFY_CLI_THEME_TOKEN:-}" ] || MISSING+=("shopify_cli_theme_token/SHOPIFY_CLI_THEME_TOKEN")
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store (input or secret) / SHOPIFY_STORE var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id (input or secret) / SHOPIFY_THEME_ID var")
+                  [ -n "${SHOPIFY_CLI_THEME_TOKEN:-}" ] || MISSING+=("shopify_cli_theme_token secret / SHOPIFY_CLI_THEME_TOKEN var")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
-                      echo "Missing required Shopify secret values: ${MISSING[*]}"
+                      echo "Missing required Shopify values: ${MISSING[*]}"
                       exit 1
                   fi
 
