@@ -83,6 +83,17 @@ Inputs:
 - `theme_id` (required)
 - `token` (required)
 
+## `.github/actions/shopify-theme-lighthouse/action.yml`
+
+Runs Shopify Lighthouse CI against a supplied theme root.
+
+Inputs:
+
+- `access_token` (required)
+- `store` (required)
+- `lhci_github_app_token` (required)
+- `theme_root` (required)
+
 ## `.github/actions/iamota-helper-checkout/action.yml`
 
 Checks out the centralized helper repository at the same ref as the running reusable workflow.

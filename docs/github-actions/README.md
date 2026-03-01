@@ -6,6 +6,8 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 
 ### Reusable Workflows
 
+- `.github/workflows/github-warn-merge-conflicts.yml`
+- `.github/workflows/github-warn-possible-conflicts.yml`
 - `.github/workflows/shopify-theme-backup.yml`
 - `.github/workflows/shopify-theme-deploy.yml`
 - `.github/workflows/shopify-theme-backup-deploy.yml`
@@ -28,6 +30,7 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/actions/shopify-theme-backup/action.yml`
 - `.github/actions/shopify-theme-create/action.yml`
 - `.github/actions/shopify-theme-delete/action.yml`
+- `.github/actions/shopify-theme-lighthouse/action.yml`
 - `.github/actions/iamota-helper-checkout/action.yml`
 - `.github/actions/npm-install/action.yml`
 - `.github/actions/webpack-build/action.yml`

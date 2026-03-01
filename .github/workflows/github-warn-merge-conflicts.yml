@@ -1,0 +1,275 @@
+name: GitHub Warn Merge Conflicts
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: github-merge-conflict-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  merge-conflict-guard:
+    name: Merge Conflict Guard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify PR author when merge conflicts exist
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const eventMarkerStart = '<!-- github-merge-conflict-guard:event ';
+            const eventMarkerEnd = ' -->';
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            const parseEventFromBody = (body) => {
+              if (!body) {
+                return null;
+              }
+
+              const start = body.indexOf(eventMarkerStart);
+              if (start === -1) {
+                return null;
+              }
+
+              const end = body.indexOf(eventMarkerEnd, start);
+              if (end === -1) {
+                return null;
+              }
+
+              const jsonPart = body.slice(start + eventMarkerStart.length, end).trim();
+              try {
+                const parsed = JSON.parse(jsonPart);
+                if (!parsed || (parsed.status !== 'conflict' && parsed.status !== 'resolved')) {
+                  return null;
+                }
+                return parsed;
+              } catch {
+                return null;
+              }
+            };
+
+            const getPullWithMergeability = async (pullNumber) => {
+              let latestPull = null;
+
+              for (let attempt = 1; attempt <= 6; attempt++) {
+                const { data: pull } = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: pullNumber
+                });
+
+                latestPull = pull;
+                if (pull.mergeable !== null) {
+                  return pull;
+                }
+
+                await sleep(1500);
+              }
+
+              return latestPull;
+            };
+
+            const getLatestEventComment = async (pullNumber) => {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: pullNumber,
+                per_page: 100
+              });
+
+              const eventComments = comments
+                .filter((comment) => comment.user?.type === 'Bot')
+                .map((comment) => ({ comment, event: parseEventFromBody(comment.body || '') }))
+                .filter((item) => item.event !== null)
+                .sort((a, b) => new Date(a.comment.created_at) - new Date(b.comment.created_at));
+
+              return eventComments.length > 0 ? eventComments[eventComments.length - 1] : null;
+            };
+
+            const createEventComment = async (pull, status, previousEvent) => {
+              const checkedAt = new Date().toISOString();
+              const headShort = (pull.head?.sha || '').slice(0, 7);
+              const headCommitUrl = `https://github.com/${owner}/${repo}/commit/${pull.head.sha}`;
+
+              const markerPayload = JSON.stringify({
+                status,
+                headSha: pull.head.sha,
+                checkedAt
+              });
+
+              const marker = `${eventMarkerStart}${markerPayload}${eventMarkerEnd}`;
+
+              if (status === 'conflict') {
+                const body = [
+                  marker,
+                  '## ⚠️ Merge conflicts detected in this PR 🆚',
+                  '',
+                  `@${pull.user.login} this PR currently has merge conflicts with \`${pull.base.ref}\`.`,
+                  '',
+                  'Please resolve merge conflicts before sharing this PR for QA or deployment.',
+                  '',
+                  `Head commit: [\`${headShort}\`](${headCommitUrl})`,
+                  `Checked: ${checkedAt}`
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: pull.number,
+                  body
+                });
+                return;
+              }
+
+              let compareLine = '';
+              if (previousEvent?.headSha && previousEvent.headSha !== pull.head.sha) {
+                const prevShort = previousEvent.headSha.slice(0, 7);
+                const compareUrl = `https://github.com/${owner}/${repo}/compare/${previousEvent.headSha}...${pull.head.sha}`;
+                compareLine = `Diff since prior conflict warning: [\`${prevShort}...${headShort}\`](${compareUrl})`;
+              }
+
+              const body = [
+                marker,
+                '## ✅ Merge conflict resolved 🆚',
+                '',
+                `@${pull.user.login} merge conflicts are currently resolved for this PR against \`${pull.base.ref}\`.`,
+                '',
+                `Latest commit: [\`${headShort}\`](${headCommitUrl})`,
+                compareLine,
+                `Checked: ${checkedAt}`
+              ].filter(Boolean).join('\n');
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull.number,
+                body
+              });
+            };
+
+            const markConflictCommentAsResolved = async (conflictComment, pull) => {
+              if (!conflictComment?.id) {
+                return;
+              }
+
+              const checkedAt = new Date().toISOString();
+              const resolvedHeading = '## ✅ ~~Merge conflicts detected in this PR~~ [Resolved] 🆚';
+              let updatedBody = conflictComment.body || '';
+
+              updatedBody = updatedBody.replace(
+                /^##\s*⚠️\s*Merge conflicts detected in this PR\s*🆚\s*$/m,
+                resolvedHeading
+              );
+
+              updatedBody = updatedBody.replace(
+                /@([A-Za-z0-9-]+)\s+this PR currently has merge conflicts with `([^`]+)`\./,
+                '@$1 merge conflicts with `$2` are now resolved.'
+              );
+
+              if (!updatedBody.includes('Resolved at:')) {
+                updatedBody = `${updatedBody}\nResolved at: ${checkedAt}`;
+              }
+
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: conflictComment.id,
+                body: updatedBody
+              });
+            };
+
+            const processPull = async (pullNumber) => {
+              const pull = await getPullWithMergeability(pullNumber);
+              const hasConflicts = pull?.mergeable_state === 'dirty' || pull?.mergeable === false;
+
+              const latestEventComment = await getLatestEventComment(pullNumber);
+              const latestStatus = latestEventComment?.event?.status || null;
+              const latestEvent = latestEventComment?.event || null;
+
+              if (hasConflicts) {
+                if (latestStatus !== 'conflict') {
+                  await createEventComment(pull, 'conflict', latestEvent);
+                }
+
+                return { pullNumber, hasConflicts: true };
+              }
+
+              if (latestStatus === 'conflict') {
+                await markConflictCommentAsResolved(latestEventComment.comment, pull);
+                await createEventComment(pull, 'resolved', latestEvent);
+              }
+
+              return { pullNumber, hasConflicts: false };
+            };
+
+            if (context.eventName === 'pull_request') {
+              const pullNumber = context.payload.pull_request.number;
+              const result = await processPull(pullNumber);
+
+              if (result.hasConflicts) {
+                core.setFailed('Merge conflicts detected. Resolve conflicts before QA or deployment handoff.');
+              } else {
+                core.info(`No merge conflicts detected for PR #${pullNumber}.`);
+              }
+
+              return;
+            }
+
+            const processOpenPullsRelatedToBranch = async (branchName) => {
+              if (!branchName) {
+                core.info('No branch context available; skipping branch-related PR check.');
+                return;
+              }
+
+              const allOpenPulls = await github.paginate(github.rest.pulls.list, {
+                owner,
+                repo,
+                state: 'open',
+                per_page: 100
+              });
+              core.info(`Push scan: loaded ${allOpenPulls.length} open PR(s) for repository.`);
+
+              const repoFullName = `${owner}/${repo}`.toLowerCase();
+              const relatedPulls = allOpenPulls.filter((pull) => {
+                const targetsBranch = pull.base?.ref === branchName;
+                const originatesFromSameRepoBranch =
+                  (pull.head?.repo?.full_name || '').toLowerCase() === repoFullName &&
+                  pull.head?.ref === branchName;
+                return targetsBranch || originatesFromSameRepoBranch;
+              });
+
+              if (relatedPulls.length === 0) {
+                core.info(`No open PRs target or originate from ${branchName}; nothing to check.`);
+                return;
+              }
+
+              let conflictsFound = 0;
+              for (const pull of relatedPulls) {
+                const result = await processPull(pull.number);
+                if (result.hasConflicts) {
+                  conflictsFound += 1;
+                }
+              }
+
+              core.info(`Checked ${relatedPulls.length} open PR(s) related to ${branchName}. Conflicted PRs: ${conflictsFound}.`);
+            };
+
+            if (context.eventName === 'push') {
+              const branchName = (context.ref || '').replace('refs/heads/', '');
+              await processOpenPullsRelatedToBranch(branchName);
+              return;
+            }
+
+            if (context.eventName === 'workflow_dispatch') {
+              const branchName = (context.ref || '').replace('refs/heads/', '');
+              await processOpenPullsRelatedToBranch(branchName);
+            }

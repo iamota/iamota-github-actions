@@ -1,0 +1,303 @@
+name: Shopify Theme CI
+
+on:
+  workflow_call:
+    inputs:
+      theme_src:
+        type: string
+        required: false
+        default: "."
+      theme_dist:
+        type: string
+        required: false
+        default: ""
+      build_install_command:
+        type: string
+        required: false
+        default: "npm ci"
+      build_command:
+        type: string
+        required: false
+        default: "npx webpack --env target=lighthouse"
+      shopify_store:
+        type: string
+        required: false
+        default: ""
+      shopify_theme_id:
+        type: string
+        required: false
+        default: ""
+      lighthouse_align_with_production_json:
+        type: string
+        required: false
+        default: "false"
+      run_theme_check:
+        type: string
+        required: false
+        default: "true"
+      run_lint:
+        type: string
+        required: false
+        default: "true"
+      run_test:
+        type: string
+        required: false
+        default: "true"
+      run_a11y:
+        type: string
+        required: false
+        default: "true"
+      run_lighthouse:
+        type: string
+        required: false
+        default: "true"
+    secrets:
+      SHOPIFY_THEME_ACCESS_TOKEN:
+        required: false
+      LHCI_GITHUB_APP_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  theme_check:
+    if: inputs.run_theme_check == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node + Install Shopify CLI
+        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+
+      - name: NPM install (self-aware)
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+        with:
+          working_directory: "."
+          install_command: ${{ inputs.build_install_command }}
+          if_package_json: "1"
+
+      - name: Webpack build (self-aware)
+        id: webpack
+        uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
+        with:
+          working_directory: "."
+          build_command: ${{ inputs.build_command }}
+          if_webpack_config: "1"
+
+      - name: Resolve theme root
+        id: root
+        run: |
+          set -euo pipefail
+          DIST="${{ inputs.theme_dist }}"
+          if [ -z "${DIST}" ]; then
+            if [ "${{ steps.webpack.outputs.ran }}" = "true" ]; then
+              DIST="./dist"
+            else
+              DIST="${{ inputs.theme_src }}"
+            fi
+          fi
+          if [ ! -d "${DIST}" ]; then
+            echo "Theme root not found: ${DIST}"
+            exit 1
+          fi
+          echo "theme_root=${DIST}" >> "$GITHUB_OUTPUT"
+
+      - name: Theme Check
+        uses: shopify/theme-check-action@v1
+        with:
+          theme_root: ${{ steps.root.outputs.theme_root }}
+          flags: "--fail-level error"
+
+  lint:
+    if: inputs.run_lint == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NPM install (self-aware)
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+        with:
+          working_directory: "."
+          install_command: ${{ inputs.build_install_command }}
+          if_package_json: "1"
+
+      - name: Run lint script when available
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "No package.json; skipping lint."
+            exit 0
+          fi
+          HAS_LINT="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.lint)?'1':'0')")"
+          if [ "${HAS_LINT}" != "1" ]; then
+            echo "No lint script; skipping."
+            exit 0
+          fi
+          npm run lint
+
+  test:
+    if: inputs.run_test == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NPM install (self-aware)
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+        with:
+          working_directory: "."
+          install_command: ${{ inputs.build_install_command }}
+          if_package_json: "1"
+
+      - name: Run test script when available
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "No package.json; skipping tests."
+            exit 0
+          fi
+          HAS_TEST="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.test)?'1':'0')")"
+          if [ "${HAS_TEST}" != "1" ]; then
+            echo "No test script; skipping."
+            exit 0
+          fi
+          npm test --if-present
+
+  a11y:
+    if: inputs.run_a11y == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NPM install (self-aware)
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+        with:
+          working_directory: "."
+          install_command: ${{ inputs.build_install_command }}
+          if_package_json: "1"
+
+      - name: Run a11y script when available
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "No package.json; skipping a11y."
+            exit 0
+          fi
+          HAS_A11Y="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.a11y)?'1':'0')")"
+          if [ "${HAS_A11Y}" != "1" ]; then
+            echo "No a11y script; skipping."
+            exit 0
+          fi
+          npm run a11y
+
+  lighthouse:
+    if: inputs.run_lighthouse == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check lighthouse prerequisites
+        id: prereq
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}" ] || [ -z "${{ inputs.shopify_store }}" ] || [ -z "${{ secrets.LHCI_GITHUB_APP_TOKEN }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Missing one or more lighthouse prerequisites; skipping."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: NPM install (self-aware)
+        if: steps.prereq.outputs.ready == 'true'
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+        with:
+          working_directory: "."
+          install_command: ${{ inputs.build_install_command }}
+          if_package_json: "1"
+
+      - name: Build for lighthouse
+        if: steps.prereq.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "No package.json; cannot build for lighthouse."
+            exit 1
+          fi
+          bash -lc "${{ inputs.build_command }}"
+
+      - name: Resolve lighthouse theme root
+        if: steps.prereq.outputs.ready == 'true'
+        id: lhroot
+        run: |
+          set -euo pipefail
+          ROOT="${{ inputs.theme_dist }}"
+          if [ -z "${ROOT}" ]; then
+            if [ -d "./dist" ]; then
+              ROOT="./dist"
+            else
+              ROOT="${{ inputs.theme_src }}"
+            fi
+          fi
+          if [ ! -d "${ROOT}" ]; then
+            echo "Resolved lighthouse theme root not found: ${ROOT}"
+            exit 1
+          fi
+          echo "theme_root=${ROOT}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node + Install Shopify CLI (for JSON alignment)
+        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true'
+        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+
+      - name: Pull production theme for lighthouse JSON alignment
+        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id != ''
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@main
+        with:
+          store: ${{ inputs.shopify_store }}
+          theme_id: ${{ inputs.shopify_theme_id }}
+          token: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+          path: _lighthouse_remote_theme
+          nodelete: "1"
+
+      - name: Sync production JSON into lighthouse theme root
+        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id != ''
+        env:
+          THEME_PULL_DIR: _lighthouse_remote_theme
+          THEME_ROOT: ${{ steps.lhroot.outputs.theme_root }}
+          DRY_RUN: "false"
+        run: |
+          set -euo pipefail
+          node .github/scripts/shopify/sync-shopify-json.mjs
+
+      - name: Warn when JSON alignment requested but theme id missing
+        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id == ''
+        run: |
+          echo "lighthouse_align_with_production_json=true but shopify_theme_id is empty; continuing without production JSON alignment."
+
+      - name: Lighthouse
+        if: steps.prereq.outputs.ready == 'true'
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@main
+        with:
+          access_token: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+          store: ${{ inputs.shopify_store }}
+          lhci_github_app_token: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          theme_root: ${{ steps.lhroot.outputs.theme_root }}
+
+  ci:
+    name: CI Aggregate
+    runs-on: ubuntu-latest
+    needs:
+      - theme_check
+      - lint
+      - test
+      - a11y
+      - lighthouse
+    if: always()
+    steps:
+      - name: Fail if any required job failed
+        run: |
+          set -euo pipefail
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more CI jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "CI aggregate passed."

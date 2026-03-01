@@ -2,6 +2,20 @@
 
 ## Reusable Workflows
 
+### `.github/workflows/github-warn-merge-conflicts.yml`
+
+Purpose:
+
+- Detect merge conflicts on PRs and push-related PRs.
+- Post bot comments when conflicts appear and when they are resolved.
+
+### `.github/workflows/github-warn-possible-conflicts.yml`
+
+Purpose:
+
+- Detect likely overlap/coordination risk across active branches.
+- Open/update tracking issues with context and diff snippets.
+
 ### `.github/workflows/shopify-theme-backup.yml`
 
 Purpose:
