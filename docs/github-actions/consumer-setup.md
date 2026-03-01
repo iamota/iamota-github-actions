@@ -26,9 +26,9 @@ jobs:
       build_command: ${{ vars.BUILD_COMMAND || 'npx webpack --env target=${GITHUB_BRANCH}' }}
       aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
+      SHOPIFY_THEME_ID: ${{ vars.SHOPIFY_THEME_ID || '' }}
     secrets:
-      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-      SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
       SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -51,9 +51,9 @@ jobs:
       production_branch: ${{ vars.PRODUCTION_BRANCH || 'production' }}
       theme_src: ${{ vars.THEME_SRC || 'src' }}
       theme_pull_dir: ${{ vars.THEME_PULL_DIR || '_remote_theme' }}
+      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
+      SHOPIFY_THEME_ID: ${{ vars.SHOPIFY_PRODUCTION_THEME_ID || vars.SHOPIFY_THEME_ID || '' }}
     secrets:
-      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-      SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
       SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 ```
 
@@ -93,24 +93,27 @@ jobs:
       aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
       shopify_ignore: ${{ vars.SHOPIFY_IGNORE || '' }}
+      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
+      SHOPIFY_THEME_ID: ${{ vars.SHOPIFY_THEME_ID || '' }}
+      SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ vars.SHOPIFY_PREVIEW_BASE_THEME_ID || vars.SHOPIFY_PRODUCTION_THEME_ID || '' }}
     secrets:
-      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-      SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
       SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-      SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
 ## 2) Configure Required Secrets/Vars In Consumer Repo
 
-Minimum Shopify secrets:
+Required Shopify vars:
 
 - `SHOPIFY_STORE`
 - `SHOPIFY_THEME_ID`
+
+Required Shopify secret:
+
 - `SHOPIFY_THEME_ACCESS_TOKEN`
 
-Preview workflow additional secret:
+Preview workflow additional var:
 
 - `SHOPIFY_PREVIEW_BASE_THEME_ID`
 

@@ -6,6 +6,13 @@ on:
             branch:
                 type: string
                 required: true
+            SHOPIFY_STORE:
+                type: string
+                required: false
+                default: ""
+            SHOPIFY_THEME_ID:
+                type: string
+                required: true
             aws_region:
                 type: string
                 required: false
@@ -15,10 +22,6 @@ on:
                 required: false
                 default: ""
         secrets:
-            SHOPIFY_STORE:
-                required: true
-            SHOPIFY_THEME_ID:
-                required: true
             SHOPIFY_THEME_ACCESS_TOKEN:
                 required: true
             AWS_ACCESS_KEY_ID:
@@ -36,8 +39,8 @@ jobs:
             GITHUB_REPOSITORY         : ${{ github.repository }}
             GITHUB_BRANCH             : ${{ inputs.branch }}
             GITHUB_SHA                : ${{ github.sha }}
-            SHOPIFY_STORE             : ${{ secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID          : ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID }}
             SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
             AWS_REGION                : ${{ inputs.aws_region }}
             AWS_S3_BUCKET             : ${{ inputs.aws_s3_bucket }}
@@ -49,6 +52,18 @@ jobs:
 
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+
+            - name: Validate required Shopify values
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required Shopify values: ${MISSING[*]}"
+                      exit 1
+                  fi
 
             - name: Set backup file metadata
               run: |

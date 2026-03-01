@@ -6,6 +6,13 @@ on:
             branch:
                 type    : string
                 required: true
+            SHOPIFY_STORE:
+                type    : string
+                required: false
+                default : ""
+            SHOPIFY_THEME_ID:
+                type    : string
+                required: true
             theme_src:
                 type    : string
                 required: false
@@ -27,10 +34,6 @@ on:
                 required: false
                 default : "npx webpack --env target=${GITHUB_BRANCH}"
         secrets:
-            SHOPIFY_STORE:
-                required: true
-            SHOPIFY_THEME_ID:
-                required: true
             SHOPIFY_THEME_ACCESS_TOKEN:
                 required: true
 
@@ -48,8 +51,8 @@ jobs:
             THEME_PATH                : ${{ inputs.theme_path }}
             BUILD_INSTALL_COMMAND     : ${{ inputs.build_install_command }}
             BUILD_COMMAND             : ${{ inputs.build_command }}
-            SHOPIFY_STORE             : ${{ secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID          : ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID }}
             SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 
         steps:

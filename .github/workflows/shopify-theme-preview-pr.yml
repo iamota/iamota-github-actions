@@ -70,14 +70,8 @@ on:
                 default: ""
 
         secrets:
-            SHOPIFY_STORE:
-                required: false
-            SHOPIFY_THEME_ID:
-                required: false
             SHOPIFY_THEME_ACCESS_TOKEN:
                 required: true
-            SHOPIFY_PREVIEW_BASE_THEME_ID:
-                required: false
 
             AWS_ACCESS_KEY_ID:
                 required: false
@@ -116,9 +110,9 @@ jobs:
 
             SHOPIFY_IGNORE            : ${{ inputs.shopify_ignore }}
 
-            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE != '' && inputs.SHOPIFY_STORE || secrets.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID != '' && inputs.SHOPIFY_THEME_ID || secrets.SHOPIFY_THEME_ID }}
-            SHOPIFY_PREVIEW_BASE_ID   : ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID != '' && inputs.SHOPIFY_PREVIEW_BASE_THEME_ID || secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
+            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID }}
+            SHOPIFY_PREVIEW_BASE_ID   : ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID }}
             SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
             SHOPIFY_CLI_TTY           : "0"
 
@@ -132,10 +126,10 @@ jobs:
               run: |
                   set -euo pipefail
                   MISSING=()
-                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE (input or secret) / SHOPIFY_STORE var")
-                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID (input or secret) / SHOPIFY_THEME_ID var")
-                  [ -n "${SHOPIFY_PREVIEW_BASE_ID:-}" ] || MISSING+=("SHOPIFY_PREVIEW_BASE_THEME_ID (input or secret) / SHOPIFY_PREVIEW_BASE_THEME_ID var")
-                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret / SHOPIFY_THEME_ACCESS_TOKEN var")
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID input/var")
+                  [ -n "${SHOPIFY_PREVIEW_BASE_ID:-}" ] || MISSING+=("SHOPIFY_PREVIEW_BASE_THEME_ID input/var")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify values: ${MISSING[*]}"
@@ -550,7 +544,7 @@ jobs:
         runs-on: ubuntu-latest
 
         env:
-            SHOPIFY_STORE      : ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_STORE      : ${{ inputs.SHOPIFY_STORE }}
             SHOPIFY_THEME_ACCESS_TOKEN : ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
             SHOPIFY_CLI_TTY         : "0"
 
@@ -562,15 +556,15 @@ jobs:
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
-            - name: Validate required Shopify secrets
+            - name: Validate required Shopify values
               run: |
                   set -euo pipefail
                   MISSING=()
-                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE/SHOPIFY_STORE")
-                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN/SHOPIFY_THEME_ACCESS_TOKEN")
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
-                      echo "Missing required Shopify secret values: ${MISSING[*]}"
+                      echo "Missing required Shopify values: ${MISSING[*]}"
                       exit 1
                   fi
 

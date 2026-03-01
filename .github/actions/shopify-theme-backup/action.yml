@@ -18,6 +18,16 @@ runs:
     steps:
         - run: |
               set -euo pipefail
+
+              MISSING=()
+              [ -n "${{ inputs.store }}" ] || MISSING+=("store")
+              [ -n "${{ inputs.theme_id }}" ] || MISSING+=("theme_id")
+              [ -n "${{ inputs.token }}" ] || MISSING+=("token")
+              if [ "${#MISSING[@]}" -gt 0 ]; then
+                  echo "Missing required Shopify backup inputs: ${MISSING[*]}"
+                  exit 1
+              fi
+
               OUT_DIR="${{ inputs.output_dir }}"
               rm -rf "${OUT_DIR}"
               mkdir -p "${OUT_DIR}"

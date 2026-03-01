@@ -26,13 +26,13 @@ Purpose:
 Inputs:
 
 - `branch` (required)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_THEME_ID` (required)
 - `aws_region` (default `us-west-2`)
 - `aws_s3_bucket` (default empty)
 
 Secrets:
 
-- `SHOPIFY_STORE` (required)
-- `SHOPIFY_THEME_ID` (required)
 - `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `AWS_ACCESS_KEY_ID` (optional)
 - `AWS_SECRET_ACCESS_KEY` (optional)
@@ -46,6 +46,8 @@ Purpose:
 Inputs:
 
 - `branch` (required)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_THEME_ID` (required)
 - `theme_src` (default `.`)
 - `theme_dist` (default empty; auto-resolves to `./dist` when webpack exists, otherwise `theme_src`)
 - `build_install_command` (default `npm ci`)
@@ -53,8 +55,6 @@ Inputs:
 
 Secrets:
 
-- `SHOPIFY_STORE` (required)
-- `SHOPIFY_THEME_ID` (required)
 - `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 
 Notes:
@@ -74,6 +74,8 @@ Purpose:
 Inputs:
 
 - `branch` (required)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_THEME_ID` (required)
 - `theme_src` (default `.`)
 - `theme_dist` (default empty; auto-resolves to `./dist` when webpack exists, otherwise `theme_src`)
 - `build_install_command` (default `npm ci`)
@@ -83,8 +85,6 @@ Inputs:
 
 Secrets:
 
-- `SHOPIFY_STORE` (required)
-- `SHOPIFY_THEME_ID` (required)
 - `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `AWS_ACCESS_KEY_ID` (optional)
 - `AWS_SECRET_ACCESS_KEY` (optional)
@@ -106,10 +106,11 @@ Inputs:
 
 - `production_branch`
 - `theme_src`, `theme_pull_dir`
+- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID` (required)
 
 Secrets:
 
-- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_THEME_ACCESS_TOKEN` (required)
+- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 
 Notes:
 
@@ -147,11 +148,11 @@ Inputs:
 - `enable_preview_backup`
 - `aws_region`, `aws_s3_bucket`
 - `shopify_ignore`
+- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_PREVIEW_BASE_THEME_ID` (required)
 
 Secrets:
 
-- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_THEME_ACCESS_TOKEN` (required)
-- `SHOPIFY_PREVIEW_BASE_THEME_ID` (required)
+- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (optional)
 
 Notes:
