@@ -75,7 +75,7 @@ on:
                 required: false
             shopify_theme_id:
                 required: false
-            shopify_cli_theme_token:
+            shopify_cli_partners_token:
                 required: true
             shopify_preview_base_theme_id:
                 required: false
@@ -104,7 +104,7 @@ jobs:
         secrets:
             shopify_store: ${{ secrets.shopify_store }}
             shopify_theme_id: ${{ secrets.shopify_theme_id }}
-            shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}
+            shopify_cli_partners_token: ${{ secrets.shopify_cli_partners_token }}
             iamota_actions_read_token: ${{ secrets.iamota_actions_read_token }}
 
     json_sync_dev:
@@ -134,7 +134,7 @@ jobs:
         secrets:
             shopify_store: ${{ secrets.shopify_store }}
             shopify_theme_id: ${{ secrets.shopify_theme_id }}
-            shopify_cli_theme_token: ${{ secrets.shopify_cli_theme_token }}
+            shopify_cli_partners_token: ${{ secrets.shopify_cli_partners_token }}
             shopify_preview_base_theme_id: ${{ secrets.shopify_preview_base_theme_id }}
             aws_access_key_id: ${{ secrets.aws_access_key_id }}
             aws_secret_access_key: ${{ secrets.aws_secret_access_key }}

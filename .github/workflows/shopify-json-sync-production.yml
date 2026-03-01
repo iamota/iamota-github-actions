@@ -31,7 +31,7 @@ on:
                 required: false
             shopify_theme_id:
                 required: false
-            shopify_cli_theme_token:
+            shopify_cli_partners_token:
                 required: true
             iamota_actions_read_token:
                 required: false
@@ -54,7 +54,7 @@ jobs:
 
             SHOPIFY_STORE      : ${{ inputs.shopify_store != '' && inputs.shopify_store || secrets.shopify_store }}
             SHOPIFY_THEME_ID   : ${{ inputs.shopify_theme_id != '' && inputs.shopify_theme_id || secrets.shopify_theme_id }}
-            SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
+            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.shopify_cli_partners_token }}
             SHOPIFY_CLI_TTY         : "0"
 
         steps:
@@ -70,7 +70,7 @@ jobs:
                   MISSING=()
                   [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store (input or secret) / SHOPIFY_STORE var")
                   [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id (input or secret) / SHOPIFY_THEME_ID var")
-                  [ -n "${SHOPIFY_CLI_THEME_TOKEN:-}" ] || MISSING+=("shopify_cli_theme_token secret / SHOPIFY_CLI_THEME_TOKEN var")
+                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("shopify_cli_partners_token secret / SHOPIFY_CLI_PARTNERS_TOKEN var")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify values: ${MISSING[*]}"
@@ -97,7 +97,7 @@ jobs:
               with:
                   store     : ${{ env.SHOPIFY_STORE }}
                   theme_id  : ${{ env.SHOPIFY_THEME_ID }}
-                  token     : ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
+                  token     : ${{ env.SHOPIFY_CLI_PARTNERS_TOKEN }}
                   path      : ${{ env.THEME_PULL_DIR }}
                   nodelete  : "1"
                   ignore_csv: "*.liquid,*.css,*.scss,*.sass,*.js,*.png,*.jpg,*.jpeg,*.gif,*.svg,*.txt,*.md,*.map"

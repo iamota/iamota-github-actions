@@ -19,7 +19,7 @@ on:
                 required: true
             shopify_theme_id:
                 required: true
-            shopify_cli_theme_token:
+            shopify_cli_partners_token:
                 required: true
             aws_access_key_id:
                 required: false
@@ -38,7 +38,7 @@ jobs:
             GITHUB_SHA             : ${{ github.sha }}
             SHOPIFY_STORE     : ${{ secrets.shopify_store }}
             SHOPIFY_THEME_ID  : ${{ secrets.shopify_theme_id }}
-            SHOPIFY_CLI_THEME_TOKEN: ${{ secrets.shopify_cli_theme_token }}
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.shopify_cli_partners_token }}
             AWS_REGION             : ${{ inputs.aws_region }}
             AWS_S3_BUCKET          : ${{ inputs.aws_s3_bucket }}
             AWS_ACCESS_KEY_ID      : ${{ secrets.aws_access_key_id }}
@@ -55,7 +55,7 @@ jobs:
               with:
                   store   : ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ env.SHOPIFY_THEME_ID }}
-                  token   : ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
+                  token   : ${{ env.SHOPIFY_CLI_PARTNERS_TOKEN }}
                   path    : ./backup
                   nodelete: "1"
 

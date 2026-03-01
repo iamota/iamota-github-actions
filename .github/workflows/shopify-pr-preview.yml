@@ -65,7 +65,7 @@ on:
                 required: false
             shopify_theme_id:
                 required: false
-            shopify_cli_theme_token:
+            shopify_cli_partners_token:
                 required: true
             shopify_preview_base_theme_id:
                 required: false
@@ -110,7 +110,7 @@ jobs:
             SHOPIFY_STORE      : ${{ inputs.shopify_store != '' && inputs.shopify_store || secrets.shopify_store }}
             SHOPIFY_THEME_ID   : ${{ inputs.shopify_theme_id != '' && inputs.shopify_theme_id || secrets.shopify_theme_id }}
             SHOPIFY_PREVIEW_BASE_ID : ${{ inputs.shopify_preview_base_theme_id != '' && inputs.shopify_preview_base_theme_id || secrets.shopify_preview_base_theme_id }}
-            SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
+            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.shopify_cli_partners_token }}
             SHOPIFY_CLI_TTY         : "0"
 
         steps:
@@ -126,7 +126,7 @@ jobs:
                   [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store (input or secret) / SHOPIFY_STORE var")
                   [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id (input or secret) / SHOPIFY_THEME_ID var")
                   [ -n "${SHOPIFY_PREVIEW_BASE_ID:-}" ] || MISSING+=("shopify_preview_base_theme_id (input or secret) / SHOPIFY_PREVIEW_BASE_THEME_ID var")
-                  [ -n "${SHOPIFY_CLI_THEME_TOKEN:-}" ] || MISSING+=("shopify_cli_theme_token secret / SHOPIFY_CLI_THEME_TOKEN var")
+                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("shopify_cli_partners_token secret / SHOPIFY_CLI_PARTNERS_TOKEN var")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify values: ${MISSING[*]}"
@@ -181,7 +181,7 @@ jobs:
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ env.SHOPIFY_THEME_ID }}
-                  token: ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
+                  token: ${{ env.SHOPIFY_CLI_PARTNERS_TOKEN }}
                   path: ${{ env.THEME_PULL_DIR }}
                   nodelete: "1"
 
@@ -357,7 +357,7 @@ jobs:
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.themeid.outputs.theme_id }}
-                  token: ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
+                  token: ${{ env.SHOPIFY_CLI_PARTNERS_TOKEN }}
                   path: ${{ env.PREVIEW_BACKUP_DIR }}
 
             - name: Zip preview backup
@@ -405,7 +405,7 @@ jobs:
                           --store "${SHOPIFY_STORE}" \
                           --theme "${SHOPIFY_PREVIEW_BASE_ID}" \
                           --name "${NAME}" \
-                          --password "${SHOPIFY_CLI_THEME_TOKEN}" \
+                          --password "${SHOPIFY_CLI_PARTNERS_TOKEN}" \
                           --force \
                           --json \
                           --no-color
@@ -442,7 +442,7 @@ jobs:
                       shopify theme push \
                           --store "${SHOPIFY_STORE}" \
                           --theme "${THEME_ID}" \
-                          --password "${SHOPIFY_CLI_THEME_TOKEN}" \
+                          --password "${SHOPIFY_CLI_PARTNERS_TOKEN}" \
                           --path "${THEME_PULL_DIR}" \
                           --json \
                           --no-color
@@ -470,7 +470,7 @@ jobs:
                       --store "${SHOPIFY_STORE}" \
                       --theme "${THEME_ID}" \
                       --name "${NAME}" \
-                      --password "${SHOPIFY_CLI_THEME_TOKEN}" \
+                      --password "${SHOPIFY_CLI_PARTNERS_TOKEN}" \
                       --no-color
 
             - name: Build PR comment body (preview + drift status)
@@ -564,7 +564,7 @@ jobs:
 
         env:
             SHOPIFY_STORE      : ${{ secrets.shopify_store }}
-            SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
+            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.shopify_cli_partners_token }}
             SHOPIFY_CLI_TTY         : "0"
 
         steps:
@@ -580,7 +580,7 @@ jobs:
                   set -euo pipefail
                   MISSING=()
                   [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store/SHOPIFY_STORE")
-                  [ -n "${SHOPIFY_CLI_THEME_TOKEN:-}" ] || MISSING+=("shopify_cli_theme_token/SHOPIFY_CLI_THEME_TOKEN")
+                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("shopify_cli_partners_token/SHOPIFY_CLI_PARTNERS_TOKEN")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify secret values: ${MISSING[*]}"
@@ -617,7 +617,7 @@ jobs:
                   shopify theme delete \
                       --store "${SHOPIFY_STORE}" \
                       --theme "${THEME_ID}" \
-                      --password "${SHOPIFY_CLI_THEME_TOKEN}" \
+                      --password "${SHOPIFY_CLI_PARTNERS_TOKEN}" \
                       --force \
                       --no-color
 
