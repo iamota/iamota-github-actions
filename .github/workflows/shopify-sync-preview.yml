@@ -110,6 +110,9 @@ jobs:
     json_sync_dev:
         if: github.event_name != 'pull_request'
         needs: [json_sync_production]
+        permissions:
+            contents: write
+            pull-requests: write
         uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-dev.yml@main
         with:
             production_branch: ${{ inputs.production_branch }}
