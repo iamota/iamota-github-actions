@@ -56,31 +56,43 @@ jobs:
             - name: Show GitHub CLI version
               run: gh --version
 
-            - name: Close existing generated sync PRs (production -> default)
+            - name: Resolve existing Shopify JSON sync PRs (production -> default)
+              id: existing_pr
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
 
-                  mapfile -t PR_NUMBERS < <(
+                  mapfile -t PR_ROWS < <(
                       gh pr list \
                           --base "${DEFAULT_BRANCH}" \
                           --head "${PRODUCTION_BRANCH}" \
                           --state open \
-                          --json number,title \
-                          --jq '.[] | select(.title | startswith("Shopify JSON Sync")) | .number' \
+                          --json number,title,url \
+                          --jq '.[] | select(.title | startswith("Shopify JSON Sync")) | [.number, .url] | @tsv' \
                       || true
                   )
 
-                  if [ "${#PR_NUMBERS[@]}" -eq 0 ]; then
-                      echo "No prior generated sync PR found."
+                  if [ "${#PR_ROWS[@]}" -eq 0 ]; then
+                      echo "No existing Shopify JSON sync PR found."
+                      echo "number=" >> "$GITHUB_OUTPUT"
+                      echo "url=" >> "$GITHUB_OUTPUT"
                       exit 0
                   fi
 
-                  for PR in "${PR_NUMBERS[@]}"; do
-                      echo "Closing prior sync PR #${PR}"
-                      gh pr close "${PR}" >/dev/null || true
-                  done
+                  IFS=$'\t' read -r PRIMARY_PR PRIMARY_URL <<< "${PR_ROWS[0]}"
+                  echo "Using existing Shopify JSON sync PR #${PRIMARY_PR}"
+                  echo "number=${PRIMARY_PR}" >> "$GITHUB_OUTPUT"
+                  echo "url=${PRIMARY_URL}" >> "$GITHUB_OUTPUT"
+
+                  if [ "${#PR_ROWS[@]}" -gt 1 ]; then
+                      for row in "${PR_ROWS[@]:1}"; do
+                          IFS=$'\t' read -r EXTRA_PR EXTRA_URL <<< "${row}"
+                          echo "Closing duplicate sync PR #${EXTRA_PR} (superseded by #${PRIMARY_PR})"
+                          gh pr comment "${EXTRA_PR}" --body "Superseded by newer Shopify JSON sync PR: ${PRIMARY_URL}" >/dev/null 2>&1 || true
+                          gh pr close "${EXTRA_PR}" >/dev/null || true
+                      done
+                  fi
 
             - name: Determine branch compare status
               id: compare
@@ -128,22 +140,30 @@ jobs:
                       fi
                   fi
 
-                  gh pr create \
-                      --base "${DEFAULT_BRANCH}" \
-                      --head "${PRODUCTION_BRANCH}" \
-                      --title "${TITLE}" \
-                      --body "${BODY}"
+                  PR_NUMBER="${{ steps.existing_pr.outputs.number }}"
+                  PR_URL="${{ steps.existing_pr.outputs.url }}"
 
-                  PR_URL="$(
-                      gh pr list \
+                  if [ -n "${PR_NUMBER}" ]; then
+                      gh pr edit "${PR_NUMBER}" --title "${TITLE}" --body "${BODY}"
+                      gh pr comment "${PR_NUMBER}" --body "Sync refreshed at ${TS} from ${SRC_STORE}#${SRC_THEME}."
+                  else
+                      gh pr create \
                           --base "${DEFAULT_BRANCH}" \
                           --head "${PRODUCTION_BRANCH}" \
-                          --json url \
-                          --jq '.[0].url'
-                  )"
-                  if [ -z "${PR_URL}" ]; then
-                      echo "Failed to resolve PR URL after creation."
-                      exit 1
+                          --title "${TITLE}" \
+                          --body "${BODY}"
+
+                      PR_URL="$(
+                          gh pr list \
+                              --base "${DEFAULT_BRANCH}" \
+                              --head "${PRODUCTION_BRANCH}" \
+                              --json url \
+                              --jq '.[0].url'
+                      )"
+                      if [ -z "${PR_URL}" ]; then
+                          echo "Failed to resolve PR URL after creation."
+                          exit 1
+                      fi
                   fi
 
                   if gh pr merge --help 2>/dev/null | grep -q -- "--auto"; then
