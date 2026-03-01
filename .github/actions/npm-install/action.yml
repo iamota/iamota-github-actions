@@ -45,7 +45,15 @@ runs:
 
               (
                 cd "${WD}"
-                bash -lc "${CMD}"
+
+                # `npm ci` requires a lockfile. Fall back to `npm install`
+                # for repos that have package.json but no lockfile yet.
+                if [[ "${CMD}" =~ ^[[:space:]]*npm[[:space:]]+ci([[:space:]]|$) ]] && [ ! -f "package-lock.json" ] && [ ! -f "npm-shrinkwrap.json" ]; then
+                  echo "package.json found but no lockfile; falling back from 'npm ci' to 'npm install'."
+                  bash -lc "npm install"
+                else
+                  bash -lc "${CMD}"
+                fi
               )
 
               echo "has_package_json=${HAS_PKG}" >> "$GITHUB_OUTPUT"
