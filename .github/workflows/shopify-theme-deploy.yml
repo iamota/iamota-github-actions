@@ -61,61 +61,17 @@ jobs:
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
-            - name: Resolve theme source and dist inputs
-              run: |
-                  set -euo pipefail
-
-                  SRC="${THEME_SRC:-.}"
-                  DIST_IN="${THEME_DIST:-}"
-                  PATH_IN="${THEME_PATH:-}"
-
-                  if [ -n "${PATH_IN}" ] && [ -z "${DIST_IN}" ]; then
-                      DIST_IN="${PATH_IN}"
-                  fi
-
-                  if [ ! -d "${SRC}" ]; then
-                      echo "THEME_SRC directory not found: ${SRC}"
-                      exit 1
-                  fi
-
-                  echo "DIST_INPUT=${DIST_IN}" >> "$GITHUB_ENV"
-
-            - name: NPM install (self-aware)
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@main
-              with:
-                  working_directory: "."
-                  install_command: ${{ env.BUILD_INSTALL_COMMAND }}
-                  if_package_json: "1"
-
-            - name: Webpack build (self-aware)
-              id: webpack
-              uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
+            - name: Prepare theme (install + build + resolve dist)
+              id: prepare
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@main
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
-                  working_directory: "."
-                  build_command: ${{ env.BUILD_COMMAND }}
-                  if_webpack_config: "1"
-
-            - name: Finalize deploy path
-              run: |
-                  set -euo pipefail
-
-                  DIST="${DIST_INPUT:-}"
-                  if [ -z "${DIST}" ]; then
-                      if [ "${{ steps.webpack.outputs.ran }}" = "true" ]; then
-                          DIST="./dist"
-                      else
-                          DIST="${THEME_SRC:-.}"
-                      fi
-                  fi
-
-                  if [ ! -d "${DIST}" ]; then
-                      echo "Resolved deploy path not found: ${DIST}"
-                      exit 1
-                  fi
-
-                  echo "THEME_DIST_EFFECTIVE=${DIST}" >> "$GITHUB_ENV"
+                  theme_src             : ${{ env.THEME_SRC }}
+                  theme_dist            : ${{ env.THEME_DIST }}
+                  theme_path            : ${{ env.THEME_PATH }}
+                  build_install_command : ${{ env.BUILD_INSTALL_COMMAND }}
+                  build_command         : ${{ env.BUILD_COMMAND }}
 
             - name: Determine allow-live and nodelete flags safely
               run: |
@@ -149,6 +105,6 @@ jobs:
                   store     : ${{ env.SHOPIFY_STORE }}
                   theme_id  : ${{ env.SHOPIFY_THEME_ID }}
                   token     : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
-                  path      : ${{ env.THEME_DIST_EFFECTIVE }}
+                  path      : ${{ steps.prepare.outputs.theme_dist_effective }}
                   allow_live: ${{ env.ALLOW_LIVE_INPUT }}
                   nodelete  : ${{ env.NODELETE_INPUT }}

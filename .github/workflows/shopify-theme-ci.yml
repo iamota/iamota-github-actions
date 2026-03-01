@@ -61,52 +61,54 @@ permissions:
   contents: read
 
 jobs:
-  theme_check:
-    if: inputs.run_theme_check == 'true'
+  prepare:
+    if: inputs.run_theme_check == 'true' || inputs.run_a11y == 'true' || inputs.run_lighthouse == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      theme_root   : ${{ steps.root.outputs.theme_dist_effective }}
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Prepare theme (install + build + resolve dist)
+        id: root
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@main
+        with:
+          theme_src            : ${{ inputs.theme_src }}
+          theme_dist           : ${{ inputs.theme_dist }}
+          build_install_command: ${{ inputs.build_install_command }}
+          build_command        : ${{ inputs.build_command }}
+
+      - name: Set artifact name
+        id: meta
+        run: |
+          echo "artifact_name=shopify-theme-ci-root" >> "$GITHUB_OUTPUT"
+
+      - name: Upload prepared theme root
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: ${{ steps.root.outputs.theme_dist_effective }}
+          if-no-files-found: error
+
+  theme_check:
+    if: inputs.run_theme_check == 'true'
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download prepared theme root
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare.outputs.artifact_name }}
+          path: _ci_theme_root
 
       - name: Setup Node + Install Shopify CLI
         uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
-      - name: NPM install (self-aware)
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
-        with:
-          working_directory: "."
-          install_command: ${{ inputs.build_install_command }}
-          if_package_json: "1"
-
-      - name: Webpack build (self-aware)
-        id: webpack
-        uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
-        with:
-          working_directory: "."
-          build_command: ${{ inputs.build_command }}
-          if_webpack_config: "1"
-
-      - name: Resolve theme root
-        id: root
-        run: |
-          set -euo pipefail
-          DIST="${{ inputs.theme_dist }}"
-          if [ -z "${DIST}" ]; then
-            if [ "${{ steps.webpack.outputs.ran }}" = "true" ]; then
-              DIST="./dist"
-            else
-              DIST="${{ inputs.theme_src }}"
-            fi
-          fi
-          if [ ! -d "${DIST}" ]; then
-            echo "Theme root not found: ${DIST}"
-            exit 1
-          fi
-          echo "theme_root=${DIST}" >> "$GITHUB_OUTPUT"
-
       - name: Theme Check
         uses: shopify/theme-check-action@v1
         with:
-          theme_root: ${{ steps.root.outputs.theme_root }}
+          theme_root: "_ci_theme_root"
           flags: "--fail-level error"
 
   lint:
@@ -165,6 +167,7 @@ jobs:
 
   a11y:
     if: inputs.run_a11y == 'true'
+    needs: [prepare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,7 +179,16 @@ jobs:
           install_command: ${{ inputs.build_install_command }}
           if_package_json: "1"
 
+      - name: Download prepared theme root
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare.outputs.artifact_name }}
+          path: _ci_theme_root
+
       - name: Run a11y script when available
+        env:
+          THEME_ROOT: _ci_theme_root
+          THEME_DIST: _ci_theme_root
         run: |
           set -euo pipefail
           if [ ! -f package.json ]; then
@@ -192,6 +204,7 @@ jobs:
 
   lighthouse:
     if: inputs.run_lighthouse == 'true'
+    needs: [prepare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -212,42 +225,12 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: NPM install (self-aware)
+      - name: Download prepared theme root
         if: steps.prereq.outputs.ready == 'true'
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+        uses: actions/download-artifact@v4
         with:
-          working_directory: "."
-          install_command: ${{ inputs.build_install_command }}
-          if_package_json: "1"
-
-      - name: Build for lighthouse
-        if: steps.prereq.outputs.ready == 'true'
-        run: |
-          set -euo pipefail
-          if [ ! -f package.json ]; then
-            echo "No package.json; cannot build for lighthouse."
-            exit 1
-          fi
-          bash -lc "${{ inputs.build_command }}"
-
-      - name: Resolve lighthouse theme root
-        if: steps.prereq.outputs.ready == 'true'
-        id: lhroot
-        run: |
-          set -euo pipefail
-          ROOT="${{ inputs.theme_dist }}"
-          if [ -z "${ROOT}" ]; then
-            if [ -d "./dist" ]; then
-              ROOT="./dist"
-            else
-              ROOT="${{ inputs.theme_src }}"
-            fi
-          fi
-          if [ ! -d "${ROOT}" ]; then
-            echo "Resolved lighthouse theme root not found: ${ROOT}"
-            exit 1
-          fi
-          echo "theme_root=${ROOT}" >> "$GITHUB_OUTPUT"
+          name: ${{ needs.prepare.outputs.artifact_name }}
+          path: _ci_theme_root
 
       - name: Setup Node + Install Shopify CLI (for JSON alignment)
         if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true'
@@ -267,7 +250,7 @@ jobs:
         if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id != ''
         env:
           THEME_PULL_DIR: _lighthouse_remote_theme
-          THEME_ROOT: ${{ steps.lhroot.outputs.theme_root }}
+          THEME_ROOT: _ci_theme_root
           DRY_RUN: "false"
         run: |
           set -euo pipefail
@@ -285,7 +268,7 @@ jobs:
           access_token: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
           store: ${{ inputs.shopify_store }}
           lhci_github_app_token: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
-          theme_root: ${{ steps.lhroot.outputs.theme_root }}
+          theme_root: _ci_theme_root
 
   ci:
     name: CI Aggregate

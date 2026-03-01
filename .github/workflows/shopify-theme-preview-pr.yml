@@ -182,73 +182,35 @@ jobs:
               if: steps.mergecheck.outputs.has_conflicts == 'false'
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@main
               with:
-                  store: ${{ env.SHOPIFY_STORE }}
+                  store   : ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ env.SHOPIFY_THEME_ID }}
-                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
-                  path: ${{ env.THEME_PULL_DIR }}
+                  token   : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  path    : ${{ env.THEME_PULL_DIR }}
                   nodelete: "1"
 
-            - name: Resolve theme source and dist inputs
+            - name: Determine delete behavior
               if: steps.mergecheck.outputs.has_conflicts == 'false'
               run: |
                   set -euo pipefail
-
-                  SRC="${THEME_SRC:-.}"
-                  DIST_IN="${THEME_DIST:-}"
-
-                  if [ ! -d "${SRC}" ]; then
-                      echo "THEME_SRC directory not found: ${SRC}"
-                      exit 1
-                  fi
-
-                  echo "DIST_INPUT=${DIST_IN}" >> "$GITHUB_ENV"
 
                   ALLOW_DELETE="false"
                   if git log -1 --pretty=%B | grep -q '\[Allow Delete\]'; then
                       ALLOW_DELETE="true"
                   fi
 
-                  echo "THEME_SRC_EFFECTIVE=${SRC}" >> "$GITHUB_ENV"
                   echo "ALLOW_DELETE=${ALLOW_DELETE}" >> "$GITHUB_ENV"
 
-            - name: NPM install (self-aware)
+            - name: Prepare theme (install + build + resolve dist)
               if: steps.mergecheck.outputs.has_conflicts == 'false'
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@main
-              with:
-                  working_directory: "."
-                  install_command: ${{ env.BUILD_INSTALL_COMMAND }}
-                  if_package_json: "1"
-
-            - name: Webpack build (self-aware)
-              if: steps.mergecheck.outputs.has_conflicts == 'false'
-              id: webpack
-              uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
+              id: prepare
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@main
               env:
                   GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
               with:
-                  working_directory: "."
-                  build_command: ${{ env.BUILD_COMMAND }}
-                  if_webpack_config: "1"
-
-            - name: Finalize theme dist
-              if: steps.mergecheck.outputs.has_conflicts == 'false'
-              run: |
-                  set -euo pipefail
-                  DIST="${DIST_INPUT:-}"
-                  if [ -z "${DIST}" ]; then
-                      if [ "${{ steps.webpack.outputs.ran }}" = "true" ]; then
-                          DIST="./dist"
-                      else
-                          DIST="${THEME_SRC_EFFECTIVE}"
-                      fi
-                  fi
-
-                  if [ ! -d "${DIST}" ]; then
-                      echo "Resolved THEME_DIST directory not found: ${DIST}"
-                      exit 1
-                  fi
-
-                  echo "THEME_DIST_EFFECTIVE=${DIST}" >> "$GITHUB_ENV"
+                  theme_src             : ${{ env.THEME_SRC }}
+                  theme_dist            : ${{ env.THEME_DIST }}
+                  build_install_command : ${{ env.BUILD_INSTALL_COMMAND }}
+                  build_command         : ${{ env.BUILD_COMMAND }}
 
             - name: Drift check (DRY_RUN) against merge result (report only)
               if: steps.mergecheck.outputs.has_conflicts == 'false'
@@ -309,7 +271,7 @@ jobs:
                   fi
 
                   rsync -a "${DELETE_ARGS[@]}" "${IGNORE_ARGS[@]}" \
-                      "${THEME_DIST_EFFECTIVE%/}/" \
+                      "${{ steps.prepare.outputs.theme_dist_effective }}/" \
                       "${THEME_PULL_DIR%/}/"
 
             - name: Resolve preview theme id from PR marker (if any)
@@ -358,9 +320,9 @@ jobs:
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@main
               with:
-                  store: ${{ env.SHOPIFY_STORE }}
-                  theme_id: ${{ steps.themeid.outputs.theme_id }}
-                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  store     : ${{ env.SHOPIFY_STORE }}
+                  theme_id  : ${{ steps.themeid.outputs.theme_id }}
+                  token     : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
                   output_dir: ${{ env.PREVIEW_BACKUP_DIR }}
                   zip_output: ${{ env.PREVIEW_BACKUP_ZIP }}
 
@@ -368,16 +330,16 @@ jobs:
               if: steps.mergecheck.outputs.has_conflicts == 'false' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
               uses: aws-actions/configure-aws-credentials@v4
               with:
-                  aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+                  aws-access-key-id    : ${{ env.AWS_ACCESS_KEY_ID }}
                   aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ env.AWS_REGION }}
+                  aws-region           : ${{ env.AWS_REGION }}
 
             - name: Upload preview backup zip to S3 (optional)
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
               uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@main
               with:
-                  file: ${{ env.PREVIEW_BACKUP_ZIP }}
-                  bucket: ${{ env.AWS_S3_BUCKET }}
+                  file     : ${{ env.PREVIEW_BACKUP_ZIP }}
+                  bucket   : ${{ env.AWS_S3_BUCKET }}
                   dest_path: ${{ env.PREVIEW_S3_DEST }}
 
             - name: Upload preview backup artifact (optional)
@@ -392,10 +354,10 @@ jobs:
               id: createtheme
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@main
               with:
-                  store: ${{ env.SHOPIFY_STORE }}
+                  store        : ${{ env.SHOPIFY_STORE }}
                   base_theme_id: ${{ env.SHOPIFY_PREVIEW_BASE_ID }}
-                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
-                  name: iamota (${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}
+                  token        : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  name         : iamota (${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}
 
             - name: Determine preview theme id
               if: steps.mergecheck.outputs.has_conflicts == 'false'
@@ -592,9 +554,9 @@ jobs:
               if: steps.themeid.outputs.theme_id != ''
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@main
               with:
-                  store: ${{ env.SHOPIFY_STORE }}
+                  store   : ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.themeid.outputs.theme_id }}
-                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  token   : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
 
             - name: Build cleanup comment body
               id: cleanup_comment

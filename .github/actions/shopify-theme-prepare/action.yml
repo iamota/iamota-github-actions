@@ -1,0 +1,84 @@
+name: "Shopify Theme Prepare"
+description: "Install/build theme and resolve effective deploy/test root"
+inputs:
+    theme_src:
+        description: "Theme source path"
+        default: "."
+    theme_dist:
+        description: "Theme dist path override"
+        default: ""
+    theme_path:
+        description: "Legacy dist path alias (used when theme_dist is empty)"
+        default: ""
+    build_install_command:
+        description: "Install command"
+        default: "npm ci"
+    build_command:
+        description: "Build command"
+        default: "npx webpack --env target=${GITHUB_BRANCH}"
+outputs:
+    theme_dist_effective:
+        description: "Resolved effective theme output path"
+        value: ${{ steps.resolve.outputs.theme_dist_effective }}
+    webpack_ran:
+        description: "Whether webpack build ran"
+        value: ${{ steps.webpack.outputs.ran }}
+    npm_install_ran:
+        description: "Whether npm install ran"
+        value: ${{ steps.npm.outputs.ran }}
+runs:
+    using: "composite"
+    steps:
+        - id: inputs
+          run: |
+              set -euo pipefail
+              SRC="${{ inputs.theme_src }}"
+              DIST_IN="${{ inputs.theme_dist }}"
+              PATH_IN="${{ inputs.theme_path }}"
+
+              if [ -n "${PATH_IN}" ] && [ -z "${DIST_IN}" ]; then
+                DIST_IN="${PATH_IN}"
+              fi
+
+              if [ ! -d "${SRC}" ]; then
+                echo "THEME_SRC directory not found: ${SRC}"
+                exit 1
+              fi
+
+              echo "theme_src_effective=${SRC}" >> "$GITHUB_OUTPUT"
+              echo "dist_input=${DIST_IN}" >> "$GITHUB_OUTPUT"
+          shell: bash
+
+        - id: npm
+          uses: iamota/iamota-github-actions/.github/actions/npm-install@main
+          with:
+              working_directory: "."
+              install_command: ${{ inputs.build_install_command }}
+              if_package_json: "1"
+
+        - id: webpack
+          uses: iamota/iamota-github-actions/.github/actions/webpack-build@main
+          with:
+              working_directory: "."
+              build_command: ${{ inputs.build_command }}
+              if_webpack_config: "1"
+
+        - id: resolve
+          run: |
+              set -euo pipefail
+              DIST="${{ steps.inputs.outputs.dist_input }}"
+              if [ -z "${DIST}" ]; then
+                if [ "${{ steps.webpack.outputs.ran }}" = "true" ]; then
+                  DIST="./dist"
+                else
+                  DIST="${{ steps.inputs.outputs.theme_src_effective }}"
+                fi
+              fi
+
+              if [ ! -d "${DIST}" ]; then
+                echo "Resolved theme output path not found: ${DIST}"
+                exit 1
+              fi
+
+              echo "theme_dist_effective=${DIST}" >> "$GITHUB_OUTPUT"
+          shell: bash
