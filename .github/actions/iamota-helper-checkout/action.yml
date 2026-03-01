@@ -1,9 +1,18 @@
 name: "IAMOTA Helper Checkout"
-description: "Resolve current reusable workflow ref and checkout iamota helper repo"
+description: "Checkout iamota helper repo with explicit ref and optional token"
 inputs:
     workflow_ref:
-        description: "github.workflow_ref from caller"
-        required: true
+        description: "Optional github.workflow_ref fallback for ref parsing"
+        required: false
+        default: ""
+    ref:
+        description: "Ref to checkout from helper repository"
+        required: false
+        default: "main"
+    token:
+        description: "Optional token with read access to helper repository"
+        required: false
+        default: ""
     repository:
         description: "Helper repository"
         default: "iamota/iamota-github-actions"
@@ -12,7 +21,7 @@ inputs:
         default: ".iamota-actions"
 outputs:
     ref:
-        description: "Resolved git ref from workflow_ref"
+        description: "Resolved git ref"
         value: ${{ steps.resolve.outputs.ref }}
 runs:
     using: "composite"
@@ -20,11 +29,30 @@ runs:
         - id: resolve
           run: |
               set -euo pipefail
+              REF_IN="${{ inputs.ref }}"
+              if [ -n "${REF_IN}" ]; then
+                  echo "ref=${REF_IN}" >> "$GITHUB_OUTPUT"
+                  exit 0
+              fi
+
               WF_REF="${{ inputs.workflow_ref }}"
-              echo "ref=${WF_REF##*@}" >> "$GITHUB_OUTPUT"
+              if [ -n "${WF_REF}" ] && [[ "${WF_REF}" == *"@"* ]]; then
+                  echo "ref=${WF_REF##*@}" >> "$GITHUB_OUTPUT"
+              else
+                  echo "ref=main" >> "$GITHUB_OUTPUT"
+              fi
           shell: bash
 
-        - uses: actions/checkout@v4
+        - if: ${{ inputs.token != '' }}
+          uses: actions/checkout@v4
+          with:
+              repository: ${{ inputs.repository }}
+              ref: ${{ steps.resolve.outputs.ref }}
+              token: ${{ inputs.token }}
+              path: ${{ inputs.path }}
+
+        - if: ${{ inputs.token == '' }}
+          uses: actions/checkout@v4
           with:
               repository: ${{ inputs.repository }}
               ref: ${{ steps.resolve.outputs.ref }}

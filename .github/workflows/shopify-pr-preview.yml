@@ -62,6 +62,8 @@ on:
                 required: false
             aws_secret_access_key:
                 required: false
+            iamota_actions_read_token:
+                required: false
 
 permissions:
     contents: write
@@ -108,7 +110,8 @@ jobs:
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
-                  workflow_ref: ${{ github.workflow_ref }}
+                  ref: main
+                  token: ${{ secrets.iamota_actions_read_token }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
@@ -542,7 +545,8 @@ jobs:
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
-                  workflow_ref: ${{ github.workflow_ref }}
+                  ref: main
+                  token: ${{ secrets.iamota_actions_read_token }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI

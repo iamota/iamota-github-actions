@@ -7,6 +7,9 @@ on:
                 type: string
                 required: false
                 default: "I will manually deploy locales"
+        secrets:
+            iamota_actions_read_token:
+                required: false
 
 permissions:
     contents: read
@@ -22,7 +25,8 @@ jobs:
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
-                  workflow_ref: ${{ github.workflow_ref }}
+                  ref: main
+                  token: ${{ secrets.iamota_actions_read_token }}
                   path: .iamota-actions
 
             - name: Setup Node
