@@ -108,20 +108,15 @@ jobs:
                   BODY="Automated Shopify JSON sync from theme pull."
 
                   if [ -n "${SHOPIFY_STORE}" ] || [ -n "${SHOPIFY_THEME_ID}" ] || [ -n "${SHOPIFY_THEME_NAME}" ]; then
-                      BODY="${BODY}
-
-Shopify source:"
+                      BODY="$(printf '%s\n\nShopify source:' "${BODY}")"
                       if [ -n "${SHOPIFY_STORE}" ]; then
-                          BODY="${BODY}
-- Store: \`${SHOPIFY_STORE}\`"
+                          BODY="$(printf '%s\n- Store: `%s`' "${BODY}" "${SHOPIFY_STORE}")"
                       fi
                       if [ -n "${SHOPIFY_THEME_ID}" ]; then
-                          BODY="${BODY}
-- Theme ID: \`${SHOPIFY_THEME_ID}\`"
+                          BODY="$(printf '%s\n- Theme ID: `%s`' "${BODY}" "${SHOPIFY_THEME_ID}")"
                       fi
                       if [ -n "${SHOPIFY_THEME_NAME}" ]; then
-                          BODY="${BODY}
-- Theme Name: ${SHOPIFY_THEME_NAME}"
+                          BODY="$(printf '%s\n- Theme Name: %s' "${BODY}" "${SHOPIFY_THEME_NAME}")"
                       fi
                   fi
 
