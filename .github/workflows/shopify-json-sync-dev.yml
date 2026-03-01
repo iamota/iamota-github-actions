@@ -29,7 +29,7 @@ on:
                 default: ""
 
 permissions:
-    contents: read
+    contents: write
     pull-requests: write
 
 concurrency:
@@ -147,7 +147,22 @@ jobs:
                   fi
 
                   if gh pr merge --help 2>/dev/null | grep -q -- "--auto"; then
-                      gh pr merge "${PR_URL}" --rebase --auto || true
+                      set +e
+                      MERGE_OUT="$(gh pr merge "${PR_URL}" --rebase --auto 2>&1)"
+                      MERGE_EXIT=$?
+                      set -e
+
+                      if [ "${MERGE_EXIT}" -ne 0 ]; then
+                          if printf '%s' "${MERGE_OUT}" | grep -q "Resource not accessible by integration"; then
+                              echo "Auto-merge could not be enabled with the current GITHUB_TOKEN permissions."
+                              echo "Verify repository settings:"
+                              echo "1) Actions > General > Workflow permissions = Read and write permissions"
+                              echo "2) Actions > General > Allow GitHub Actions to create and approve pull requests = enabled"
+                          else
+                              echo "Auto-merge enable failed:"
+                              echo "${MERGE_OUT}"
+                          fi
+                      fi
                   else
                       echo "Current gh CLI does not support --auto; skipping auto-merge enable."
                   fi
