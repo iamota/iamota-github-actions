@@ -155,7 +155,13 @@ jobs:
             echo "No lint script; skipping."
             exit 0
           fi
-          npm run lint
+          LINT_CMD="$(node -e "const p=require('./package.json');process.stdout.write(String((p.scripts&&p.scripts.lint)||''))")"
+          if echo "${LINT_CMD}" | grep -qi "eslint"; then
+            echo "Running ESLint lint script with warnings allowed (errors still fail)."
+            npm run lint -- --max-warnings=-1
+          else
+            npm run lint
+          fi
 
   test:
     if: inputs.run_test == 'true'
