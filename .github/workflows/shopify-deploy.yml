@@ -31,7 +31,7 @@ on:
                 required: true
             SHOPIFY_THEME_ID:
                 required: true
-            SHOPIFY_CLI_PARTNERS_TOKEN:
+            SHOPIFY_THEME_ACCESS_TOKEN:
                 required: true
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
             BUILD_COMMAND          : ${{ inputs.build_command }}
             SHOPIFY_STORE     : ${{ secrets.SHOPIFY_STORE }}
             SHOPIFY_THEME_ID  : ${{ secrets.SHOPIFY_THEME_ID }}
-            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 
         steps:
             - uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ env.SHOPIFY_THEME_ID }}
-                  token: ${{ env.SHOPIFY_CLI_PARTNERS_TOKEN }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
                   path: ${{ env.THEME_DIST_EFFECTIVE }}
                   allow_live: ${{ env.ALLOW_LIVE_INPUT }}
                   nodelete: ${{ env.NODELETE_INPUT }}
