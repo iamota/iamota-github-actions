@@ -19,7 +19,7 @@ Secrets:
 
 - `shopify_store` (required)
 - `shopify_theme_id` (required)
-- `shopify_cli_theme_token` (required)
+- `shopify_cli_partners_token` (required)
 - `aws_access_key_id` (optional)
 - `aws_secret_access_key` (optional)
 
@@ -41,7 +41,7 @@ Secrets:
 
 - `shopify_store` (required)
 - `shopify_theme_id` (required)
-- `shopify_cli_theme_token` (required)
+- `shopify_cli_partners_token` (required)
 
 Notes:
 
@@ -71,7 +71,7 @@ Secrets:
 
 - `shopify_store` (required)
 - `shopify_theme_id` (required)
-- `shopify_cli_theme_token` (required)
+- `shopify_cli_partners_token` (required)
 - `aws_access_key_id` (optional)
 - `aws_secret_access_key` (optional)
 
@@ -95,7 +95,7 @@ Inputs:
 
 Secrets:
 
-- `shopify_store`, `shopify_theme_id`, `shopify_cli_theme_token` (required)
+- `shopify_store`, `shopify_theme_id`, `shopify_cli_partners_token` (required)
 
 Notes:
 
@@ -135,7 +135,7 @@ Inputs:
 
 Secrets:
 
-- `shopify_store`, `shopify_theme_id`, `shopify_cli_theme_token` (required)
+- `shopify_store`, `shopify_theme_id`, `shopify_cli_partners_token` (required)
 - `shopify_preview_base_theme_id` (required)
 - `aws_access_key_id`, `aws_secret_access_key` (optional)
 
