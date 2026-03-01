@@ -131,7 +131,7 @@ Inputs:
 - `build_install_command`, `build_command`
 - `enable_preview_backup`
 - `aws_region`, `aws_s3_bucket`
-- `shopify_flag_ignore`
+- `shopify_ignore`
 
 Secrets:
 
@@ -144,7 +144,7 @@ Notes:
 - Preview deploy simulation behavior:
   - pulls full remote production theme into `_remote_theme`
   - applies JSON sync against `theme_src`
-  - overlays `theme_dist` onto `_remote_theme` via `rsync` using `.shopifyignore` and `shopify_flag_ignore`
+  - overlays `theme_dist` onto `_remote_theme` via `rsync` using `.shopifyignore` and `shopify_ignore`
   - pushes `_remote_theme` to preview theme
 - Backs up existing preview themes before overwrite when enabled.
 - Uses shared comment utility scripts for marker lookup/upsert.

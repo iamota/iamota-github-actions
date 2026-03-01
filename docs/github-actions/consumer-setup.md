@@ -92,7 +92,7 @@ jobs:
       enable_preview_backup: ${{ vars.ENABLE_PREVIEW_BACKUP || 'true' }}
       aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
-      shopify_flag_ignore: ${{ vars.SHOPIFY_FLAG_IGNORE || '' }}
+      shopify_ignore: ${{ vars.SHOPIFY_IGNORE || '' }}
     secrets:
       shopify_store: ${{ secrets.SHOPIFY_STORE }}
       shopify_theme_id: ${{ secrets.SHOPIFY_THEME_ID }}
@@ -131,7 +131,7 @@ Optional behavior vars:
 - `PRODUCTION_BRANCH`
 - `DEFAULT_BRANCH`
 - `ENABLE_PREVIEW_BACKUP`
-- `SHOPIFY_FLAG_IGNORE`
+- `SHOPIFY_IGNORE`
 - `SHOPIFY_LOCALE_ACK_LABEL`
 - `SHOPIFY_THEME_SETTINGS_ACK_LABEL`
 

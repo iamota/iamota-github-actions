@@ -53,7 +53,7 @@ on:
                 required: false
                 default: ""
 
-            shopify_flag_ignore:
+            shopify_ignore:
                 type: string
                 required: false
                 default: ""
@@ -113,7 +113,7 @@ jobs:
             enable_preview_backup: ${{ inputs.enable_preview_backup }}
             aws_region: ${{ inputs.aws_region }}
             aws_s3_bucket: ${{ inputs.aws_s3_bucket }}
-            shopify_flag_ignore: ${{ inputs.shopify_flag_ignore }}
+            shopify_ignore: ${{ inputs.shopify_ignore }}
         secrets:
             shopify_store: ${{ secrets.shopify_store }}
             shopify_theme_id: ${{ secrets.shopify_theme_id }}

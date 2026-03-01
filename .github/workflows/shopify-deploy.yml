@@ -48,8 +48,8 @@ jobs:
             THEME_PATH             : ${{ inputs.theme_path }}
             BUILD_INSTALL_COMMAND  : ${{ inputs.build_install_command }}
             BUILD_COMMAND          : ${{ inputs.build_command }}
-            SHOPIFY_FLAG_STORE     : ${{ secrets.shopify_store }}
-            SHOPIFY_FLAG_THEME_ID  : ${{ secrets.shopify_theme_id }}
+            SHOPIFY_STORE     : ${{ secrets.shopify_store }}
+            SHOPIFY_THEME_ID  : ${{ secrets.shopify_theme_id }}
             SHOPIFY_CLI_THEME_TOKEN: ${{ secrets.shopify_cli_theme_token }}
 
         steps:
@@ -143,8 +143,8 @@ jobs:
             - name: Deploy
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-push@main
               with:
-                  store: ${{ env.SHOPIFY_FLAG_STORE }}
-                  theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ env.SHOPIFY_THEME_ID }}
                   token: ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
                   path: ${{ env.THEME_DIST_EFFECTIVE }}
                   allow_live: ${{ env.ALLOW_LIVE_INPUT }}

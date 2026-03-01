@@ -43,7 +43,7 @@ on:
                 required: false
                 default: ""
 
-            shopify_flag_ignore:
+            shopify_ignore:
                 type: string
                 required: false
                 default: ""
@@ -93,10 +93,10 @@ jobs:
             AWS_ACCESS_KEY_ID       : ${{ secrets.aws_access_key_id }}
             AWS_SECRET_ACCESS_KEY   : ${{ secrets.aws_secret_access_key }}
 
-            SHOPIFY_FLAG_IGNORE     : ${{ inputs.shopify_flag_ignore }}
+            SHOPIFY_IGNORE     : ${{ inputs.shopify_ignore }}
 
-            SHOPIFY_FLAG_STORE      : ${{ secrets.shopify_store }}
-            SHOPIFY_FLAG_THEME_ID   : ${{ secrets.shopify_theme_id }}
+            SHOPIFY_STORE      : ${{ secrets.shopify_store }}
+            SHOPIFY_THEME_ID   : ${{ secrets.shopify_theme_id }}
             SHOPIFY_PREVIEW_BASE_ID : ${{ secrets.shopify_preview_base_theme_id }}
             SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
             SHOPIFY_CLI_TTY         : "0"
@@ -153,8 +153,8 @@ jobs:
               if: steps.mergecheck.outputs.has_conflicts == 'false'
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
-                  store: ${{ env.SHOPIFY_FLAG_STORE }}
-                  theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ env.SHOPIFY_THEME_ID }}
                   token: ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
                   path: ${{ env.THEME_PULL_DIR }}
                   nodelete: "1"
@@ -266,7 +266,7 @@ jobs:
                       IGNORE_ARGS+=(--exclude-from=".shopifyignore")
                   fi
 
-                  IFS=',' read -r -a IG <<< "${SHOPIFY_FLAG_IGNORE}"
+                  IFS=',' read -r -a IG <<< "${SHOPIFY_IGNORE}"
                   for g in "${IG[@]}"; do
                       g_trim="$(echo "${g}" | xargs)"
                       if [ -n "${g_trim}" ]; then
@@ -329,7 +329,7 @@ jobs:
               if: steps.mergecheck.outputs.has_conflicts == 'false' && steps.themeid.outputs.theme_id != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
-                  store: ${{ env.SHOPIFY_FLAG_STORE }}
+                  store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.themeid.outputs.theme_id }}
                   token: ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
                   path: ${{ env.PREVIEW_BACKUP_DIR }}
@@ -376,7 +376,7 @@ jobs:
 
                   OUT="$(
                       shopify theme duplicate \
-                          --store "${SHOPIFY_FLAG_STORE}" \
+                          --store "${SHOPIFY_STORE}" \
                           --theme "${SHOPIFY_PREVIEW_BASE_ID}" \
                           --name "${NAME}" \
                           --password "${SHOPIFY_CLI_THEME_TOKEN}" \
@@ -414,7 +414,7 @@ jobs:
                   THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
                   OUT="$(
                       shopify theme push \
-                          --store "${SHOPIFY_FLAG_STORE}" \
+                          --store "${SHOPIFY_STORE}" \
                           --theme "${THEME_ID}" \
                           --password "${SHOPIFY_CLI_THEME_TOKEN}" \
                           --path "${THEME_PULL_DIR}" \
@@ -441,7 +441,7 @@ jobs:
                   THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
 
                   shopify theme rename \
-                      --store "${SHOPIFY_FLAG_STORE}" \
+                      --store "${SHOPIFY_STORE}" \
                       --theme "${THEME_ID}" \
                       --name "${NAME}" \
                       --password "${SHOPIFY_CLI_THEME_TOKEN}" \
@@ -537,7 +537,7 @@ jobs:
         runs-on: ubuntu-latest
 
         env:
-            SHOPIFY_FLAG_STORE      : ${{ secrets.shopify_store }}
+            SHOPIFY_STORE      : ${{ secrets.shopify_store }}
             SHOPIFY_CLI_THEME_TOKEN : ${{ secrets.shopify_cli_theme_token }}
             SHOPIFY_CLI_TTY         : "0"
 
@@ -577,7 +577,7 @@ jobs:
                   THEME_ID="${{ steps.themeid.outputs.theme_id }}"
 
                   shopify theme delete \
-                      --store "${SHOPIFY_FLAG_STORE}" \
+                      --store "${SHOPIFY_STORE}" \
                       --theme "${THEME_ID}" \
                       --password "${SHOPIFY_CLI_THEME_TOKEN}" \
                       --force \

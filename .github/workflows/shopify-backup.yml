@@ -36,8 +36,8 @@ jobs:
             GITHUB_REPOSITORY      : ${{ github.repository }}
             GITHUB_BRANCH          : ${{ inputs.branch }}
             GITHUB_SHA             : ${{ github.sha }}
-            SHOPIFY_FLAG_STORE     : ${{ secrets.shopify_store }}
-            SHOPIFY_FLAG_THEME_ID  : ${{ secrets.shopify_theme_id }}
+            SHOPIFY_STORE     : ${{ secrets.shopify_store }}
+            SHOPIFY_THEME_ID  : ${{ secrets.shopify_theme_id }}
             SHOPIFY_CLI_THEME_TOKEN: ${{ secrets.shopify_cli_theme_token }}
             AWS_REGION             : ${{ inputs.aws_region }}
             AWS_S3_BUCKET          : ${{ inputs.aws_s3_bucket }}
@@ -53,8 +53,8 @@ jobs:
             - name: Shopify theme pull (backup)
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-pull@main
               with:
-                  store   : ${{ env.SHOPIFY_FLAG_STORE }}
-                  theme_id: ${{ env.SHOPIFY_FLAG_THEME_ID }}
+                  store   : ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ env.SHOPIFY_THEME_ID }}
                   token   : ${{ env.SHOPIFY_CLI_THEME_TOKEN }}
                   path    : ./backup
                   nodelete: "1"
@@ -73,7 +73,7 @@ jobs:
                   DATETIME="$(date +%Y-%m-%d_%H%M%S)"
                   SANITIZED_BRANCH="$(echo "${GITHUB_BRANCH}" | tr '/' '_')"
 
-                  FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${SHOPIFY_FLAG_THEME_ID}__${GITHUB_SHA}"
+                  FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${SHOPIFY_THEME_ID}__${GITHUB_SHA}"
                   ZIP_NAME="${FILE_NAME}.zip"
                   DEST_PATH="${YEAR}/${REPO_NAME}/${ZIP_NAME}"
 
