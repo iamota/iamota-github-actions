@@ -130,5 +130,12 @@ jobs:
                   git add -A
 
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
-                  git commit -m "chore: Shopify JSON sync (${TS})"
+                  SRC_STORE_RAW="${SHOPIFY_STORE:-unknown-store}"
+                  SRC_STORE="${SRC_STORE_RAW#https://}"
+                  SRC_STORE="${SRC_STORE#http://}"
+                  SRC_STORE="${SRC_STORE%%/*}"
+                  SRC_STORE="${SRC_STORE%.myshopify.com}"
+                  [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
+                  SRC_THEME="${SHOPIFY_THEME_ID:-unknown-theme}"
+                  git commit -m "Shopify JSON Sync from ${SRC_STORE}#${SRC_THEME} @ ${TS}"
                   git push origin "${PRODUCTION_BRANCH}"

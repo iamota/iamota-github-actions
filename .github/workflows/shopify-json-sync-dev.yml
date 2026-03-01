@@ -1,4 +1,4 @@
-name: Shopify JSON Sync - Dev Forward
+name: Shopify JSON Sync - Dev
 
 on:
     workflow_call:
@@ -9,6 +9,21 @@ on:
                 default: "production"
 
             default_branch:
+                type: string
+                required: false
+                default: ""
+
+            shopify_store:
+                type: string
+                required: false
+                default: ""
+
+            shopify_theme_id:
+                type: string
+                required: false
+                default: ""
+
+            shopify_theme_name:
                 type: string
                 required: false
                 default: ""
@@ -28,6 +43,9 @@ jobs:
         env:
             PRODUCTION_BRANCH: ${{ inputs.production_branch }}
             DEFAULT_BRANCH   : ${{ inputs.default_branch != '' && inputs.default_branch || github.event.repository.default_branch }}
+            SHOPIFY_STORE    : ${{ inputs.shopify_store }}
+            SHOPIFY_THEME_ID : ${{ inputs.shopify_theme_id }}
+            SHOPIFY_THEME_NAME: ${{ inputs.shopify_theme_name }}
 
         steps:
             - name: Close existing generated sync PRs (production -> default)
@@ -71,7 +89,7 @@ jobs:
 
                   echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
 
-            - name: Create sync PR production -> default, enable auto-merge
+            - name: Create Shopify JSON sync PR (production -> default) and enable auto-merge
               if: steps.compare.outputs.status == 'ahead' || steps.compare.outputs.status == 'diverged'
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -79,22 +97,46 @@ jobs:
                   set -euo pipefail
 
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
-                  TITLE="Shopify JSON Sync ${TS}"
+                  SRC_STORE_RAW="${SHOPIFY_STORE:-unknown-store}"
+                  SRC_STORE="${SRC_STORE_RAW#https://}"
+                  SRC_STORE="${SRC_STORE#http://}"
+                  SRC_STORE="${SRC_STORE%%/*}"
+                  SRC_STORE="${SRC_STORE%.myshopify.com}"
+                  [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
+                  SRC_THEME="${SHOPIFY_THEME_ID:-unknown-theme}"
+                  TITLE="Shopify JSON Sync from ${SRC_STORE}#${SRC_THEME} @ ${TS}"
+                  BODY="Automated Shopify JSON sync from theme pull."
 
-                  PR_URL="$(
-                      gh pr create \
-                          --base "${DEFAULT_BRANCH}" \
-                          --head "${PRODUCTION_BRANCH}" \
-                          --title "${TITLE}" \
-                          --body "Automated Shopify JSON sync from theme pull." \
-                          --json url \
-                          --jq '.url'
-                  )"
+                  if [ -n "${SHOPIFY_STORE}" ] || [ -n "${SHOPIFY_THEME_ID}" ] || [ -n "${SHOPIFY_THEME_NAME}" ]; then
+                      BODY="${BODY}
+
+Shopify source:"
+                      if [ -n "${SHOPIFY_STORE}" ]; then
+                          BODY="${BODY}
+- Store: \`${SHOPIFY_STORE}\`"
+                      fi
+                      if [ -n "${SHOPIFY_THEME_ID}" ]; then
+                          BODY="${BODY}
+- Theme ID: \`${SHOPIFY_THEME_ID}\`"
+                      fi
+                      if [ -n "${SHOPIFY_THEME_NAME}" ]; then
+                          BODY="${BODY}
+- Theme Name: ${SHOPIFY_THEME_NAME}"
+                      fi
+                  fi
+
+                  gh pr create \
+                      --base "${DEFAULT_BRANCH}" \
+                      --head "${PRODUCTION_BRANCH}" \
+                      --title "${TITLE}" \
+                      --body "${BODY}"
+
+                  PR_URL="$(gh pr view --base "${DEFAULT_BRANCH}" --head "${PRODUCTION_BRANCH}" --json url --jq '.url')"
 
                   gh pr merge "${PR_URL}" --rebase --auto || true
 
-            - name: No forward PR needed
+            - name: No Shopify JSON sync PR needed
               if: steps.compare.outputs.status != 'ahead' && steps.compare.outputs.status != 'diverged'
               run: |
                   set -euo pipefail
-                  echo "No forward sync PR needed (compare status: ${{ steps.compare.outputs.status }})."
+                  echo "No Shopify JSON sync PR needed (compare status: ${{ steps.compare.outputs.status }})."
