@@ -47,34 +47,34 @@ on:
                 type: string
                 required: false
                 default: ""
-            shopify_store:
+            SHOPIFY_STORE:
                 type: string
                 required: false
                 default: ""
-            shopify_theme_id:
+            SHOPIFY_THEME_ID:
                 type: string
                 required: false
                 default: ""
-            shopify_preview_base_theme_id:
+            SHOPIFY_PREVIEW_BASE_THEME_ID:
                 type: string
                 required: false
                 default: ""
 
         secrets:
-            shopify_store:
+            SHOPIFY_STORE:
                 required: false
-            shopify_theme_id:
+            SHOPIFY_THEME_ID:
                 required: false
-            shopify_cli_partners_token:
+            SHOPIFY_CLI_PARTNERS_TOKEN:
                 required: true
-            shopify_preview_base_theme_id:
+            SHOPIFY_PREVIEW_BASE_THEME_ID:
                 required: false
 
-            aws_access_key_id:
+            AWS_ACCESS_KEY_ID:
                 required: false
-            aws_secret_access_key:
+            AWS_SECRET_ACCESS_KEY:
                 required: false
-            iamota_actions_read_token:
+            IAMOTA_ACTIONS_READ_TOKEN:
                 required: false
 
 permissions:
@@ -102,15 +102,15 @@ jobs:
 
             AWS_REGION              : ${{ inputs.aws_region }}
             AWS_S3_BUCKET           : ${{ inputs.aws_s3_bucket }}
-            AWS_ACCESS_KEY_ID       : ${{ secrets.aws_access_key_id }}
-            AWS_SECRET_ACCESS_KEY   : ${{ secrets.aws_secret_access_key }}
+            AWS_ACCESS_KEY_ID       : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY   : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
             SHOPIFY_IGNORE     : ${{ inputs.shopify_ignore }}
 
-            SHOPIFY_STORE      : ${{ inputs.shopify_store != '' && inputs.shopify_store || secrets.shopify_store }}
-            SHOPIFY_THEME_ID   : ${{ inputs.shopify_theme_id != '' && inputs.shopify_theme_id || secrets.shopify_theme_id }}
-            SHOPIFY_PREVIEW_BASE_ID : ${{ inputs.shopify_preview_base_theme_id != '' && inputs.shopify_preview_base_theme_id || secrets.shopify_preview_base_theme_id }}
-            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.shopify_cli_partners_token }}
+            SHOPIFY_STORE      : ${{ inputs.SHOPIFY_STORE != '' && inputs.SHOPIFY_STORE || secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID   : ${{ inputs.SHOPIFY_THEME_ID != '' && inputs.SHOPIFY_THEME_ID || secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_PREVIEW_BASE_ID : ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID != '' && inputs.SHOPIFY_PREVIEW_BASE_THEME_ID || secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
+            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
             SHOPIFY_CLI_TTY         : "0"
 
         steps:
@@ -123,10 +123,10 @@ jobs:
               run: |
                   set -euo pipefail
                   MISSING=()
-                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store (input or secret) / SHOPIFY_STORE var")
-                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id (input or secret) / SHOPIFY_THEME_ID var")
-                  [ -n "${SHOPIFY_PREVIEW_BASE_ID:-}" ] || MISSING+=("shopify_preview_base_theme_id (input or secret) / SHOPIFY_PREVIEW_BASE_THEME_ID var")
-                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("shopify_cli_partners_token secret / SHOPIFY_CLI_PARTNERS_TOKEN var")
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE (input or secret) / SHOPIFY_STORE var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID (input or secret) / SHOPIFY_THEME_ID var")
+                  [ -n "${SHOPIFY_PREVIEW_BASE_ID:-}" ] || MISSING+=("SHOPIFY_PREVIEW_BASE_THEME_ID (input or secret) / SHOPIFY_PREVIEW_BASE_THEME_ID var")
+                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("SHOPIFY_CLI_PARTNERS_TOKEN secret / SHOPIFY_CLI_PARTNERS_TOKEN var")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify values: ${MISSING[*]}"
@@ -137,7 +137,7 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   ref: main
-                  token: ${{ secrets.iamota_actions_read_token }}
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
@@ -563,8 +563,8 @@ jobs:
         runs-on: ubuntu-latest
 
         env:
-            SHOPIFY_STORE      : ${{ secrets.shopify_store }}
-            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.shopify_cli_partners_token }}
+            SHOPIFY_STORE      : ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
             SHOPIFY_CLI_TTY         : "0"
 
         steps:
@@ -572,15 +572,15 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   ref: main
-                  token: ${{ secrets.iamota_actions_read_token }}
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
             - name: Validate required Shopify secrets
               run: |
                   set -euo pipefail
                   MISSING=()
-                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store/SHOPIFY_STORE")
-                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("shopify_cli_partners_token/SHOPIFY_CLI_PARTNERS_TOKEN")
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE/SHOPIFY_STORE")
+                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("SHOPIFY_CLI_PARTNERS_TOKEN/SHOPIFY_CLI_PARTNERS_TOKEN")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify secret values: ${MISSING[*]}"

@@ -35,15 +35,15 @@ on:
                 required: false
                 default: ""
         secrets:
-            shopify_store:
+            SHOPIFY_STORE:
                 required: true
-            shopify_theme_id:
+            SHOPIFY_THEME_ID:
                 required: true
-            shopify_cli_partners_token:
+            SHOPIFY_CLI_PARTNERS_TOKEN:
                 required: true
-            aws_access_key_id:
+            AWS_ACCESS_KEY_ID:
                 required: false
-            aws_secret_access_key:
+            AWS_SECRET_ACCESS_KEY:
                 required: false
 
 permissions:
@@ -61,11 +61,11 @@ jobs:
             aws_region: ${{ inputs.aws_region }}
             aws_s3_bucket: ${{ inputs.aws_s3_bucket }}
         secrets:
-            shopify_store: ${{ secrets.shopify_store }}
-            shopify_theme_id: ${{ secrets.shopify_theme_id }}
-            shopify_cli_partners_token: ${{ secrets.shopify_cli_partners_token }}
-            aws_access_key_id: ${{ secrets.aws_access_key_id }}
-            aws_secret_access_key: ${{ secrets.aws_secret_access_key }}
+            SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     deploy:
         needs: [backup]
@@ -78,6 +78,6 @@ jobs:
             build_install_command: ${{ inputs.build_install_command }}
             build_command: ${{ inputs.build_command }}
         secrets:
-            shopify_store: ${{ secrets.shopify_store }}
-            shopify_theme_id: ${{ secrets.shopify_theme_id }}
-            shopify_cli_partners_token: ${{ secrets.shopify_cli_partners_token }}
+            SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}

@@ -17,11 +17,11 @@ Inputs:
 
 Secrets:
 
-- `shopify_store` (required)
-- `shopify_theme_id` (required)
-- `shopify_cli_partners_token` (required)
-- `aws_access_key_id` (optional)
-- `aws_secret_access_key` (optional)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_THEME_ID` (required)
+- `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `AWS_ACCESS_KEY_ID` (optional)
+- `AWS_SECRET_ACCESS_KEY` (optional)
 
 ### `.github/workflows/shopify-deploy.yml`
 
@@ -39,9 +39,9 @@ Inputs:
 
 Secrets:
 
-- `shopify_store` (required)
-- `shopify_theme_id` (required)
-- `shopify_cli_partners_token` (required)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_THEME_ID` (required)
+- `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
 
 Notes:
 
@@ -69,11 +69,11 @@ Inputs:
 
 Secrets:
 
-- `shopify_store` (required)
-- `shopify_theme_id` (required)
-- `shopify_cli_partners_token` (required)
-- `aws_access_key_id` (optional)
-- `aws_secret_access_key` (optional)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_THEME_ID` (required)
+- `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `AWS_ACCESS_KEY_ID` (optional)
+- `AWS_SECRET_ACCESS_KEY` (optional)
 
 Notes:
 
@@ -95,7 +95,7 @@ Inputs:
 
 Secrets:
 
-- `shopify_store`, `shopify_theme_id`, `shopify_cli_partners_token` (required)
+- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
 
 Notes:
 
@@ -135,9 +135,9 @@ Inputs:
 
 Secrets:
 
-- `shopify_store`, `shopify_theme_id`, `shopify_cli_partners_token` (required)
-- `shopify_preview_base_theme_id` (required)
-- `aws_access_key_id`, `aws_secret_access_key` (optional)
+- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_CLI_PARTNERS_TOKEN` (required)
+- `SHOPIFY_PREVIEW_BASE_THEME_ID` (required)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (optional)
 
 Notes:
 

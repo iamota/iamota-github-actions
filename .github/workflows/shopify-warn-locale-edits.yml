@@ -8,7 +8,7 @@ on:
                 required: false
                 default: "I will manually deploy locales"
         secrets:
-            iamota_actions_read_token:
+            IAMOTA_ACTIONS_READ_TOKEN:
                 required: false
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   ref: main
-                  token: ${{ secrets.iamota_actions_read_token }}
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
             - name: Setup Node

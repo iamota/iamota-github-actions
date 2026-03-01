@@ -27,11 +27,11 @@ jobs:
       aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
     secrets:
-      shopify_store: ${{ secrets.SHOPIFY_STORE }}
-      shopify_theme_id: ${{ secrets.SHOPIFY_THEME_ID }}
-      shopify_cli_partners_token: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
-      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+      SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+      SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
 Example: split JSON sync + forward + preview wrappers
@@ -52,9 +52,9 @@ jobs:
       theme_src: ${{ vars.THEME_SRC || 'src' }}
       theme_pull_dir: ${{ vars.THEME_PULL_DIR || '_remote_theme' }}
     secrets:
-      shopify_store: ${{ secrets.SHOPIFY_STORE }}
-      shopify_theme_id: ${{ secrets.SHOPIFY_THEME_ID }}
-      shopify_cli_partners_token: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+      SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+      SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
 ```
 
 ```yaml
@@ -94,12 +94,12 @@ jobs:
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
       shopify_ignore: ${{ vars.SHOPIFY_IGNORE || '' }}
     secrets:
-      shopify_store: ${{ secrets.SHOPIFY_STORE }}
-      shopify_theme_id: ${{ secrets.SHOPIFY_THEME_ID }}
-      shopify_cli_partners_token: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
-      shopify_preview_base_theme_id: ${{ secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
-      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+      SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+      SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+      SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ secrets.SHOPIFY_PREVIEW_BASE_THEME_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
 ## 2) Configure Required Secrets/Vars In Consumer Repo

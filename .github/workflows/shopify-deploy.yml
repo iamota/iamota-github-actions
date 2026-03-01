@@ -27,11 +27,11 @@ on:
                 required: false
                 default : "npx webpack --env target=${GITHUB_BRANCH}"
         secrets:
-            shopify_store:
+            SHOPIFY_STORE:
                 required: true
-            shopify_theme_id:
+            SHOPIFY_THEME_ID:
                 required: true
-            shopify_cli_partners_token:
+            SHOPIFY_CLI_PARTNERS_TOKEN:
                 required: true
 
 permissions:
@@ -48,9 +48,9 @@ jobs:
             THEME_PATH             : ${{ inputs.theme_path }}
             BUILD_INSTALL_COMMAND  : ${{ inputs.build_install_command }}
             BUILD_COMMAND          : ${{ inputs.build_command }}
-            SHOPIFY_STORE     : ${{ secrets.shopify_store }}
-            SHOPIFY_THEME_ID  : ${{ secrets.shopify_theme_id }}
-            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.shopify_cli_partners_token }}
+            SHOPIFY_STORE     : ${{ secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID  : ${{ secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
 
         steps:
             - uses: actions/checkout@v4

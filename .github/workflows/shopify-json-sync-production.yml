@@ -17,23 +17,23 @@ on:
                 type: string
                 required: false
                 default: "_remote_theme"
-            shopify_store:
+            SHOPIFY_STORE:
                 type: string
                 required: false
                 default: ""
-            shopify_theme_id:
+            SHOPIFY_THEME_ID:
                 type: string
                 required: false
                 default: ""
 
         secrets:
-            shopify_store:
+            SHOPIFY_STORE:
                 required: false
-            shopify_theme_id:
+            SHOPIFY_THEME_ID:
                 required: false
-            shopify_cli_partners_token:
+            SHOPIFY_CLI_PARTNERS_TOKEN:
                 required: true
-            iamota_actions_read_token:
+            IAMOTA_ACTIONS_READ_TOKEN:
                 required: false
 
 permissions:
@@ -48,14 +48,13 @@ jobs:
         runs-on: ubuntu-latest
 
         env:
-            PRODUCTION_BRANCH       : ${{ inputs.production_branch }}
-            THEME_SRC               : ${{ inputs.theme_src }}
-            THEME_PULL_DIR          : ${{ inputs.theme_pull_dir }}
-
-            SHOPIFY_STORE      : ${{ inputs.shopify_store != '' && inputs.shopify_store || secrets.shopify_store }}
-            SHOPIFY_THEME_ID   : ${{ inputs.shopify_theme_id != '' && inputs.shopify_theme_id || secrets.shopify_theme_id }}
-            SHOPIFY_CLI_PARTNERS_TOKEN : ${{ secrets.shopify_cli_partners_token }}
-            SHOPIFY_CLI_TTY         : "0"
+            PRODUCTION_BRANCH         : ${{ inputs.production_branch }}
+            THEME_SRC                 : ${{ inputs.theme_src }}
+            THEME_PULL_DIR            : ${{ inputs.theme_pull_dir }}
+            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE != '' && inputs.SHOPIFY_STORE || secrets.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID != '' && inputs.SHOPIFY_THEME_ID || secrets.SHOPIFY_THEME_ID }}
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+            SHOPIFY_CLI_TTY           : "0"
 
         steps:
             - name: Checkout production branch
@@ -68,9 +67,9 @@ jobs:
               run: |
                   set -euo pipefail
                   MISSING=()
-                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("shopify_store (input or secret) / SHOPIFY_STORE var")
-                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("shopify_theme_id (input or secret) / SHOPIFY_THEME_ID var")
-                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("shopify_cli_partners_token secret / SHOPIFY_CLI_PARTNERS_TOKEN var")
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE (input or secret) / SHOPIFY_STORE var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID (input or secret) / SHOPIFY_THEME_ID var")
+                  [ -n "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ] || MISSING+=("SHOPIFY_CLI_PARTNERS_TOKEN secret / SHOPIFY_CLI_PARTNERS_TOKEN var")
 
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify values: ${MISSING[*]}"
@@ -81,7 +80,7 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   ref: main
-                  token: ${{ secrets.iamota_actions_read_token }}
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
