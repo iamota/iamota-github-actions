@@ -35,6 +35,22 @@ on:
         type: string
         required: false
         default: "true"
+      theme_check_fail_level:
+        type: string
+        required: false
+        default: "error"
+      theme_check_config_path:
+        type: string
+        required: false
+        default: ""
+      theme_check_verbose:
+        type: string
+        required: false
+        default: "false"
+      theme_check_auto_correct:
+        type: string
+        required: false
+        default: "false"
       run_lint:
         type: string
         required: false
@@ -106,10 +122,13 @@ jobs:
         uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
       - name: Theme Check
-        uses: shopify/theme-check-action@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-check@main
         with:
-          theme_root: "_ci_theme_root"
-          flags: "--fail-level error"
+          path: _ci_theme_root
+          fail_level: ${{ inputs.theme_check_fail_level }}
+          config_path: ${{ inputs.theme_check_config_path }}
+          verbose: ${{ inputs.theme_check_verbose }}
+          auto_correct: ${{ inputs.theme_check_auto_correct }}
 
   lint:
     if: inputs.run_lint == 'true'
