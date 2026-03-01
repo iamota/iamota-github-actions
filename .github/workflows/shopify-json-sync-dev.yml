@@ -48,6 +48,11 @@ jobs:
             SHOPIFY_THEME_NAME: ${{ inputs.shopify_theme_name }}
 
         steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
             - name: Close existing generated sync PRs (production -> default)
               env:
                   GH_TOKEN: ${{ github.token }}
