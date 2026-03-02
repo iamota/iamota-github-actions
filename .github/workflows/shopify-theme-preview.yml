@@ -418,23 +418,31 @@ jobs:
                   marker: iamota-shopify-preview
                   extract_regex: theme_id=(\d+)
 
+            - name: Normalize marker theme id
+              id: marker_norm
+              run: |
+                  set -euo pipefail
+                  RAW_ID="${{ steps.marker.outputs.extracted_value }}"
+                  THEME_ID="$(printf '%s' "${RAW_ID}" | tr -cd '0-9')"
+                  echo "theme_id=${THEME_ID}" >> "$GITHUB_OUTPUT"
+
             - name: Delete preview theme (if exists)
-              if: steps.marker.outputs.extracted_value != ''
+              if: steps.marker_norm.outputs.theme_id != ''
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@main
               with:
                   store: ${{ env.SHOPIFY_STORE }}
-                  theme_id: ${{ steps.marker.outputs.extracted_value }}
+                  theme_id: ${{ steps.marker_norm.outputs.theme_id }}
                   token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
 
             - name: Build cleanup comment body
               id: cleanup_comment
               run: |
                   set -euo pipefail
-                  THEME_ID="${{ steps.marker.outputs.extracted_value }}"
+                  THEME_ID="${{ steps.marker_norm.outputs.theme_id }}"
                   if [ -n "${THEME_ID}" ]; then
-                      BODY="<!-- iamota-shopify-preview -->[CLEANUP] Preview theme deleted: \`${THEME_ID}\`"
+                      BODY="[CLEANUP] Preview theme deleted: \`${THEME_ID}\`"
                   else
-                      BODY="<!-- iamota-shopify-preview -->[CLEANUP] No preview theme found to delete."
+                      BODY="[CLEANUP] No preview theme found to delete."
                   fi
                   {
                     echo "body<<EOF"
