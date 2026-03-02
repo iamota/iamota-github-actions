@@ -39,7 +39,7 @@ jobs:
             matrix_json: ${{ steps.stores.outputs.matrix_json }}
         steps:
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matrix
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
 
@@ -67,42 +67,42 @@ jobs:
 
             - name: Resolve theme id
               id: resolve_theme_id
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
 
             - name: Resolve Shopify token
               id: resolve_theme_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
 
             - name: Resolve AWS region
               id: resolve_aws_region
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_REGION }}
 
             - name: Resolve AWS bucket
               id: resolve_aws_bucket
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_S3_BUCKET }}
 
             - name: Resolve AWS access key id
               id: resolve_aws_key
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_ACCESS_KEY_ID }}
 
             - name: Resolve AWS secret access key
               id: resolve_aws_secret
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
@@ -121,7 +121,7 @@ jobs:
                   } >> "$GITHUB_ENV"
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matrix
 
             - name: Validate required Shopify values
               run: |
@@ -152,7 +152,7 @@ jobs:
                   echo "DEST_PATH=${DEST_PATH}" >> "$GITHUB_ENV"
 
             - name: Backup and zip theme files
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@matrix
               with:
                   store     : ${{ env.SHOPIFY_STORE }}
                   theme_id  : ${{ env.SHOPIFY_THEME_ID }}
@@ -170,14 +170,14 @@ jobs:
 
             - name: Upload backup zip to S3 (optional)
               if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
-              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@matix
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@matrix
               with:
                   file     : ${{ env.ZIP_NAME }}
                   bucket   : ${{ env.AWS_S3_BUCKET }}
                   dest_path: ${{ env.DEST_PATH }}
 
             - name: Upload backup to GitHub Actions Artifacts
-              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@matix
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@matrix
               with:
                   name: ${{ env.FILE_NAME }}
                   path: ./backup

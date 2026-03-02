@@ -99,97 +99,97 @@ jobs:
       run_lighthouse: ${{ steps.out.outputs.run_lighthouse }}
     steps:
       - id: stores
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matrix
         with:
           stores: ${{ inputs.shopify_store }}
           allow_empty: "true"
 
       - id: resolve_theme_src
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_src }}
 
       - id: resolve_theme_dist
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_dist }}
 
       - id: resolve_build_install
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.build_install_command }}
 
       - id: resolve_build_command
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.build_command }}
 
       - id: resolve_shopify_theme_id
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.shopify_theme_id }}
 
       - id: resolve_lighthouse_align
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.lighthouse_align_with_production_json }}
 
       - id: resolve_run_theme_check
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_theme_check }}
 
       - id: resolve_theme_check_fail_level
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_fail_level }}
 
       - id: resolve_theme_check_config_path
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_config_path }}
 
       - id: resolve_theme_check_verbose
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_verbose }}
 
       - id: resolve_theme_check_auto_correct
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_auto_correct }}
 
       - id: resolve_run_lint
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_lint }}
 
       - id: resolve_run_test
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_test }}
 
       - id: resolve_run_a11y
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_a11y }}
 
       - id: resolve_run_lighthouse
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_lighthouse }}
@@ -226,7 +226,7 @@ jobs:
 
       - name: Prepare theme (install + build + resolve dist)
         id: root
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@matrix
         with:
           theme_src            : ${{ needs.resolve_inputs.outputs.theme_src }}
           theme_dist           : ${{ needs.resolve_inputs.outputs.theme_dist }}
@@ -257,10 +257,10 @@ jobs:
           path: _ci_theme_root
 
       - name: Setup Node + Install Shopify CLI
-        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matrix
 
       - name: Theme Check
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-check@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-check@matrix
         with:
           path: _ci_theme_root
           fail_level: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
@@ -276,7 +276,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: NPM install (self-aware)
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@matix
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@matrix
         with:
           working_directory: "."
           install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
@@ -310,7 +310,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: NPM install (self-aware)
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@matix
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@matrix
         with:
           working_directory: "."
           install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
@@ -338,7 +338,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: NPM install (self-aware)
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@matix
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@matrix
         with:
           working_directory: "."
           install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
@@ -384,35 +384,35 @@ jobs:
     steps:
       - name: Resolve store-scoped run_lighthouse flag
         id: resolve_store_run_lighthouse
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_RUN_LIGHTHOUSE }}
 
       - name: Resolve store-scoped lighthouse theme id
         id: resolve_store_theme_id
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
 
       - name: Resolve store-scoped lighthouse JSON alignment flag
         id: resolve_store_lh_align
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LIGHTHOUSE_ALIGN }}
 
       - name: Resolve store-scoped Shopify token
         id: resolve_store_shopify_token
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
 
       - name: Resolve store-scoped LHCI token
         id: resolve_store_lhci_token
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LHCI_GITHUB_APP_TOKEN }}
@@ -450,11 +450,11 @@ jobs:
 
       - name: Setup Node + Install Shopify CLI (for JSON alignment)
         if: steps.prereq.outputs.ready == 'true' && steps.resolve_store_lh_align.outputs.value == 'true'
-        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matrix
 
       - name: Pull production theme for lighthouse JSON alignment
         if: steps.prereq.outputs.ready == 'true' && steps.resolve_store_lh_align.outputs.value == 'true' && steps.resolve_store_theme_id.outputs.value != ''
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@matrix
         with:
           store: ${{ env.TARGET_STORE }}
           theme_id: ${{ steps.resolve_store_theme_id.outputs.value }}
@@ -479,7 +479,7 @@ jobs:
 
       - name: Lighthouse
         if: steps.prereq.outputs.ready == 'true'
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@matix
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@matrix
         with:
           access_token: ${{ steps.resolve_store_shopify_token.outputs.value }}
           store: ${{ env.TARGET_STORE }}

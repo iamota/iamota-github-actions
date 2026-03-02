@@ -50,7 +50,7 @@ jobs:
             first_store: ${{ steps.stores.outputs.first_store }}
         steps:
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matrix
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
 
@@ -71,35 +71,35 @@ jobs:
         steps:
             - name: Resolve master theme source path
               id: resolve_theme_src
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_THEME_SRC }}
 
             - name: Resolve master theme pull path
               id: resolve_theme_pull_dir
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_THEME_PULL_DIR }}
 
             - name: Resolve master source theme id
               id: resolve_theme_id
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
 
             - name: Resolve master Shopify token
               id: resolve_shopify_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
 
             - name: Resolve helper checkout token (optional)
               id: resolve_helper_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
@@ -135,14 +135,14 @@ jobs:
                   fi
 
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@matix
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@matrix
               with:
-                  ref: matix
+                  ref: matrix
                   token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matrix
 
             - name: Reset pulled theme directory
               run: |
@@ -150,7 +150,7 @@ jobs:
                   rm -rf "${THEME_PULL_DIR}"
 
             - name: Pull theme into temp directory (json-oriented pull)
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@matix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@matrix
               with:
                   store     : ${{ env.SHOPIFY_STORE }}
                   theme_id  : ${{ env.SHOPIFY_THEME_ID }}
