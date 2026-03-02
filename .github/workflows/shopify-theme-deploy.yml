@@ -41,22 +41,97 @@ permissions:
     contents: read
 
 jobs:
+    resolve_targets:
+        runs-on: ubuntu-latest
+        outputs:
+            matrix_json: ${{ steps.stores.outputs.matrix_json }}
+        steps:
+            - id: stores
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@main
+              with:
+                  stores: ${{ inputs.SHOPIFY_STORE }}
+
     deploy:
+        needs: [resolve_targets]
+        strategy:
+            fail-fast: false
+            matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
         runs-on: ubuntu-latest
         env:
             GITHUB_BRANCH             : ${{ inputs.branch }}
             GITHUB_SHA                : ${{ github.sha }}
-            THEME_SRC                 : ${{ inputs.theme_src }}
-            THEME_DIST                : ${{ inputs.theme_dist }}
-            THEME_PATH                : ${{ inputs.theme_path }}
-            BUILD_INSTALL_COMMAND     : ${{ inputs.build_install_command }}
-            BUILD_COMMAND             : ${{ inputs.build_command }}
-            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID }}
-            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            TARGET_STORE              : ${{ matrix.store }}
+            RAW_THEME_SRC             : ${{ inputs.theme_src }}
+            RAW_THEME_DIST            : ${{ inputs.theme_dist }}
+            RAW_THEME_PATH            : ${{ inputs.theme_path }}
+            RAW_BUILD_INSTALL_COMMAND : ${{ inputs.build_install_command }}
+            RAW_BUILD_COMMAND         : ${{ inputs.build_command }}
+            RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_THEME_ID }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 
         steps:
             - uses: actions/checkout@v4
+
+            - name: Resolve theme id
+              id: resolve_theme_id
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
+
+            - name: Resolve theme source path
+              id: resolve_theme_src
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_THEME_SRC }}
+
+            - name: Resolve theme dist path
+              id: resolve_theme_dist
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_THEME_DIST }}
+
+            - name: Resolve explicit theme path
+              id: resolve_theme_path
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_THEME_PATH }}
+
+            - name: Resolve build install command
+              id: resolve_build_install
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_BUILD_INSTALL_COMMAND }}
+
+            - name: Resolve build command
+              id: resolve_build_command
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_BUILD_COMMAND }}
+
+            - name: Resolve Shopify token
+              id: resolve_token
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+
+            - name: Validate resolved Shopify values
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${TARGET_STORE:-}" ] || MISSING+=("SHOPIFY_STORE (resolved target store)")
+                  [ -n "${{ steps.resolve_theme_id.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ID (resolved)")
+                  [ -n "${{ steps.resolve_token.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN (resolved)")
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required resolved values: ${MISSING[*]}"
+                      exit 1
+                  fi
 
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
@@ -67,11 +142,11 @@ jobs:
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
-                  theme_src             : ${{ env.THEME_SRC }}
-                  theme_dist            : ${{ env.THEME_DIST }}
-                  theme_path            : ${{ env.THEME_PATH }}
-                  build_install_command : ${{ env.BUILD_INSTALL_COMMAND }}
-                  build_command         : ${{ env.BUILD_COMMAND }}
+                  theme_src             : ${{ steps.resolve_theme_src.outputs.value }}
+                  theme_dist            : ${{ steps.resolve_theme_dist.outputs.value }}
+                  theme_path            : ${{ steps.resolve_theme_path.outputs.value }}
+                  build_install_command : ${{ steps.resolve_build_install.outputs.value }}
+                  build_command         : ${{ steps.resolve_build_command.outputs.value }}
 
             - name: Determine allow-live and nodelete flags safely
               run: |
@@ -102,9 +177,9 @@ jobs:
             - name: Deploy
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@main
               with:
-                  store     : ${{ env.SHOPIFY_STORE }}
-                  theme_id  : ${{ env.SHOPIFY_THEME_ID }}
-                  token     : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  store     : ${{ env.TARGET_STORE }}
+                  theme_id  : ${{ steps.resolve_theme_id.outputs.value }}
+                  token     : ${{ steps.resolve_token.outputs.value }}
                   path      : ${{ steps.prepare.outputs.theme_dist_effective }}
                   allow_live: ${{ env.ALLOW_LIVE_INPUT }}
                   nodelete  : ${{ env.NODELETE_INPUT }}

@@ -1,0 +1,89 @@
+name: "Shopify Multistore Resolve Value"
+description: "Resolve a scalar or store-keyed JSON object value for a specific store"
+inputs:
+    store:
+        required: true
+    raw:
+        required: false
+        default: ""
+outputs:
+    value:
+        description: "Resolved value for this store"
+        value: ${{ steps.resolve.outputs.value }}
+runs:
+    using: "composite"
+    steps:
+        - id: resolve
+          run: |
+              set -euo pipefail
+              STORE="${{ inputs.store }}"
+              RAW="${{ inputs.raw }}"
+
+              VALUE="$(
+                node - "${STORE}" "${RAW}" <<'NODE'
+                function normalizeStore(v) {
+                    let s = String(v ?? "").trim();
+                    if (!s) return "";
+                    s = s.replace(/^https?:\/\//i, "");
+                    s = s.split("/")[0].trim().toLowerCase();
+                    if (!s) return "";
+                    if (!s.includes(".")) s = `${s}.myshopify.com`;
+                    return s;
+                }
+
+                function asString(v) {
+                    if (v === undefined || v === null) return "";
+                    if (typeof v === "string") return v;
+                    if (typeof v === "number" || typeof v === "boolean") return String(v);
+                    return JSON.stringify(v);
+                }
+
+                const storeRaw = process.argv[2] || "";
+                const raw = process.argv[3] || "";
+                const store = normalizeStore(storeRaw);
+                const slug = store.replace(/\.myshopify\.com$/i, "");
+                const trimmed = String(raw).trim();
+
+                if (!trimmed) {
+                    process.stdout.write("");
+                    process.exit(0);
+                }
+
+                // Scalar value: return as-is
+                if (!(trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+                    process.stdout.write(raw);
+                    process.exit(0);
+                }
+
+                let obj;
+                try {
+                    obj = JSON.parse(trimmed);
+                } catch {
+                    process.stdout.write(raw);
+                    process.exit(0);
+                }
+
+                if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+                    process.stdout.write(raw);
+                    process.exit(0);
+                }
+
+                const keyVariants = [storeRaw, store, slug, String(storeRaw || "").toLowerCase(), String(slug || "").toLowerCase()];
+                for (const k of keyVariants) {
+                    if (!k) continue;
+                    if (Object.prototype.hasOwnProperty.call(obj, k)) {
+                        process.stdout.write(asString(obj[k]));
+                        process.exit(0);
+                    }
+                }
+
+                process.stdout.write("");
+                NODE
+              )"
+
+              {
+                echo "value<<EOF"
+                printf '%s\n' "${VALUE}"
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+          shell: bash

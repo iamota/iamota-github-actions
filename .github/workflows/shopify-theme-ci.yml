@@ -77,8 +77,146 @@ permissions:
   contents: read
 
 jobs:
+  resolve_inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix_json: ${{ steps.stores.outputs.matrix_json }}
+      first_store: ${{ steps.stores.outputs.first_store }}
+      theme_src: ${{ steps.out.outputs.theme_src }}
+      theme_dist: ${{ steps.out.outputs.theme_dist }}
+      build_install_command: ${{ steps.out.outputs.build_install_command }}
+      build_command: ${{ steps.out.outputs.build_command }}
+      shopify_theme_id: ${{ steps.out.outputs.shopify_theme_id }}
+      lighthouse_align_with_production_json: ${{ steps.out.outputs.lighthouse_align_with_production_json }}
+      run_theme_check: ${{ steps.out.outputs.run_theme_check }}
+      theme_check_fail_level: ${{ steps.out.outputs.theme_check_fail_level }}
+      theme_check_config_path: ${{ steps.out.outputs.theme_check_config_path }}
+      theme_check_verbose: ${{ steps.out.outputs.theme_check_verbose }}
+      theme_check_auto_correct: ${{ steps.out.outputs.theme_check_auto_correct }}
+      run_lint: ${{ steps.out.outputs.run_lint }}
+      run_test: ${{ steps.out.outputs.run_test }}
+      run_a11y: ${{ steps.out.outputs.run_a11y }}
+      run_lighthouse: ${{ steps.out.outputs.run_lighthouse }}
+    steps:
+      - id: stores
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@main
+        with:
+          stores: ${{ inputs.shopify_store }}
+          allow_empty: "true"
+
+      - id: resolve_theme_src
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_src }}
+
+      - id: resolve_theme_dist
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_dist }}
+
+      - id: resolve_build_install
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.build_install_command }}
+
+      - id: resolve_build_command
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.build_command }}
+
+      - id: resolve_shopify_theme_id
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.shopify_theme_id }}
+
+      - id: resolve_lighthouse_align
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.lighthouse_align_with_production_json }}
+
+      - id: resolve_run_theme_check
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.run_theme_check }}
+
+      - id: resolve_theme_check_fail_level
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_check_fail_level }}
+
+      - id: resolve_theme_check_config_path
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_check_config_path }}
+
+      - id: resolve_theme_check_verbose
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_check_verbose }}
+
+      - id: resolve_theme_check_auto_correct
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_check_auto_correct }}
+
+      - id: resolve_run_lint
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.run_lint }}
+
+      - id: resolve_run_test
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.run_test }}
+
+      - id: resolve_run_a11y
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.run_a11y }}
+
+      - id: resolve_run_lighthouse
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.run_lighthouse }}
+
+      - id: out
+        run: |
+          {
+            echo "theme_src=${{ steps.resolve_theme_src.outputs.value != '' && steps.resolve_theme_src.outputs.value || '.' }}"
+            echo "theme_dist=${{ steps.resolve_theme_dist.outputs.value }}"
+            echo "build_install_command=${{ steps.resolve_build_install.outputs.value != '' && steps.resolve_build_install.outputs.value || 'npm ci' }}"
+            echo "build_command=${{ steps.resolve_build_command.outputs.value != '' && steps.resolve_build_command.outputs.value || 'npx webpack --env target=lighthouse' }}"
+            echo "shopify_theme_id=${{ steps.resolve_shopify_theme_id.outputs.value }}"
+            echo "lighthouse_align_with_production_json=${{ steps.resolve_lighthouse_align.outputs.value != '' && steps.resolve_lighthouse_align.outputs.value || 'false' }}"
+            echo "run_theme_check=${{ steps.resolve_run_theme_check.outputs.value != '' && steps.resolve_run_theme_check.outputs.value || 'true' }}"
+            echo "theme_check_fail_level=${{ steps.resolve_theme_check_fail_level.outputs.value != '' && steps.resolve_theme_check_fail_level.outputs.value || 'error' }}"
+            echo "theme_check_config_path=${{ steps.resolve_theme_check_config_path.outputs.value }}"
+            echo "theme_check_verbose=${{ steps.resolve_theme_check_verbose.outputs.value != '' && steps.resolve_theme_check_verbose.outputs.value || 'false' }}"
+            echo "theme_check_auto_correct=${{ steps.resolve_theme_check_auto_correct.outputs.value != '' && steps.resolve_theme_check_auto_correct.outputs.value || 'false' }}"
+            echo "run_lint=${{ steps.resolve_run_lint.outputs.value != '' && steps.resolve_run_lint.outputs.value || 'true' }}"
+            echo "run_test=${{ steps.resolve_run_test.outputs.value != '' && steps.resolve_run_test.outputs.value || 'true' }}"
+            echo "run_a11y=${{ steps.resolve_run_a11y.outputs.value != '' && steps.resolve_run_a11y.outputs.value || 'true' }}"
+            echo "run_lighthouse=${{ steps.resolve_run_lighthouse.outputs.value != '' && steps.resolve_run_lighthouse.outputs.value || 'true' }}"
+          } >> "$GITHUB_OUTPUT"
+
   prepare:
-    if: inputs.run_theme_check == 'true' || inputs.run_a11y == 'true' || inputs.run_lighthouse == 'true'
+    if: needs.resolve_inputs.outputs.run_theme_check == 'true' || needs.resolve_inputs.outputs.run_a11y == 'true' || needs.resolve_inputs.outputs.run_lighthouse == 'true'
+    needs: [resolve_inputs]
     runs-on: ubuntu-latest
     outputs:
       theme_root   : ${{ steps.root.outputs.theme_dist_effective }}
@@ -90,10 +228,10 @@ jobs:
         id: root
         uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@main
         with:
-          theme_src            : ${{ inputs.theme_src }}
-          theme_dist           : ${{ inputs.theme_dist }}
-          build_install_command: ${{ inputs.build_install_command }}
-          build_command        : ${{ inputs.build_command }}
+          theme_src            : ${{ needs.resolve_inputs.outputs.theme_src }}
+          theme_dist           : ${{ needs.resolve_inputs.outputs.theme_dist }}
+          build_install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
+          build_command        : ${{ needs.resolve_inputs.outputs.build_command }}
 
       - name: Set artifact name
         id: meta
@@ -108,8 +246,8 @@ jobs:
           if-no-files-found: error
 
   theme_check:
-    if: inputs.run_theme_check == 'true'
-    needs: [prepare]
+    if: needs.resolve_inputs.outputs.run_theme_check == 'true'
+    needs: [resolve_inputs, prepare]
     runs-on: ubuntu-latest
     steps:
       - name: Download prepared theme root
@@ -125,13 +263,14 @@ jobs:
         uses: iamota/iamota-github-actions/.github/actions/shopify-theme-check@main
         with:
           path: _ci_theme_root
-          fail_level: ${{ inputs.theme_check_fail_level }}
-          config_path: ${{ inputs.theme_check_config_path }}
-          verbose: ${{ inputs.theme_check_verbose }}
-          auto_correct: ${{ inputs.theme_check_auto_correct }}
+          fail_level: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
+          config_path: ${{ needs.resolve_inputs.outputs.theme_check_config_path }}
+          verbose: ${{ needs.resolve_inputs.outputs.theme_check_verbose }}
+          auto_correct: ${{ needs.resolve_inputs.outputs.theme_check_auto_correct }}
 
   lint:
-    if: inputs.run_lint == 'true'
+    if: needs.resolve_inputs.outputs.run_lint == 'true'
+    needs: [resolve_inputs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,7 +279,7 @@ jobs:
         uses: iamota/iamota-github-actions/.github/actions/npm-install@main
         with:
           working_directory: "."
-          install_command: ${{ inputs.build_install_command }}
+          install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
           if_package_json: "1"
 
       - name: Run lint script when available
@@ -164,7 +303,8 @@ jobs:
           fi
 
   test:
-    if: inputs.run_test == 'true'
+    if: needs.resolve_inputs.outputs.run_test == 'true'
+    needs: [resolve_inputs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +313,7 @@ jobs:
         uses: iamota/iamota-github-actions/.github/actions/npm-install@main
         with:
           working_directory: "."
-          install_command: ${{ inputs.build_install_command }}
+          install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
           if_package_json: "1"
 
       - name: Run test script when available
@@ -191,8 +331,8 @@ jobs:
           npm test --if-present
 
   a11y:
-    if: inputs.run_a11y == 'true'
-    needs: [prepare]
+    if: needs.resolve_inputs.outputs.run_a11y == 'true'
+    needs: [resolve_inputs, prepare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -201,7 +341,7 @@ jobs:
         uses: iamota/iamota-github-actions/.github/actions/npm-install@main
         with:
           working_directory: "."
-          install_command: ${{ inputs.build_install_command }}
+          install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
           if_package_json: "1"
 
       - name: Download prepared theme root
@@ -228,20 +368,71 @@ jobs:
           npm run a11y
 
   lighthouse:
-    if: inputs.run_lighthouse == 'true'
-    needs: [prepare]
+    if: inputs.run_lighthouse != 'false'
+    needs: [resolve_inputs, prepare]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve_inputs.outputs.matrix_json) }}
     runs-on: ubuntu-latest
+    env:
+      TARGET_STORE: ${{ matrix.store }}
+      RAW_SHOPIFY_THEME_ID: ${{ inputs.shopify_theme_id }}
+      RAW_LIGHTHOUSE_ALIGN: ${{ inputs.lighthouse_align_with_production_json }}
+      RAW_RUN_LIGHTHOUSE: ${{ inputs.run_lighthouse }}
+      RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+      RAW_LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
     steps:
+      - name: Resolve store-scoped run_lighthouse flag
+        id: resolve_store_run_lighthouse
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ env.TARGET_STORE }}
+          raw: ${{ env.RAW_RUN_LIGHTHOUSE }}
+
+      - name: Resolve store-scoped lighthouse theme id
+        id: resolve_store_theme_id
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ env.TARGET_STORE }}
+          raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
+
+      - name: Resolve store-scoped lighthouse JSON alignment flag
+        id: resolve_store_lh_align
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ env.TARGET_STORE }}
+          raw: ${{ env.RAW_LIGHTHOUSE_ALIGN }}
+
+      - name: Resolve store-scoped Shopify token
+        id: resolve_store_shopify_token
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ env.TARGET_STORE }}
+          raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+
+      - name: Resolve store-scoped LHCI token
+        id: resolve_store_lhci_token
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+        with:
+          store: ${{ env.TARGET_STORE }}
+          raw: ${{ env.RAW_LHCI_GITHUB_APP_TOKEN }}
+
       - uses: actions/checkout@v4
 
       - name: Check lighthouse prerequisites
         id: prereq
         run: |
           set -euo pipefail
+          if [ "${{ steps.resolve_store_run_lighthouse.outputs.value }}" = "false" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping lighthouse for ${TARGET_STORE}: run_lighthouse=false."
+            exit 0
+          fi
+
           MISSING=()
-          [ -n "${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
-          [ -n "${{ inputs.shopify_store }}" ] || MISSING+=("shopify_store input")
-          [ -n "${{ secrets.LHCI_GITHUB_APP_TOKEN }}" ] || MISSING+=("LHCI_GITHUB_APP_TOKEN")
+          [ -n "${{ steps.resolve_store_shopify_token.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
+          [ -n "${TARGET_STORE}" ] || MISSING+=("shopify_store input")
+          [ -n "${{ steps.resolve_store_lhci_token.outputs.value }}" ] || MISSING+=("LHCI_GITHUB_APP_TOKEN")
 
           if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -258,21 +449,21 @@ jobs:
           path: _ci_theme_root
 
       - name: Setup Node + Install Shopify CLI (for JSON alignment)
-        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true'
+        if: steps.prereq.outputs.ready == 'true' && steps.resolve_store_lh_align.outputs.value == 'true'
         uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
 
       - name: Pull production theme for lighthouse JSON alignment
-        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id != ''
+        if: steps.prereq.outputs.ready == 'true' && steps.resolve_store_lh_align.outputs.value == 'true' && steps.resolve_store_theme_id.outputs.value != ''
         uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@main
         with:
-          store: ${{ inputs.shopify_store }}
-          theme_id: ${{ inputs.shopify_theme_id }}
-          token: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+          store: ${{ env.TARGET_STORE }}
+          theme_id: ${{ steps.resolve_store_theme_id.outputs.value }}
+          token: ${{ steps.resolve_store_shopify_token.outputs.value }}
           path: _lighthouse_remote_theme
           nodelete: "1"
 
       - name: Sync production JSON into lighthouse theme root
-        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id != ''
+        if: steps.prereq.outputs.ready == 'true' && steps.resolve_store_lh_align.outputs.value == 'true' && steps.resolve_store_theme_id.outputs.value != ''
         env:
           THEME_PULL_DIR: _lighthouse_remote_theme
           THEME_ROOT: _ci_theme_root
@@ -282,7 +473,7 @@ jobs:
           node .github/scripts/shopify/sync-shopify-json.mjs
 
       - name: Warn when JSON alignment requested but theme id missing
-        if: steps.prereq.outputs.ready == 'true' && inputs.lighthouse_align_with_production_json == 'true' && inputs.shopify_theme_id == ''
+        if: steps.prereq.outputs.ready == 'true' && steps.resolve_store_lh_align.outputs.value == 'true' && steps.resolve_store_theme_id.outputs.value == ''
         run: |
           echo "lighthouse_align_with_production_json=true but shopify_theme_id is empty; continuing without production JSON alignment."
 
@@ -290,15 +481,16 @@ jobs:
         if: steps.prereq.outputs.ready == 'true'
         uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@main
         with:
-          access_token: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-          store: ${{ inputs.shopify_store }}
-          lhci_github_app_token: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          access_token: ${{ steps.resolve_store_shopify_token.outputs.value }}
+          store: ${{ env.TARGET_STORE }}
+          lhci_github_app_token: ${{ steps.resolve_store_lhci_token.outputs.value }}
           theme_root: _ci_theme_root
 
   ci:
     name: CI Aggregate
     runs-on: ubuntu-latest
     needs:
+      - resolve_inputs
       - theme_check
       - lint
       - test

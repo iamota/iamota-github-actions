@@ -33,22 +33,92 @@ permissions:
     contents: read
 
 jobs:
+    resolve_targets:
+        runs-on: ubuntu-latest
+        outputs:
+            matrix_json: ${{ steps.stores.outputs.matrix_json }}
+        steps:
+            - id: stores
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@main
+              with:
+                  stores: ${{ inputs.SHOPIFY_STORE }}
+
     backup:
+        needs: [resolve_targets]
+        strategy:
+            fail-fast: false
+            matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
         runs-on: ubuntu-latest
         env:
             GITHUB_REPOSITORY         : ${{ github.repository }}
             GITHUB_BRANCH             : ${{ inputs.branch }}
             GITHUB_SHA                : ${{ github.sha }}
-            SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID }}
-            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-            AWS_REGION                : ${{ inputs.aws_region }}
-            AWS_S3_BUCKET             : ${{ inputs.aws_s3_bucket }}
-            AWS_ACCESS_KEY_ID         : ${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY     : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            TARGET_STORE              : ${{ matrix.store }}
+            TARGET_STORE_SLUG         : ${{ matrix.store_slug }}
+            RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_THEME_ID }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            RAW_AWS_REGION            : ${{ inputs.aws_region }}
+            RAW_AWS_S3_BUCKET         : ${{ inputs.aws_s3_bucket }}
+            RAW_AWS_ACCESS_KEY_ID     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            RAW_AWS_SECRET_ACCESS_KEY : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
         steps:
             - uses: actions/checkout@v4
+
+            - name: Resolve theme id
+              id: resolve_theme_id
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
+
+            - name: Resolve Shopify token
+              id: resolve_theme_token
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+
+            - name: Resolve AWS region
+              id: resolve_aws_region
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_AWS_REGION }}
+
+            - name: Resolve AWS bucket
+              id: resolve_aws_bucket
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_AWS_S3_BUCKET }}
+
+            - name: Resolve AWS access key id
+              id: resolve_aws_key
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_AWS_ACCESS_KEY_ID }}
+
+            - name: Resolve AWS secret access key
+              id: resolve_aws_secret
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
+
+            - name: Export resolved env values
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "SHOPIFY_STORE=${TARGET_STORE}"
+                      echo "SHOPIFY_THEME_ID=${{ steps.resolve_theme_id.outputs.value }}"
+                      echo "SHOPIFY_THEME_ACCESS_TOKEN=${{ steps.resolve_theme_token.outputs.value }}"
+                      echo "AWS_REGION=${{ steps.resolve_aws_region.outputs.value }}"
+                      echo "AWS_S3_BUCKET=${{ steps.resolve_aws_bucket.outputs.value }}"
+                      echo "AWS_ACCESS_KEY_ID=${{ steps.resolve_aws_key.outputs.value }}"
+                      echo "AWS_SECRET_ACCESS_KEY=${{ steps.resolve_aws_secret.outputs.value }}"
+                  } >> "$GITHUB_ENV"
 
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
@@ -73,7 +143,7 @@ jobs:
                   DATETIME="$(date +%Y-%m-%d_%H%M%S)"
                   SANITIZED_BRANCH="$(echo "${GITHUB_BRANCH}" | tr '/' '_')"
 
-                  FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${SHOPIFY_THEME_ID}__${GITHUB_SHA}"
+                  FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${TARGET_STORE_SLUG}__${SHOPIFY_THEME_ID}__${GITHUB_SHA}"
                   ZIP_NAME="${FILE_NAME}.zip"
                   DEST_PATH="${YEAR}/${REPO_NAME}/${ZIP_NAME}"
 

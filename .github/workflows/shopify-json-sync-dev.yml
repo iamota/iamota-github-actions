@@ -37,17 +37,52 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    resolve_master_store:
+        runs-on: ubuntu-latest
+        outputs:
+            first_store: ${{ steps.stores.outputs.first_store }}
+        steps:
+            - id: stores
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@main
+              with:
+                  stores: ${{ inputs.shopify_store }}
+                  allow_empty: "true"
+
     sync_dev:
+        needs: [resolve_master_store]
         runs-on: ubuntu-latest
 
         env:
             PRODUCTION_BRANCH : ${{ inputs.production_branch }}
             DEFAULT_BRANCH    : ${{ inputs.default_branch != '' && inputs.default_branch || github.event.repository.default_branch }}
-            SHOPIFY_STORE     : ${{ inputs.shopify_store }}
-            SHOPIFY_THEME_ID  : ${{ inputs.shopify_theme_id }}
-            SHOPIFY_THEME_NAME: ${{ inputs.shopify_theme_name }}
+            MASTER_STORE      : ${{ needs.resolve_master_store.outputs.first_store }}
+            RAW_SHOPIFY_THEME_ID: ${{ inputs.shopify_theme_id }}
+            RAW_SHOPIFY_THEME_NAME: ${{ inputs.shopify_theme_name }}
 
         steps:
+            - name: Resolve master theme id (metadata)
+              id: resolve_theme_id
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
+
+            - name: Resolve master theme name (metadata)
+              id: resolve_theme_name
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_NAME }}
+
+            - name: Export resolved sync metadata values
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "SHOPIFY_STORE=${MASTER_STORE}"
+                      echo "SHOPIFY_THEME_ID=${{ steps.resolve_theme_id.outputs.value }}"
+                      echo "SHOPIFY_THEME_NAME=${{ steps.resolve_theme_name.outputs.value }}"
+                  } >> "$GITHUB_ENV"
+
             - name: Checkout repository
               uses: actions/checkout@v4
               with:

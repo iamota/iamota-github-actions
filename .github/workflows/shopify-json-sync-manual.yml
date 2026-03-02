@@ -35,18 +35,76 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
+    resolve_master_store:
+        runs-on: ubuntu-latest
+        outputs:
+            first_store: ${{ steps.stores.outputs.first_store }}
+        steps:
+            - id: stores
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@main
+              with:
+                  stores: ${{ inputs.SHOPIFY_STORE }}
+
     sync_manual:
+        needs: [resolve_master_store]
         runs-on: ubuntu-latest
         env:
             TARGET_BRANCH: ${{ inputs.target_branch }}
-            SOURCE_THEME_ID: ${{ inputs.source_theme_id }}
-            THEME_SRC: ${{ inputs.theme_src }}
-            THEME_PULL_DIR: ${{ inputs.theme_pull_dir }}
-            SHOPIFY_STORE: ${{ inputs.SHOPIFY_STORE }}
-            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            MASTER_STORE: ${{ needs.resolve_master_store.outputs.first_store }}
+            SOURCE_THEME_ID_RAW: ${{ inputs.source_theme_id }}
+            RAW_THEME_SRC: ${{ inputs.theme_src }}
+            RAW_THEME_PULL_DIR: ${{ inputs.theme_pull_dir }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            RAW_IAMOTA_ACTIONS_READ_TOKEN: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
             SHOPIFY_CLI_TTY: "0"
 
         steps:
+            - name: Resolve master theme source path
+              id: resolve_theme_src
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_THEME_SRC }}
+
+            - name: Resolve master theme pull path
+              id: resolve_theme_pull_dir
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_THEME_PULL_DIR }}
+
+            - name: Resolve master source theme id
+              id: resolve_source_theme
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.SOURCE_THEME_ID_RAW }}
+
+            - name: Resolve master Shopify token
+              id: resolve_shopify_token
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+
+            - name: Resolve helper checkout token (optional)
+              id: resolve_helper_token
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
+
+            - name: Export resolved master source settings
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "THEME_SRC=${{ steps.resolve_theme_src.outputs.value != '' && steps.resolve_theme_src.outputs.value || '.' }}"
+                      echo "THEME_PULL_DIR=${{ steps.resolve_theme_pull_dir.outputs.value != '' && steps.resolve_theme_pull_dir.outputs.value || '_remote_theme' }}"
+                      echo "SHOPIFY_STORE=${MASTER_STORE}"
+                      echo "SOURCE_THEME_ID=${{ steps.resolve_source_theme.outputs.value }}"
+                      echo "SHOPIFY_THEME_ACCESS_TOKEN=${{ steps.resolve_shopify_token.outputs.value }}"
+                  } >> "$GITHUB_ENV"
+
             - name: Checkout target branch
               uses: actions/checkout@v4
               with:
@@ -69,7 +127,7 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
               with:
                   ref: main
-                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI

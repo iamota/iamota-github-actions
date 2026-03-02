@@ -2,6 +2,23 @@
 
 ## Reusable Workflows
 
+### Multi-Store Inputs (Supported)
+
+For store-aware workflows, you can pass:
+
+- Scalar values: `SHOPIFY_STORE=store1.myshopify.com`
+- CSV stores: `SHOPIFY_STORE=store1.myshopify.com,store2.myshopify.com`
+- JSON array stores: `SHOPIFY_STORE=["store1.myshopify.com","store2.myshopify.com"]`
+- Store-keyed values:
+  - `SHOPIFY_THEME_ID={"store1.myshopify.com":"123","store2.myshopify.com":"456"}`
+  - `CI_RUN_LIGHTHOUSE={"store1.myshopify.com":"true","store2.myshopify.com":"false"}`
+
+Resolution rules:
+
+- Backup/deploy/preview workflows run per store (matrix).
+- JSON sync workflows use the first resolved store as the master source.
+- Scalar values apply to all stores.
+
 ### `.github/workflows/github-warn-merge-conflicts.yml`
 
 Purpose:
@@ -106,7 +123,8 @@ Inputs:
 
 - `production_branch`
 - `theme_src`, `theme_pull_dir`
-- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID` (required)
+- `SHOPIFY_STORE` (required; first store is the master source)
+- `SHOPIFY_PRODUCTION_THEME_ID` (preferred) or `SHOPIFY_THEME_ID` (fallback)
 
 Secrets:
 
@@ -128,6 +146,7 @@ Purpose:
 Inputs:
 
 - `production_branch`, `default_branch`
+- `shopify_store`, `shopify_theme_id`, `shopify_theme_name` (optional metadata; first store is used when multiple provided)
 
 Notes:
 
@@ -143,9 +162,9 @@ Purpose:
 Inputs:
 
 - `target_branch` (required)
-- `source_theme_id` (required)
+- `source_theme_id` (required; scalar or store-keyed object, resolved from first store)
 - `theme_src`, `theme_pull_dir`
-- `SHOPIFY_STORE` (required)
+- `SHOPIFY_STORE` (required; first store is the master source)
 
 Secrets:
 
@@ -157,16 +176,16 @@ Secrets:
 Purpose:
 
 - PR preview theme lifecycle (create/reuse/push/comment/cleanup)
-- PR drift enforcement between local merge result and remote JSON
+- Creates preview from duplicated base theme, then pushes branch output
 
 Inputs:
 
-- `theme_src`, `theme_dist`, `theme_pull_dir`
+- `theme_src`, `theme_dist`
 - `build_install_command`, `build_command`
 - `enable_preview_backup`
 - `aws_region`, `aws_s3_bucket`
 - `shopify_ignore`
-- `SHOPIFY_STORE` (required)
+- `SHOPIFY_STORE` (required; supports multi-store matrix)
 - `SHOPIFY_PREVIEW_BASE_THEME_ID` (preferred source + create base)
 - `SHOPIFY_PRODUCTION_THEME_ID` (fallback source when preview base not set)
 
@@ -177,14 +196,23 @@ Secrets:
 
 Notes:
 
-- Preview deploy simulation behavior:
-  - pulls full remote production theme into `_remote_theme`
-  - applies JSON sync against `theme_src`
-  - overlays `theme_dist` onto `_remote_theme` via `rsync` using `.shopifyignore` and `shopify_ignore`
-  - pushes `_remote_theme` to preview theme
+- Preview behavior:
+  - resolves/creates preview theme per store using PR comment marker
+  - builds theme output
+  - pushes branch output to preview theme (including `shopify_ignore` when set)
 - Backs up existing preview themes before overwrite when enabled.
-- Uses shared comment utility scripts for marker lookup/set.
-- Fails PR check on merge conflicts and JSON drift.
+- Uses shared comment marker helpers for create/update/cleanup.
+
+### `.github/workflows/shopify-theme-ci.yml`
+
+Purpose:
+
+- Runs theme quality gates (theme check, lint, test, a11y, lighthouse).
+
+Notes:
+
+- Store-agnostic checks run once against prepared theme output.
+- Lighthouse runs per resolved store when multi-store input is provided.
 
 ### `.github/workflows/shopify-warn-locale-edits.yml`
 
