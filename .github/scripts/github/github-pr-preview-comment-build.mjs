@@ -29,8 +29,10 @@ function main() {
     const driftCount = Number(arg("--drift-count", "0") || "0");
     const driftFilesPath = arg("--drift-files-path", "");
     const sourceStore = arg("--source-store", "");
+    const sourceStoreHostRaw = arg("--source-store-host", "");
     const sourceThemeId = arg("--source-theme-id", "");
     const syncAt = arg("--sync-at", "");
+    const previewThemeName = arg("--preview-theme-name", "Preview Theme");
 
     if (mode === "conflict") {
         const body = [
@@ -43,20 +45,40 @@ function main() {
         return;
     }
 
-    const driftLines = readDriftLines(driftFilesPath);
-    const driftBlock =
-        driftCount === 0
-            ? "[OK] JSON matches remote."
-            : `[FAIL] JSON drift vs remote detected (**${driftCount}** file(s)). This check will fail until the PR matches remote JSON.\n\nChanged files:\n${driftLines}`;
+    const sourceStoreHost = sourceStoreHostRaw
+        ? sourceStoreHostRaw
+        : sourceStore
+          ? `${sourceStore}.myshopify.com`
+          : "";
+
+    let resolvedThemeId = themeId || "";
+    if (!resolvedThemeId && previewUrl) {
+        const m = String(previewUrl).match(/[?&]preview_theme_id=(\d+)/);
+        resolvedThemeId = m ? m[1] : "";
+    }
+    if (!resolvedThemeId) resolvedThemeId = "unknown";
+
+    const baseThemeUrl =
+        sourceStoreHost && sourceThemeId
+            ? `https://${sourceStoreHost}?preview_theme_id=${sourceThemeId}`
+            : "";
+
+    const firstLine = baseThemeUrl
+        ? `Shopify preview theme [${previewThemeName}](${previewUrl || "#"}) generated using the latest JSON content from [base theme](${baseThemeUrl}) @ ${syncAt || "unknown-time"}.`
+        : `Shopify preview theme [${previewThemeName}](${previewUrl || "#"}) generated @ ${syncAt || "unknown-time"}.`;
+
+    let driftBlock = "";
+    if (driftCount > 0) {
+        const driftLines = readDriftLines(driftFilesPath);
+        driftBlock = `\n[WARN] JSON drift vs remote detected (**${driftCount}** file(s)).\n\nChanged files:\n${driftLines}`;
+    }
 
     const body = [
-        `<!-- iamota-shopify-preview:theme_id=${themeId} -->`,
-        `[OK] **Shopify preview generated** from base \`${sourceStore || "unknown-store"}#${sourceThemeId || "unknown-theme"}\` overlaid with branch \`${branch || "unknown-branch"}\` output.`,
+        `<!-- iamota-shopify-preview:theme_id=${resolvedThemeId} -->`,
+        firstLine,
         "",
-        `- Preview: ${previewUrl || "(missing)"}`,
-        `- Preview Theme ID: \`${themeId || "unknown"}\``,
-        `- JSON sync source: \`${sourceStore || "unknown-store"}#${sourceThemeId || "unknown-theme"}\` @ ${syncAt || "unknown-time"}`,
-        "",
+        `Preview Theme ID: \`${resolvedThemeId}\``,
+        `Base Theme ID (JSON content source): \`${sourceThemeId || "unknown"}\``,
         driftBlock,
     ].join("\n");
 

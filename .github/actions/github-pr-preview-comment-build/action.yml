@@ -26,10 +26,16 @@ inputs:
     source_store:
         required: false
         default: ""
+    source_store_host:
+        required: false
+        default: ""
     source_theme_id:
         required: false
         default: ""
     sync_at:
+        required: false
+        default: ""
+    preview_theme_name:
         required: false
         default: ""
 outputs:
@@ -53,8 +59,10 @@ runs:
                   --drift-count "${{ inputs.drift_count }}" \
                   --drift-files-path "${{ inputs.drift_files_path }}" \
                   --source-store "${{ inputs.source_store }}" \
+                  --source-store-host "${{ inputs.source_store_host }}" \
                   --source-theme-id "${{ inputs.source_theme_id }}" \
-                  --sync-at "${{ inputs.sync_at }}"
+                  --sync-at "${{ inputs.sync_at }}" \
+                  --preview-theme-name "${{ inputs.preview_theme_name }}"
               )"
 
               {
