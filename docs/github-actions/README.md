@@ -41,7 +41,6 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 ### Helper Scripts
 
 - `.github/scripts/shopify/sync-shopify-json.mjs`
-- `.github/scripts/common/json-read-field.mjs`
 - `.github/scripts/github/github-api-lib.mjs`
 - `.github/scripts/github/github-pr-comment-lib.mjs`
 - `.github/scripts/github/github-pr-comment-marker-get.mjs`

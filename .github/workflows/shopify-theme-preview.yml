@@ -326,11 +326,14 @@ jobs:
                   set -euo pipefail
 
                   PREVIEW_URL="${{ steps.push.outputs.preview_url }}"
-                  PREVIEW_THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
-                  BASE_THEME_ID="${{ steps.source.outputs.source_theme_id }}"
+                  PREVIEW_THEME_ID_RAW="${{ steps.finaltheme.outputs.theme_id }}"
+                  BASE_THEME_ID_RAW="${{ steps.source.outputs.source_theme_id }}"
                   SOURCE_HOST="${{ steps.source.outputs.source_store_host }}"
                   PREVIEW_THEME_NAME="${{ steps.comment_meta.outputs.preview_theme_name }}"
                   SYNC_AT="${{ steps.comment_meta.outputs.sync_at }}"
+
+                  PREVIEW_THEME_ID="$(printf '%s' "${PREVIEW_THEME_ID_RAW}" | tr -cd '0-9')"
+                  BASE_THEME_ID="$(printf '%s' "${BASE_THEME_ID_RAW}" | tr -cd '0-9')"
 
                   if [ -z "${PREVIEW_THEME_ID}" ] && [ -n "${PREVIEW_URL}" ]; then
                       PREVIEW_THEME_ID="$(echo "${PREVIEW_URL}" | sed -n 's/.*[?&]preview_theme_id=\([0-9][0-9]*\).*/\1/p')"
@@ -356,8 +359,8 @@ jobs:
                     "<!-- iamota-shopify-preview:theme_id=${PREVIEW_THEME_ID} -->" \
                     "${FIRST_LINE}" \
                     "" \
-                    "Preview Theme ID: \`${PREVIEW_THEME_ID}\`" \
-                    "Base Theme ID (JSON content source): \`${BASE_THEME_ID}\`" \
+                    "Preview Theme ID: ${PREVIEW_THEME_ID}" \
+                    "Base Theme ID (JSON content source): ${BASE_THEME_ID}" \
                   )"
 
                   {

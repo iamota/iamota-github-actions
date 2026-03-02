@@ -25,17 +25,6 @@ Output:
 - Prints compact totals JSON.
 - Optionally writes detailed report JSON when `WRITE_REPORT=true`.
 
-## Common Scripts
-
-### `.github/scripts/common/json-read-field.mjs`
-
-Reads JSON from stdin and prints a value by dotted path.
-
-Inputs:
-
-- `--path <dotted.path>`
-- `--required <true|false>` (default false)
-
 ## GitHub Helper Scripts
 
 ### `.github/scripts/github/github-api-lib.mjs`
