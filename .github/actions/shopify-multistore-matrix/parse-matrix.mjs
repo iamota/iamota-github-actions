@@ -12,16 +12,18 @@ function parseStores(raw) {
     const s = String(raw ?? "").trim();
     if (!s) return [];
 
-    if (s.startsWith("[")) {
+    if (s.startsWith("[") && s.endsWith("]")) {
         const arr = JSON.parse(s);
         if (!Array.isArray(arr)) throw new Error("stores JSON must be an array");
-        return arr.map(normalizeStore).filter(Boolean);
+        return arr.map((x) => normalizeStore(String(x ?? ""))).filter(Boolean);
     }
 
-    return s
-        .split(",")
-        .map((x) => normalizeStore(x))
-        .filter(Boolean);
+    if (s.includes(",")) {
+        throw new Error('Multiple stores must use a valid JSON array, e.g. ["store1","store2"].');
+    }
+
+    const single = normalizeStore(s.replace(/^["']|["']$/g, ""));
+    return single ? [single] : [];
 }
 
 function main() {

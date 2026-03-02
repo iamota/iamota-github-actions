@@ -36,8 +36,7 @@ function main() {
     try {
         obj = JSON.parse(trimmed);
     } catch {
-        process.stdout.write(raw);
-        return;
+        throw new Error(`Store-scoped values must be valid JSON objects. Invalid value: ${trimmed}`);
     }
 
     if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
