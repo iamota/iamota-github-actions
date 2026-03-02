@@ -505,14 +505,11 @@ jobs:
                   BODY="$(printf '%s\n' \
                     "<!-- ${MARKER}:theme_id=${PREVIEW_THEME_ID} -->" \
                     "" \
-                    "# 🏠 Store: **[${STORE_SLUG}](${STORE_ADMIN_URL})**" \
+                    "## 🏠 Store: **[${STORE_SLUG}](${STORE_ADMIN_URL})**" \
                     "" \
                     "**[${PREVIEW_THEME_NAME}](${PREVIEW_URL})** (${PREVIEW_THEME_ID}) - [[Preview](${PREVIEW_URL}) | [Customizer](${PREVIEW_CUSTOMIZER_URL}) | [Edit Code](${PREVIEW_EDIT_CODE_URL})]" \
                     "" \
                     "<sub>Generated a Shopify preview theme on [${SOURCE_HOST}](https://${SOURCE_HOST}/admin) using the latest JSON content from ${BASE_THEME_REF} @ ${SYNC_AT}</sub>" \
-                    "" \
-                    "Preview Theme ID: **${PREVIEW_THEME_ID}**" \
-                    "Base Theme ID (JSON content source): **${BASE_THEME_ID}**" \
                   )"
 
                   {
@@ -611,12 +608,14 @@ jobs:
                   echo "theme_id=${THEME_ID}" >> "$GITHUB_OUTPUT"
 
             - name: Delete preview theme (if exists)
+              id: delete_preview
               if: steps.marker_norm.outputs.theme_id != ''
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@matrix
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.marker_norm.outputs.theme_id }}
                   token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  ignore_not_found: "true"
 
             - name: Build cleanup comment body
               id: cleanup_comment
@@ -624,8 +623,11 @@ jobs:
                   set -euo pipefail
                   MARKER="${PREVIEW_MARKER:-iamota-shopify-preview}"
                   THEME_ID="${{ steps.marker_norm.outputs.theme_id }}"
-                  if [ -n "${THEME_ID}" ]; then
+                  DELETE_STATUS="${{ steps.delete_preview.outputs.status }}"
+                  if [ -n "${THEME_ID}" ] && [ "${DELETE_STATUS}" = "deleted" ]; then
                       BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Preview theme deleted: \`${THEME_ID}\`")"
+                  elif [ -n "${THEME_ID}" ] && [ "${DELETE_STATUS}" = "missing" ]; then
+                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Preview theme already missing (nothing to delete): \`${THEME_ID}\`")"
                   else
                       BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] No preview theme found to delete.")"
                   fi
