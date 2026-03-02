@@ -23,9 +23,9 @@ jobs:
 
         steps:
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@matix
               with:
-                  ref: main
+                  ref: matix
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 

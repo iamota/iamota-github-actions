@@ -80,7 +80,7 @@ jobs:
             matrix_json: ${{ steps.stores.outputs.matrix_json }}
         steps:
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matix
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
 
@@ -203,20 +203,20 @@ jobs:
 
             - name: Resolve helper checkout token (optional)
               id: resolve_helper_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
 
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@matix
               with:
-                  ref: main
+                  ref: matix
                   token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matix
 
             - name: Resolve source theme id and store metadata
               id: source
@@ -251,7 +251,7 @@ jobs:
               id: marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@main
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@matix
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
@@ -276,7 +276,7 @@ jobs:
 
             - name: Pull existing preview theme for backup
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@matix
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.marker.outputs.extracted_value }}
@@ -294,7 +294,7 @@ jobs:
 
             - name: Upload preview backup zip to S3 (optional)
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
-              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@main
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@matix
               with:
                   file: ${{ env.PREVIEW_BACKUP_ZIP }}
                   bucket: ${{ env.AWS_S3_BUCKET }}
@@ -302,7 +302,7 @@ jobs:
 
             - name: Upload preview backup artifact (optional)
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@main
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@matix
               with:
                   name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}
                   path: ${{ env.PREVIEW_BACKUP_ZIP }}
@@ -310,7 +310,7 @@ jobs:
             - name: Create preview theme (duplicate base) if missing
               if: steps.marker.outputs.extracted_value == ''
               id: createtheme
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@matix
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   base_theme_id: ${{ env.SHOPIFY_PREVIEW_BASE_ID }}
@@ -347,7 +347,7 @@ jobs:
 
             - name: Prepare theme (install + build + resolve dist)
               id: prepare
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@matix
               env:
                   GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
               with:
@@ -415,7 +415,7 @@ jobs:
 
             - name: Push branch theme output into preview theme
               id: push
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@matix
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.finaltheme.outputs.theme_id }}
@@ -513,7 +513,7 @@ jobs:
             - name: Sync PR comment marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@main
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@matix
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
@@ -538,21 +538,21 @@ jobs:
         steps:
             - name: Resolve helper checkout token (optional)
               id: resolve_helper_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
 
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@matix
               with:
-                  ref: main
+                  ref: matix
                   token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
             - name: Resolve store-scoped Shopify token
               id: resolve_theme_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matix
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
@@ -578,13 +578,13 @@ jobs:
                   fi
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matix
 
             - name: Find preview theme id from marker
               id: marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@main
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@matix
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
@@ -601,7 +601,7 @@ jobs:
 
             - name: Delete preview theme (if exists)
               if: steps.marker_norm.outputs.theme_id != ''
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@main
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@matix
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.marker_norm.outputs.theme_id }}
@@ -627,7 +627,7 @@ jobs:
             - name: Sync cleanup comment marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@main
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@matix
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
