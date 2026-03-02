@@ -338,33 +338,29 @@ jobs:
                       --password "${SHOPIFY_THEME_ACCESS_TOKEN}" \
                       --no-color
 
-            - name: Build preview comment body
-              id: preview_comment
+            - name: Build preview comment metadata
+              id: comment_meta
               run: |
                   set -euo pipefail
-                  THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
-                  PREVIEW_URL="${{ steps.push.outputs.preview_url }}"
-                  SRC_STORE="${{ steps.source.outputs.source_store_slug }}"
-                  SRC_THEME="${{ steps.source.outputs.source_theme_id }}"
-                  BASE_REF="${{ github.base_ref }}"
-                  BRANCH="${{ github.event.pull_request.head.ref }}"
-                  HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+                  TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
+                  echo "sync_at=${TS}" >> "$GITHUB_OUTPUT"
 
-                  BODY="$(printf '%s\n' \
-                    "<!-- iamota-shopify-preview:theme_id=${THEME_ID} -->" \
-                    "[OK] **Shopify preview generated** from base \`${SRC_STORE}#${SRC_THEME}\` overlaid with branch \`${BRANCH}\` output." \
-                    "" \
-                    "- Preview: ${PREVIEW_URL}" \
-                    "- Theme ID: \`${THEME_ID}\`" \
-                    "- Base branch: \`${BASE_REF}\`" \
-                    "- PR head: \`${HEAD_SHA}\`" \
-                  )"
-
-                  {
-                    echo "body<<EOF"
-                    printf '%s\n' "${BODY}"
-                    echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
+            - name: Build preview comment body
+              id: preview_comment
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-preview-comment-build@main
+              with:
+                  mode           : success
+                  author         : ${{ github.event.pull_request.user.login }}
+                  branch         : ${{ github.event.pull_request.head.ref }}
+                  base_ref       : ${{ github.event.pull_request.base.ref }}
+                  head_sha       : ${{ github.event.pull_request.head.sha }}
+                  theme_id       : ${{ steps.finaltheme.outputs.theme_id }}
+                  preview_url    : ${{ steps.push.outputs.preview_url }}
+                  drift_count    : "0"
+                  drift_files_path: ""
+                  source_store   : ${{ steps.source.outputs.source_store_slug }}
+                  source_theme_id: ${{ steps.source.outputs.source_theme_id }}
+                  sync_at        : ${{ steps.comment_meta.outputs.sync_at }}
 
             - name: Sync PR comment marker
               env:

@@ -23,6 +23,15 @@ inputs:
     drift_files_path:
         required: false
         default: ""
+    source_store:
+        required: false
+        default: ""
+    source_theme_id:
+        required: false
+        default: ""
+    sync_at:
+        required: false
+        default: ""
 outputs:
     body:
         value: ${{ steps.build.outputs.body }}
@@ -42,7 +51,10 @@ runs:
                   --theme-id "${{ inputs.theme_id }}" \
                   --preview-url "${{ inputs.preview_url }}" \
                   --drift-count "${{ inputs.drift_count }}" \
-                  --drift-files-path "${{ inputs.drift_files_path }}"
+                  --drift-files-path "${{ inputs.drift_files_path }}" \
+                  --source-store "${{ inputs.source_store }}" \
+                  --source-theme-id "${{ inputs.source_theme_id }}" \
+                  --sync-at "${{ inputs.sync_at }}"
               )"
 
               {

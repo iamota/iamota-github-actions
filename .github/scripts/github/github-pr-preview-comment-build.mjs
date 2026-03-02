@@ -28,6 +28,9 @@ function main() {
     const previewUrl = arg("--preview-url");
     const driftCount = Number(arg("--drift-count", "0") || "0");
     const driftFilesPath = arg("--drift-files-path", "");
+    const sourceStore = arg("--source-store", "");
+    const sourceThemeId = arg("--source-theme-id", "");
+    const syncAt = arg("--sync-at", "");
 
     if (mode === "conflict") {
         const body = [
@@ -48,12 +51,11 @@ function main() {
 
     const body = [
         `<!-- iamota-shopify-preview:theme_id=${themeId} -->`,
-        `[OK] **Shopify preview generated** from the **local merge result** of \`${baseRef}\` -> \`${branch}\`.`,
+        `[OK] **Shopify preview generated** from base \`${sourceStore || "unknown-store"}#${sourceThemeId || "unknown-theme"}\` overlaid with branch \`${branch || "unknown-branch"}\` output.`,
         "",
-        `- Preview: ${previewUrl}`,
-        `- Theme ID: \`${themeId}\``,
-        `- Base: \`${baseRef}\``,
-        `- PR head: \`${headSha}\``,
+        `- Preview: ${previewUrl || "(missing)"}`,
+        `- Preview Theme ID: \`${themeId || "unknown"}\``,
+        `- JSON sync source: \`${sourceStore || "unknown-store"}#${sourceThemeId || "unknown-theme"}\` @ ${syncAt || "unknown-time"}`,
         "",
         driftBlock,
     ].join("\n");
