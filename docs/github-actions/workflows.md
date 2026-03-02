@@ -166,7 +166,9 @@ Inputs:
 - `enable_preview_backup`
 - `aws_region`, `aws_s3_bucket`
 - `shopify_ignore`
-- `SHOPIFY_STORE`, `SHOPIFY_THEME_ID`, `SHOPIFY_PREVIEW_BASE_THEME_ID` (required)
+- `SHOPIFY_STORE` (required)
+- `SHOPIFY_PREVIEW_BASE_THEME_ID` (preferred source + create base)
+- `SHOPIFY_PRODUCTION_THEME_ID` (fallback source when preview base not set)
 
 Secrets:
 

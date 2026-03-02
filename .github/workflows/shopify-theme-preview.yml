@@ -79,7 +79,7 @@ concurrency:
 
 jobs:
     shopify_theme_review_prepare:
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main' && (inputs.SHOPIFY_PRODUCTION_THEME_ID == '' || inputs.SHOPIFY_THEME_ID == '' || inputs.SHOPIFY_THEME_ID != inputs.SHOPIFY_PRODUCTION_THEME_ID)
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main'
         runs-on: ubuntu-latest
         env:
             THEME_SRC: ${{ inputs.theme_src }}
@@ -111,7 +111,9 @@ jobs:
                   set -euo pipefail
                   MISSING=()
                   [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
-                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID input/var")
+                  if [ -z "${SHOPIFY_PREVIEW_BASE_ID:-}" ] && [ -z "${SHOPIFY_PRODUCTION_THEME_ID:-}" ]; then
+                      MISSING+=("SHOPIFY_PREVIEW_BASE_THEME_ID or SHOPIFY_PRODUCTION_THEME_ID input/var")
+                  fi
                   [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret")
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required Shopify values: ${MISSING[*]}"
@@ -132,9 +134,13 @@ jobs:
               id: source
               run: |
                   set -euo pipefail
-                  SOURCE_THEME_ID="${SHOPIFY_PRODUCTION_THEME_ID:-}"
+                  SOURCE_THEME_ID="${SHOPIFY_PREVIEW_BASE_ID:-}"
                   if [ -z "${SOURCE_THEME_ID}" ]; then
-                      SOURCE_THEME_ID="${SHOPIFY_THEME_ID}"
+                      SOURCE_THEME_ID="${SHOPIFY_PRODUCTION_THEME_ID}"
+                  fi
+                  if [ -z "${SOURCE_THEME_ID}" ]; then
+                      echo "Unable to resolve source theme id. Set SHOPIFY_PREVIEW_BASE_THEME_ID or SHOPIFY_PRODUCTION_THEME_ID."
+                      exit 1
                   fi
 
                   SRC_STORE_RAW="${SHOPIFY_STORE:-unknown-store}"
@@ -381,7 +387,7 @@ jobs:
                   label: "Sync JSON"
 
     shopify_theme_preview_cleanup:
-        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main' && (inputs.SHOPIFY_PRODUCTION_THEME_ID == '' || inputs.SHOPIFY_THEME_ID == '' || inputs.SHOPIFY_THEME_ID != inputs.SHOPIFY_PRODUCTION_THEME_ID)
+        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main'
         runs-on: ubuntu-latest
         env:
             SHOPIFY_STORE: ${{ inputs.SHOPIFY_STORE }}

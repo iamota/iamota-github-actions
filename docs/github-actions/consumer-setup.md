@@ -122,7 +122,7 @@ jobs:
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
       shopify_ignore: ${{ vars.SHOPIFY_IGNORE || '' }}
       SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
-      SHOPIFY_THEME_ID: ${{ vars.SHOPIFY_THEME_ID || '' }}
+      SHOPIFY_PRODUCTION_THEME_ID: ${{ vars.SHOPIFY_PRODUCTION_THEME_ID || '' }}
       SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ vars.SHOPIFY_PREVIEW_BASE_THEME_ID || vars.SHOPIFY_PRODUCTION_THEME_ID || '' }}
     secrets:
       SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
