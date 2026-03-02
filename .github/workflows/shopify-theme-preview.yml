@@ -322,22 +322,49 @@ jobs:
 
             - name: Build preview comment body
               id: preview_comment
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-preview-comment-build@main
-              with:
-                  mode            : success
-                  author          : ${{ github.event.pull_request.user.login }}
-                  branch          : ${{ github.event.pull_request.head.ref }}
-                  base_ref        : ${{ github.event.pull_request.base.ref }}
-                  head_sha        : ${{ github.event.pull_request.head.sha }}
-                  theme_id        : ${{ steps.finaltheme.outputs.theme_id }}
-                  preview_url     : ${{ steps.push.outputs.preview_url }}
-                  drift_count     : "0"
-                  drift_files_path: ""
-                  source_store    : ${{ steps.source.outputs.source_store_slug }}
-                  source_store_host: ${{ steps.source.outputs.source_store_host }}
-                  source_theme_id : ${{ steps.source.outputs.source_theme_id }}
-                  sync_at         : ${{ steps.comment_meta.outputs.sync_at }}
-                  preview_theme_name: ${{ steps.comment_meta.outputs.preview_theme_name }}
+              run: |
+                  set -euo pipefail
+
+                  PREVIEW_URL="${{ steps.push.outputs.preview_url }}"
+                  PREVIEW_THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
+                  BASE_THEME_ID="${{ steps.source.outputs.source_theme_id }}"
+                  SOURCE_HOST="${{ steps.source.outputs.source_store_host }}"
+                  PREVIEW_THEME_NAME="${{ steps.comment_meta.outputs.preview_theme_name }}"
+                  SYNC_AT="${{ steps.comment_meta.outputs.sync_at }}"
+
+                  if [ -z "${PREVIEW_THEME_ID}" ] && [ -n "${PREVIEW_URL}" ]; then
+                      PREVIEW_THEME_ID="$(echo "${PREVIEW_URL}" | sed -n 's/.*[?&]preview_theme_id=\([0-9][0-9]*\).*/\1/p')"
+                  fi
+
+                  [ -n "${PREVIEW_THEME_ID}" ] || PREVIEW_THEME_ID="unknown"
+                  [ -n "${BASE_THEME_ID}" ] || BASE_THEME_ID="unknown"
+                  [ -n "${PREVIEW_THEME_NAME}" ] || PREVIEW_THEME_NAME="Preview Theme"
+                  [ -n "${SYNC_AT}" ] || SYNC_AT="unknown-time"
+
+                  BASE_URL=""
+                  if [ -n "${SOURCE_HOST}" ] && [ "${BASE_THEME_ID}" != "unknown" ]; then
+                      BASE_URL="https://${SOURCE_HOST}?preview_theme_id=${BASE_THEME_ID}"
+                  fi
+
+                  if [ -n "${BASE_URL}" ]; then
+                      FIRST_LINE="Shopify preview theme [${PREVIEW_THEME_NAME}](${PREVIEW_URL}) generated using the latest JSON content from [base theme](${BASE_URL}) @ ${SYNC_AT}."
+                  else
+                      FIRST_LINE="Shopify preview theme [${PREVIEW_THEME_NAME}](${PREVIEW_URL}) generated @ ${SYNC_AT}."
+                  fi
+
+                  BODY="$(printf '%s\n' \
+                    "<!-- iamota-shopify-preview:theme_id=${PREVIEW_THEME_ID} -->" \
+                    "${FIRST_LINE}" \
+                    "" \
+                    "Preview Theme ID: \`${PREVIEW_THEME_ID}\`" \
+                    "Base Theme ID (JSON content source): \`${BASE_THEME_ID}\`" \
+                  )"
+
+                  {
+                    echo "body<<EOF"
+                    printf '%s\n' "${BODY}"
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: Sync PR comment marker
               env:
@@ -349,15 +376,6 @@ jobs:
                   marker: iamota-shopify-preview
                   body: ${{ steps.preview_comment.outputs.body }}
                   refresh_after_comments: "75"
-
-            - name: Remove Sync JSON label
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-label-remove@main
-              with:
-                  repo: ${{ github.repository }}
-                  pr: ${{ github.event.pull_request.number }}
-                  label: "Sync JSON"
 
     shopify_theme_preview_cleanup:
         if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main'
@@ -433,12 +451,3 @@ jobs:
                   pr: ${{ github.event.pull_request.number }}
                   marker: iamota-shopify-preview
                   body: ${{ steps.cleanup_comment.outputs.body }}
-
-            - name: Remove Sync JSON label
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-label-remove@main
-              with:
-                  repo: ${{ github.repository }}
-                  pr: ${{ github.event.pull_request.number }}
-                  label: "Sync JSON"
