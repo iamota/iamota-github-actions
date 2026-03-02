@@ -13,7 +13,14 @@ function parseStores(raw) {
     if (!s) return [];
 
     if (s.startsWith("[") && s.endsWith("]")) {
-        const arr = JSON.parse(s);
+        let arr;
+        try {
+            arr = JSON.parse(s);
+        } catch {
+            throw new Error(
+                `Invalid SHOPIFY_STORE JSON array: ${s}. Use valid JSON like ["store1","store2"] or a single string like store1.`
+            );
+        }
         if (!Array.isArray(arr)) throw new Error("stores JSON must be an array");
         return arr.map((x) => normalizeStore(String(x ?? ""))).filter(Boolean);
     }

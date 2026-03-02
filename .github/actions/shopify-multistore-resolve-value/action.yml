@@ -14,10 +14,13 @@ runs:
     using: "composite"
     steps:
         - id: resolve
+          env:
+              INPUT_STORE: ${{ inputs.store }}
+              INPUT_RAW: ${{ inputs.raw }}
           run: |
               set -euo pipefail
-              STORE="${{ inputs.store }}"
-              RAW="${{ inputs.raw }}"
+              STORE="${INPUT_STORE}"
+              RAW="${INPUT_RAW}"
 
               VALUE="$(node "${GITHUB_ACTION_PATH}/resolve-value.mjs" "${STORE}" "${RAW}")"
 

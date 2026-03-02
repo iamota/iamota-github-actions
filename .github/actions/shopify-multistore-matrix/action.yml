@@ -1,5 +1,5 @@
 name: "Shopify Multistore Matrix"
-description: "Parses Shopify store input (CSV or JSON array) into a workflow matrix"
+description: "Parses Shopify store input (single store string or JSON array) into a workflow matrix"
 inputs:
     stores:
         required: true
@@ -20,10 +20,13 @@ runs:
     using: "composite"
     steps:
         - id: parse
+          env:
+              INPUT_STORES: ${{ inputs.stores }}
+              INPUT_ALLOW_EMPTY: ${{ inputs.allow_empty }}
           run: |
               set -euo pipefail
-              RAW="${{ inputs.stores }}"
-              ALLOW_EMPTY="${{ inputs.allow_empty }}"
+              RAW="${INPUT_STORES}"
+              ALLOW_EMPTY="${INPUT_ALLOW_EMPTY}"
 
               OUT="$(node "${GITHUB_ACTION_PATH}/parse-matrix.mjs" "${RAW}" "${ALLOW_EMPTY}")"
 
