@@ -485,8 +485,22 @@ jobs:
                   [ -n "${PREVIEW_THEME_NAME}" ] || PREVIEW_THEME_NAME="Preview Theme"
                   [ -n "${SYNC_AT}" ] || SYNC_AT="unknown-time"
                   [ -n "${PREVIEW_URL}" ] || PREVIEW_URL="#"
+                  SOURCE_HOST="${SOURCE_HOST#https://}"
+                  SOURCE_HOST="${SOURCE_HOST#http://}"
+                  SOURCE_HOST="${SOURCE_HOST%%/*}"
                   [ -n "${SOURCE_HOST}" ] || SOURCE_HOST="unknown-store.myshopify.com"
-                  [ -n "${STORE_SLUG}" ] || STORE_SLUG="${SOURCE_HOST%.myshopify.com}"
+
+                  STORE_SLUG="${STORE_SLUG#https://}"
+                  STORE_SLUG="${STORE_SLUG#http://}"
+                  STORE_SLUG="${STORE_SLUG%%/*}"
+                  if [ -z "${STORE_SLUG}" ]; then
+                      STORE_SLUG="${SOURCE_HOST}"
+                  fi
+                  STORE_SLUG="${STORE_SLUG%.myshopify.com}"
+                  if echo "${STORE_SLUG}" | grep -q '\.'; then
+                      STORE_SLUG="${STORE_SLUG%%.*}"
+                  fi
+                  [ -n "${STORE_SLUG}" ] || STORE_SLUG="unknown-store"
 
                   BASE_URL=""
                   if [ -n "${SOURCE_HOST}" ] && [ "${BASE_THEME_ID}" != "UNKNOWN_BASE_THEME_ID" ]; then
