@@ -396,13 +396,14 @@ jobs:
                       PREVIEW_THEME_ID="$(echo "${PREVIEW_URL}" | sed -n 's/.*[?&]preview_theme_id=\([0-9][0-9]*\).*/\1/p')"
                   fi
 
-                  [ -n "${PREVIEW_THEME_ID}" ] || PREVIEW_THEME_ID="unknown"
-                  [ -n "${BASE_THEME_ID}" ] || BASE_THEME_ID="unknown"
+                  [ -n "${PREVIEW_THEME_ID}" ] || PREVIEW_THEME_ID="UNKNOWN_PREVIEW_THEME_ID"
+                  [ -n "${BASE_THEME_ID}" ] || BASE_THEME_ID="UNKNOWN_BASE_THEME_ID"
                   [ -n "${PREVIEW_THEME_NAME}" ] || PREVIEW_THEME_NAME="Preview Theme"
                   [ -n "${SYNC_AT}" ] || SYNC_AT="unknown-time"
+                  [ -n "${PREVIEW_URL}" ] || PREVIEW_URL="#"
 
                   BASE_URL=""
-                  if [ -n "${SOURCE_HOST}" ] && [ "${BASE_THEME_ID}" != "unknown" ]; then
+                  if [ -n "${SOURCE_HOST}" ] && [ "${BASE_THEME_ID}" != "UNKNOWN_BASE_THEME_ID" ]; then
                       BASE_URL="https://${SOURCE_HOST}?preview_theme_id=${BASE_THEME_ID}"
                   fi
 
@@ -416,8 +417,8 @@ jobs:
                     "<!-- iamota-shopify-preview:theme_id=${PREVIEW_THEME_ID} -->" \
                     "${FIRST_LINE}" \
                     "" \
-                    "Preview Theme ID: \`${PREVIEW_THEME_ID}\`" \
-                    "Base Theme ID (JSON content source): \`${BASE_THEME_ID}\`" \
+                    "Preview Theme ID: **${PREVIEW_THEME_ID}**" \
+                    "Base Theme ID (JSON content source): **${BASE_THEME_ID}**" \
                   )"
 
                   {
