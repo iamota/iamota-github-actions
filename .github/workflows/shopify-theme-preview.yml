@@ -457,7 +457,7 @@ jobs:
                   set -euo pipefail
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
                   echo "sync_at=${TS}" >> "$GITHUB_OUTPUT"
-                  echo "preview_theme_name=iamota (${TARGET_STORE_SLUG}:${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+                  echo "preview_theme_name=iamota (${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
 
             - name: Build preview comment body
               id: preview_comment
@@ -468,6 +468,7 @@ jobs:
                   PREVIEW_THEME_ID_RAW="${{ steps.finaltheme.outputs.theme_id }}"
                   BASE_THEME_ID_RAW="${{ steps.source.outputs.source_theme_id }}"
                   SOURCE_HOST="${{ steps.source.outputs.source_store_host }}"
+                  STORE_SLUG="${{ steps.source.outputs.source_store_slug }}"
                   PREVIEW_THEME_NAME="${{ steps.comment_meta.outputs.preview_theme_name }}"
                   SYNC_AT="${{ steps.comment_meta.outputs.sync_at }}"
                   MARKER="${PREVIEW_MARKER:-iamota-shopify-preview}"
@@ -484,21 +485,31 @@ jobs:
                   [ -n "${PREVIEW_THEME_NAME}" ] || PREVIEW_THEME_NAME="Preview Theme"
                   [ -n "${SYNC_AT}" ] || SYNC_AT="unknown-time"
                   [ -n "${PREVIEW_URL}" ] || PREVIEW_URL="#"
+                  [ -n "${SOURCE_HOST}" ] || SOURCE_HOST="unknown-store.myshopify.com"
+                  [ -n "${STORE_SLUG}" ] || STORE_SLUG="${SOURCE_HOST%.myshopify.com}"
 
                   BASE_URL=""
                   if [ -n "${SOURCE_HOST}" ] && [ "${BASE_THEME_ID}" != "UNKNOWN_BASE_THEME_ID" ]; then
                       BASE_URL="https://${SOURCE_HOST}?preview_theme_id=${BASE_THEME_ID}"
                   fi
 
+                  STORE_ADMIN_URL="https://admin.shopify.com/store/${STORE_SLUG}"
+                  PREVIEW_CUSTOMIZER_URL="https://admin.shopify.com/store/${STORE_SLUG}/themes/${PREVIEW_THEME_ID}/editor"
+                  PREVIEW_EDIT_CODE_URL="https://admin.shopify.com/store/${STORE_SLUG}/themes/${PREVIEW_THEME_ID}"
                   if [ -n "${BASE_URL}" ]; then
-                      FIRST_LINE="Shopify preview theme [${PREVIEW_THEME_NAME}](${PREVIEW_URL}) generated using the latest JSON content from [base theme](${BASE_URL}) @ ${SYNC_AT}."
+                      BASE_THEME_REF="[base theme](${BASE_URL}) (${BASE_THEME_ID})"
                   else
-                      FIRST_LINE="Shopify preview theme [${PREVIEW_THEME_NAME}](${PREVIEW_URL}) generated @ ${SYNC_AT}."
+                      BASE_THEME_REF="base theme (${BASE_THEME_ID})"
                   fi
 
                   BODY="$(printf '%s\n' \
                     "<!-- ${MARKER}:theme_id=${PREVIEW_THEME_ID} -->" \
-                    "${FIRST_LINE}" \
+                    "" \
+                    "# 🏠 Store: **[${STORE_SLUG}](${STORE_ADMIN_URL})**" \
+                    "" \
+                    "**[${PREVIEW_THEME_NAME}](${PREVIEW_URL})** (${PREVIEW_THEME_ID}) - [[Preview](${PREVIEW_URL}) | [Customizer](${PREVIEW_CUSTOMIZER_URL}) | [Edit Code](${PREVIEW_EDIT_CODE_URL})]" \
+                    "" \
+                    "<sub>Generated a Shopify preview theme on [${SOURCE_HOST}](https://${SOURCE_HOST}/admin) using the latest JSON content from ${BASE_THEME_REF} @ ${SYNC_AT}</sub>" \
                     "" \
                     "Preview Theme ID: **${PREVIEW_THEME_ID}**" \
                     "Base Theme ID (JSON content source): **${BASE_THEME_ID}**" \
