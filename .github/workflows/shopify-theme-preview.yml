@@ -359,8 +359,8 @@ jobs:
                     "<!-- iamota-shopify-preview:theme_id=${PREVIEW_THEME_ID} -->" \
                     "${FIRST_LINE}" \
                     "" \
-                    "Preview Theme ID: ${PREVIEW_THEME_ID}" \
-                    "Base Theme ID (JSON content source): ${BASE_THEME_ID}" \
+                    "Preview Theme ID: \`${PREVIEW_THEME_ID}\`" \
+                    "Base Theme ID (JSON content source): \`${BASE_THEME_ID}\`" \
                   )"
 
                   {
