@@ -275,6 +275,63 @@ jobs:
                   build_install_command: ${{ env.BUILD_INSTALL_COMMAND }}
                   build_command: ${{ env.BUILD_COMMAND }}
 
+            - name: Ignore unchanged JSON files for preview push
+              run: |
+                  set -euo pipefail
+
+                  SRC_ROOT="${THEME_SRC#./}"
+                  SRC_ROOT="${SRC_ROOT%/}"
+                  [ -n "${SRC_ROOT}" ] || SRC_ROOT="."
+
+                  DIST_ROOT="${{ steps.prepare.outputs.theme_dist_effective }}"
+                  DIST_ROOT="${DIST_ROOT#./}"
+                  DIST_ROOT="${DIST_ROOT%/}"
+                  [ -n "${DIST_ROOT}" ] || DIST_ROOT="."
+
+                  BASE_SHA="${{ github.event.pull_request.base.sha }}"
+                  HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+                  CHANGED_REL="/tmp/preview-json-changed.rel.txt"
+                  DIST_REL="/tmp/preview-json-dist.rel.txt"
+                  IGNORE_REL="/tmp/preview-json-ignore.rel.txt"
+
+                  git diff --name-only --diff-filter=ACMRT "${BASE_SHA}...${HEAD_SHA}" -- "${SRC_ROOT}" \
+                    | awk -v src="${SRC_ROOT}/" 'tolower($0) ~ /\.json$/ { p=$0; if (src == "./") { print p; next } if (index(p, src) == 1) print substr(p, length(src)+1) }' \
+                    | sed 's#^\\./##' \
+                    | sort -u > "${CHANGED_REL}"
+
+                  find "${DIST_ROOT}" -type f -name '*.json' \
+                    | sed "s#^${DIST_ROOT%/}/##" \
+                    | sed 's#^\\./##' \
+                    | sort -u > "${DIST_REL}"
+
+                  comm -23 "${DIST_REL}" "${CHANGED_REL}" > "${IGNORE_REL}" || true
+
+                  IGNORE_FILE="${DIST_ROOT%/}/.shopifyignore"
+                  START_MARKER="# iamota-preview-unchanged-json:start"
+                  END_MARKER="# iamota-preview-unchanged-json:end"
+
+                  if [ -f "${IGNORE_FILE}" ]; then
+                    awk -v s="${START_MARKER}" -v e="${END_MARKER}" '
+                      $0==s { inblk=1; next }
+                      $0==e { inblk=0; next }
+                      !inblk { print }
+                    ' "${IGNORE_FILE}" > "${IGNORE_FILE}.tmp"
+                    mv "${IGNORE_FILE}.tmp" "${IGNORE_FILE}"
+                  else
+                    : > "${IGNORE_FILE}"
+                  fi
+
+                  if [ -s "${IGNORE_REL}" ]; then
+                    {
+                      echo "${START_MARKER}"
+                      cat "${IGNORE_REL}"
+                      echo "${END_MARKER}"
+                    } >> "${IGNORE_FILE}"
+                  fi
+
+                  echo "Unchanged JSON ignore count: $(wc -l < "${IGNORE_REL}" | tr -d ' ')"
+
             - name: Push branch theme output into preview theme
               id: push
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@main
