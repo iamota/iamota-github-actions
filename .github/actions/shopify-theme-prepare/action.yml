@@ -50,14 +50,14 @@ runs:
           shell: bash
 
         - id: npm
-          uses: iamota/iamota-github-actions/.github/actions/npm-install@matix
+          uses: iamota/iamota-github-actions/.github/actions/npm-install@matrix
           with:
               working_directory: "."
               install_command: ${{ inputs.build_install_command }}
               if_package_json: "1"
 
         - id: webpack
-          uses: iamota/iamota-github-actions/.github/actions/webpack-build@matix
+          uses: iamota/iamota-github-actions/.github/actions/webpack-build@matrix
           with:
               working_directory: "."
               build_command: ${{ inputs.build_command }}
