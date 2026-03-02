@@ -9,6 +9,23 @@ export function markerNeedle(marker) {
     return `<!-- ${marker}`;
 }
 
+function escapeRegex(s) {
+    return String(s || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function markerRegex(marker) {
+    const esc = escapeRegex(marker);
+    // Match marker boundaries exactly:
+    // <!-- marker -->
+    // <!-- marker:... -->
+    return new RegExp(`<!--\\s*${esc}(?:\\s*-->|:)`);
+}
+
+export function markerMatches(body, marker) {
+    if (typeof body !== "string") return false;
+    return markerRegex(marker).test(body);
+}
+
 export function orderCommentsAsc(comments) {
     return (comments || [])
         .filter((c) => c && typeof c === "object")
@@ -16,9 +33,9 @@ export function orderCommentsAsc(comments) {
 }
 
 export function findLatestMarkerComment(comments, marker) {
-    const needle = markerNeedle(marker);
+    const matches = (body) => markerMatches(body, marker);
     return (comments || [])
-        .filter((c) => typeof c?.body === "string" && c.body.includes(needle))
+        .filter((c) => matches(c?.body))
         .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))[0];
 }
 

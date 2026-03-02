@@ -1,5 +1,5 @@
 import { apiRequest, paginateGet } from "./github-api-lib.mjs";
-import { listPrComments, markerNeedle, syncMarkerComment } from "./github-pr-comment-lib.mjs";
+import { findLatestMarkerComment, listPrComments, syncMarkerComment } from "./github-pr-comment-lib.mjs";
 
 async function tryDeleteComment(token, repo, commentId) {
     const url = `https://api.github.com/repos/${repo}/issues/comments/${commentId}`;
@@ -84,11 +84,9 @@ export async function runManualDeployGuard(opts) {
     const allFiles = await paginateGet(filesUrl, token);
     const matchedFiles = allFiles.filter((file) => pathRegex.test(String(file.filename || "")));
 
-    const markerNeedleValue = markerNeedle(marker);
-
     if (matchedFiles.length === 0) {
         const comments = await listPrComments(repo, prNumber, token);
-        const existing = comments.find((c) => typeof c?.body === "string" && c.body.includes(markerNeedleValue));
+        const existing = findLatestMarkerComment(comments, marker);
         if (existing?.id) await tryDeleteComment(token, repo, existing.id);
         return { passed: true, reason: "no-matching-files" };
     }

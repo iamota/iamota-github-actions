@@ -1,0 +1,30 @@
+name: "GitHub PR Comment Add"
+description: "Add a new PR comment via helper script"
+inputs:
+    repo:
+        required: true
+    pr:
+        required: true
+    body:
+        required: true
+    scripts_root:
+        required: false
+        default: ".iamota-actions/.github/scripts/github"
+runs:
+    using: "composite"
+    steps:
+        - run: |
+              set -euo pipefail
+              ROOT="${{ inputs.scripts_root }}"
+              SCRIPT="${ROOT}/github-pr-comment-add.mjs"
+
+              if [ ! -f "${SCRIPT}" ]; then
+                  echo "Missing comment-add script: ${SCRIPT}"
+                  exit 1
+              fi
+
+              node "${SCRIPT}" \
+                --repo "${{ inputs.repo }}" \
+                --pr "${{ inputs.pr }}" \
+                --body "${{ inputs.body }}"
+          shell: bash

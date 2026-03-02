@@ -638,12 +638,13 @@ jobs:
                   MARKER="${PREVIEW_MARKER:-iamota-shopify-preview}"
                   THEME_ID="${{ steps.marker_norm.outputs.theme_id }}"
                   DELETE_STATUS="${{ steps.delete_preview.outputs.status }}"
+                  STORE_HOST="${SHOPIFY_STORE:-unknown-store.myshopify.com}"
                   if [ -n "${THEME_ID}" ] && [ "${DELETE_STATUS}" = "deleted" ]; then
-                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Preview theme deleted: \`${THEME_ID}\`")"
+                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Deleted preview theme **${THEME_ID}** from **${STORE_HOST}**")"
                   elif [ -n "${THEME_ID}" ] && [ "${DELETE_STATUS}" = "missing" ]; then
-                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Preview theme already missing (nothing to delete): \`${THEME_ID}\`")"
+                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Preview theme already missing on **${STORE_HOST}** (nothing to delete): **${THEME_ID}**")"
                   else
-                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] No preview theme found to delete.")"
+                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] No preview theme found to delete on **${STORE_HOST}**.")"
                   fi
                   {
                     echo "body<<EOF"
@@ -651,12 +652,11 @@ jobs:
                     echo "EOF"
                   } >> "$GITHUB_OUTPUT"
 
-            - name: Sync cleanup comment marker
+            - name: Add cleanup comment
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@matrix
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-add@matrix
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
-                  marker: ${{ env.PREVIEW_MARKER }}
                   body: ${{ steps.cleanup_comment.outputs.body }}
