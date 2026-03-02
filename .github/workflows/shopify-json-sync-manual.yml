@@ -1,0 +1,128 @@
+name: Shopify JSON Sync - Manual
+
+on:
+    workflow_call:
+        inputs:
+            target_branch:
+                type: string
+                required: true
+            source_theme_id:
+                type: string
+                required: true
+            theme_src:
+                type: string
+                required: false
+                default: "."
+            theme_pull_dir:
+                type: string
+                required: false
+                default: "_remote_theme"
+            SHOPIFY_STORE:
+                type: string
+                required: false
+                default: ""
+        secrets:
+            SHOPIFY_THEME_ACCESS_TOKEN:
+                required: true
+            IAMOTA_ACTIONS_READ_TOKEN:
+                required: false
+
+permissions:
+    contents: write
+
+concurrency:
+    group: iamota-shopify-json-sync-manual-${{ inputs.target_branch }}
+    cancel-in-progress: false
+
+jobs:
+    sync_manual:
+        runs-on: ubuntu-latest
+        env:
+            TARGET_BRANCH: ${{ inputs.target_branch }}
+            SOURCE_THEME_ID: ${{ inputs.source_theme_id }}
+            THEME_SRC: ${{ inputs.theme_src }}
+            THEME_PULL_DIR: ${{ inputs.theme_pull_dir }}
+            SHOPIFY_STORE: ${{ inputs.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            SHOPIFY_CLI_TTY: "0"
+
+        steps:
+            - name: Checkout target branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ env.TARGET_BRANCH }}
+                  fetch-depth: 0
+
+            - name: Validate required values
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SOURCE_THEME_ID:-}" ] || MISSING+=("source_theme_id")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret")
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required values: ${MISSING[*]}"
+                      exit 1
+                  fi
+
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
+              with:
+                  ref: main
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Setup Node + Install Shopify CLI
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+
+            - name: Reset pulled theme directory
+              run: |
+                  set -euo pipefail
+                  rm -rf "${THEME_PULL_DIR}"
+
+            - name: Pull source theme into temp directory
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@main
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ env.SOURCE_THEME_ID }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  path: ${{ env.THEME_PULL_DIR }}
+                  nodelete: "1"
+                  ignore_csv: "*.liquid,*.css,*.scss,*.sass,*.js,*.png,*.jpg,*.jpeg,*.gif,*.svg,*.txt,*.md,*.map"
+
+            - name: Sync remote JSON into repo layout (writes report)
+              env:
+                  WRITE_REPORT: "true"
+                  REPORT_PATH: "/tmp/shopify-json-sync-manual.report.json"
+              run: |
+                  set -euo pipefail
+                  node .iamota-actions/.github/scripts/shopify/sync-shopify-json.mjs
+                  test -f /tmp/shopify-json-sync-manual.report.json && cat /tmp/shopify-json-sync-manual.report.json || true
+
+            - name: Remove temp helper folders before git status/commit
+              run: |
+                  set -euo pipefail
+                  rm -rf .iamota-actions "${THEME_PULL_DIR}"
+
+            - name: Commit and push to target branch (if changed)
+              run: |
+                  set -euo pipefail
+                  if [ -z "$(git status --porcelain)" ]; then
+                      echo "No JSON sync changes to commit."
+                      exit 0
+                  fi
+
+                  git config user.name  "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  git add -A
+
+                  TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
+                  SRC_STORE_RAW="${SHOPIFY_STORE:-unknown-store}"
+                  SRC_STORE="${SRC_STORE_RAW#https://}"
+                  SRC_STORE="${SRC_STORE#http://}"
+                  SRC_STORE="${SRC_STORE%%/*}"
+                  SRC_STORE="${SRC_STORE%.myshopify.com}"
+                  [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
+                  git commit -m "Shopify JSON Sync from ${SRC_STORE}#${SOURCE_THEME_ID} @ ${TS}"
+                  git push origin "${TARGET_BRANCH}"

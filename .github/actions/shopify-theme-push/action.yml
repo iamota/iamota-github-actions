@@ -15,10 +15,21 @@ inputs:
         default: "1"
     ignore:
         default: ""
+    json:
+        description: "When set to 1, run with --json and expose outputs"
+        default: "0"
+outputs:
+    raw_json:
+        description: "Raw JSON output from Shopify CLI (when json=1)"
+        value: ${{ steps.push.outputs.raw_json }}
+    preview_url:
+        description: "Theme preview URL parsed from JSON output (when available)"
+        value: ${{ steps.push.outputs.preview_url }}
 runs:
     using: "composite"
     steps:
-        - run: |
+        - id: push
+          run: |
               set -euo pipefail
               ARGS=(
                 theme push
@@ -38,5 +49,17 @@ runs:
                 ARGS+=(--ignore "${{ inputs.ignore }}")
               fi
               command -v shopify >/dev/null
-              shopify "${ARGS[@]}"
+              if [ "${{ inputs.json }}" = "1" ]; then
+                ARGS+=(--json)
+                OUT="$(shopify "${ARGS[@]}")"
+                PREVIEW_URL="$(echo "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);process.stdout.write(String(j?.theme?.preview_url||''));}catch{process.stdout.write('');}});")"
+                {
+                  echo "raw_json<<EOF"
+                  printf '%s\n' "${OUT}"
+                  echo "EOF"
+                  echo "preview_url=${PREVIEW_URL}"
+                } >> "$GITHUB_OUTPUT"
+              else
+                shopify "${ARGS[@]}"
+              fi
           shell: bash

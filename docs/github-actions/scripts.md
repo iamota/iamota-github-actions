@@ -52,7 +52,7 @@ Shared PR comment helpers:
 - list PR comments
 - marker matching
 - value extraction
-- marker upsert with refresh threshold support
+- marker sync (set) with refresh threshold support
 
 ### `.github/scripts/github/github-pr-comment-marker-get.mjs`
 
@@ -63,7 +63,7 @@ Supports:
 - optional value extraction via regex (`--extract-regex`)
 - staleness detection by comment count (`--refresh-after-comments`)
 
-### `.github/scripts/github/github-pr-comment-upsert.mjs`
+### `.github/scripts/github/github-pr-comment-marker-set.mjs`
 
 Creates or updates a marker-based PR comment for idempotent bot messaging.
 
@@ -79,7 +79,7 @@ Shared utility library for PR guard scripts.
 Responsibilities:
 
 - guard flow orchestration (build body, label checks, compare logic)
-- marker comment cleanup/upsert via shared comment library
+- marker comment cleanup/set via shared comment library
 - stale acknowledgement label removal
 - standardized diff snippet rendering
 

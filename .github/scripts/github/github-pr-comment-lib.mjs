@@ -36,7 +36,7 @@ export function extractByRegex(body, regexPattern) {
     return m[1] || m[0] || "";
 }
 
-export async function upsertMarkerComment({ repo, prNumber, marker, body, token, refreshAfterComments = 0 }) {
+export async function syncMarkerComment({ repo, prNumber, marker, body, token, refreshAfterComments = 0 }) {
     const comments = await listPrComments(repo, prNumber, token);
     const existing = findLatestMarkerComment(comments, marker);
 

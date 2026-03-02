@@ -13,8 +13,8 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/workflows/shopify-theme-backup-deploy.yml`
 - `.github/workflows/shopify-json-sync-production.yml`
 - `.github/workflows/shopify-json-sync-dev.yml`
-- `.github/workflows/shopify-theme-preview-pr.yml`
-- `.github/workflows/shopify-sync-preview.yml` (legacy orchestration wrapper)
+- `.github/workflows/shopify-json-sync-manual.yml`
+- `.github/workflows/shopify-theme-preview.yml`
 - `.github/workflows/shopify-warn-locale-edits.yml`
 - `.github/workflows/shopify-warn-theme-settings-edits.yml`
 
@@ -45,7 +45,7 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/scripts/github/github-api-lib.mjs`
 - `.github/scripts/github/github-pr-comment-lib.mjs`
 - `.github/scripts/github/github-pr-comment-marker-get.mjs`
-- `.github/scripts/github/github-pr-comment-upsert.mjs`
+- `.github/scripts/github/github-pr-comment-marker-set.mjs`
 - `.github/scripts/github/github-pr-guard-core.mjs`
 - `.github/scripts/github/github-pr-guard-shopify-locale.mjs`
 - `.github/scripts/github/github-pr-guard-shopify-theme-settings.mjs`

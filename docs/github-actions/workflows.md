@@ -134,7 +134,25 @@ Notes:
 - No Shopify credentials required.
 - Safe to run on a schedule and/or manually.
 
-### `.github/workflows/shopify-theme-preview-pr.yml`
+### `.github/workflows/shopify-json-sync-manual.yml`
+
+Purpose:
+
+- Run on-demand JSON sync from a chosen Shopify source theme into a chosen target branch.
+
+Inputs:
+
+- `target_branch` (required)
+- `source_theme_id` (required)
+- `theme_src`, `theme_pull_dir`
+- `SHOPIFY_STORE` (required)
+
+Secrets:
+
+- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
+- `IAMOTA_ACTIONS_READ_TOKEN` (optional for private helper checkout)
+
+### `.github/workflows/shopify-theme-preview.yml`
 
 Purpose:
 
@@ -163,21 +181,8 @@ Notes:
   - overlays `theme_dist` onto `_remote_theme` via `rsync` using `.shopifyignore` and `shopify_ignore`
   - pushes `_remote_theme` to preview theme
 - Backs up existing preview themes before overwrite when enabled.
-- Uses shared comment utility scripts for marker lookup/upsert.
+- Uses shared comment utility scripts for marker lookup/set.
 - Fails PR check on merge conflicts and JSON drift.
-
-### `.github/workflows/shopify-sync-preview.yml` (Legacy)
-
-Purpose:
-
-- Backward-compatible orchestration wrapper for the older combined interface.
-
-Notes:
-
-- Composes:
-  - `shopify-json-sync-production.yml`
-  - `shopify-json-sync-dev.yml`
-  - `shopify-theme-preview-pr.yml`
 
 ### `.github/workflows/shopify-warn-locale-edits.yml`
 
@@ -210,6 +215,7 @@ Use these workflows for all integrations:
 - `shopify-theme-backup-deploy.yml`
 - `shopify-json-sync-production.yml`
 - `shopify-json-sync-dev.yml`
-- `shopify-theme-preview-pr.yml`
+- `shopify-json-sync-manual.yml`
+- `shopify-theme-preview.yml`
 - `shopify-warn-locale-edits.yml`
 - `shopify-warn-theme-settings-edits.yml`

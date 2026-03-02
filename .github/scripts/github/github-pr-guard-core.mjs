@@ -1,5 +1,5 @@
 import { apiRequest, paginateGet } from "./github-api-lib.mjs";
-import { listPrComments, markerNeedle, upsertMarkerComment } from "./github-pr-comment-lib.mjs";
+import { listPrComments, markerNeedle, syncMarkerComment } from "./github-pr-comment-lib.mjs";
 
 async function tryDeleteComment(token, repo, commentId) {
     const url = `https://api.github.com/repos/${repo}/issues/comments/${commentId}`;
@@ -10,8 +10,8 @@ async function tryDeleteComment(token, repo, commentId) {
     }
 }
 
-async function upsertComment(token, repo, prNumber, marker, body) {
-    await upsertMarkerComment({
+async function syncComment(token, repo, prNumber, marker, body) {
+    await syncMarkerComment({
         repo,
         prNumber,
         marker,
@@ -145,7 +145,7 @@ export async function runManualDeployGuard(opts) {
         .filter(Boolean)
         .join("\n");
 
-    await upsertComment(token, repo, prNumber, marker, body);
+    await syncComment(token, repo, prNumber, marker, body);
 
     if (!acknowledged) {
         return { passed: false, reason: failSummary };

@@ -1,0 +1,53 @@
+name: "GitHub PR Preview Comment Build"
+description: "Build standardized Shopify preview PR comment body"
+inputs:
+    mode:
+        required: true
+    author:
+        required: true
+    branch:
+        required: true
+    base_ref:
+        required: true
+    head_sha:
+        required: true
+    theme_id:
+        required: false
+        default: ""
+    preview_url:
+        required: false
+        default: ""
+    drift_count:
+        required: false
+        default: "0"
+    drift_files_path:
+        required: false
+        default: ""
+outputs:
+    body:
+        value: ${{ steps.build.outputs.body }}
+runs:
+    using: "composite"
+    steps:
+        - id: build
+          run: |
+              set -euo pipefail
+              BODY="$(
+                node .iamota-actions/.github/scripts/github/github-pr-preview-comment-build.mjs \
+                  --mode "${{ inputs.mode }}" \
+                  --author "${{ inputs.author }}" \
+                  --branch "${{ inputs.branch }}" \
+                  --base-ref "${{ inputs.base_ref }}" \
+                  --head-sha "${{ inputs.head_sha }}" \
+                  --theme-id "${{ inputs.theme_id }}" \
+                  --preview-url "${{ inputs.preview_url }}" \
+                  --drift-count "${{ inputs.drift_count }}" \
+                  --drift-files-path "${{ inputs.drift_files_path }}"
+              )"
+
+              {
+                echo "body<<EOF"
+                printf '%s\n' "${BODY}"
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+          shell: bash

@@ -1,4 +1,4 @@
-import { upsertMarkerComment } from "./github-pr-comment-lib.mjs";
+import { syncMarkerComment } from "./github-pr-comment-lib.mjs";
 
 function arg(name) {
     const idx = process.argv.indexOf(name);
@@ -22,7 +22,7 @@ async function main() {
     const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
     if (!token) throw new Error("Missing GH_TOKEN/GITHUB_TOKEN");
 
-    const result = await upsertMarkerComment({
+    const result = await syncMarkerComment({
         repo,
         prNumber: pr,
         marker,

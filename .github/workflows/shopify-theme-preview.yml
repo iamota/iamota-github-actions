@@ -1,0 +1,465 @@
+name: Shopify Theme Preview (Canonical)
+
+on:
+    workflow_call:
+        inputs:
+            production_branch:
+                type: string
+                required: false
+                default: "production"
+            theme_src:
+                type: string
+                required: false
+                default: "."
+            theme_dist:
+                type: string
+                required: false
+                default: ""
+            theme_pull_dir:
+                type: string
+                required: false
+                default: "_remote_theme"
+            build_install_command:
+                type: string
+                required: false
+                default: "npm ci"
+            build_command:
+                type: string
+                required: false
+                default: "npx webpack --env target=${GITHUB_BRANCH}"
+            enable_preview_backup:
+                type: string
+                required: false
+                default: "true"
+            aws_region:
+                type: string
+                required: false
+                default: "us-west-2"
+            aws_s3_bucket:
+                type: string
+                required: false
+                default: ""
+            shopify_ignore:
+                type: string
+                required: false
+                default: ""
+            SHOPIFY_STORE:
+                type: string
+                required: false
+                default: ""
+            SHOPIFY_THEME_ID:
+                type: string
+                required: false
+                default: ""
+            SHOPIFY_PRODUCTION_THEME_ID:
+                type: string
+                required: false
+                default: ""
+            SHOPIFY_PREVIEW_BASE_THEME_ID:
+                type: string
+                required: false
+                default: ""
+        secrets:
+            SHOPIFY_THEME_ACCESS_TOKEN:
+                required: true
+            AWS_ACCESS_KEY_ID:
+                required: false
+            AWS_SECRET_ACCESS_KEY:
+                required: false
+            IAMOTA_ACTIONS_READ_TOKEN:
+                required: false
+
+permissions:
+    contents: write
+    pull-requests: write
+
+concurrency:
+    group: iamota-shopify-theme-preview-${{ github.event.pull_request.number || github.run_id }}
+    cancel-in-progress: true
+
+jobs:
+    shopify_theme_review_prepare:
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main' && (inputs.SHOPIFY_PRODUCTION_THEME_ID == '' || inputs.SHOPIFY_THEME_ID == '' || inputs.SHOPIFY_THEME_ID != inputs.SHOPIFY_PRODUCTION_THEME_ID)
+        runs-on: ubuntu-latest
+        env:
+            THEME_SRC: ${{ inputs.theme_src }}
+            THEME_DIST: ${{ inputs.theme_dist }}
+            THEME_PULL_DIR: ${{ inputs.theme_pull_dir }}
+            BUILD_INSTALL_COMMAND: ${{ inputs.build_install_command }}
+            BUILD_COMMAND: ${{ inputs.build_command }}
+            ENABLE_PREVIEW_BACKUP: ${{ inputs.enable_preview_backup }}
+            AWS_REGION: ${{ inputs.aws_region }}
+            AWS_S3_BUCKET: ${{ inputs.aws_s3_bucket }}
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            SHOPIFY_IGNORE: ${{ inputs.shopify_ignore }}
+            SHOPIFY_STORE: ${{ inputs.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ID: ${{ inputs.SHOPIFY_THEME_ID }}
+            SHOPIFY_PRODUCTION_THEME_ID: ${{ inputs.SHOPIFY_PRODUCTION_THEME_ID }}
+            SHOPIFY_PREVIEW_BASE_ID: ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID }}
+            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            SHOPIFY_CLI_TTY: "0"
+
+        steps:
+            - name: Checkout PR head
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Validate required Shopify values
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID input/var")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret")
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required Shopify values: ${MISSING[*]}"
+                      exit 1
+                  fi
+
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
+              with:
+                  ref: main
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Setup Node + Install Shopify CLI
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+
+            - name: Resolve source theme id and store slug
+              id: source
+              run: |
+                  set -euo pipefail
+                  SOURCE_THEME_ID="${SHOPIFY_PRODUCTION_THEME_ID:-}"
+                  if [ -z "${SOURCE_THEME_ID}" ]; then
+                      SOURCE_THEME_ID="${SHOPIFY_THEME_ID}"
+                  fi
+
+                  SRC_STORE_RAW="${SHOPIFY_STORE:-unknown-store}"
+                  SRC_STORE="${SRC_STORE_RAW#https://}"
+                  SRC_STORE="${SRC_STORE#http://}"
+                  SRC_STORE="${SRC_STORE%%/*}"
+                  SRC_STORE="${SRC_STORE%.myshopify.com}"
+                  [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
+
+                  echo "source_theme_id=${SOURCE_THEME_ID}" >> "$GITHUB_OUTPUT"
+                  echo "source_store_slug=${SRC_STORE}" >> "$GITHUB_OUTPUT"
+
+            - name: Resolve preview theme id from PR marker (if any)
+              id: marker
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@main
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ github.event.pull_request.number }}
+                  marker: iamota-shopify-preview
+                  extract_regex: theme_id=(\d+)
+                  refresh_after_comments: "75"
+
+            - name: Validate preview base theme when creating a new preview
+              if: steps.marker.outputs.extracted_value == ''
+              run: |
+                  set -euo pipefail
+                  if [ -z "${SHOPIFY_PREVIEW_BASE_ID:-}" ]; then
+                      echo "Missing SHOPIFY_PREVIEW_BASE_THEME_ID input/var for initial preview creation."
+                      exit 1
+                  fi
+
+            - name: Reset pulled theme directory
+              run: |
+                  set -euo pipefail
+                  rm -rf "${THEME_PULL_DIR}"
+
+            - name: Pull base theme into temp directory
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-pull@main
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ steps.source.outputs.source_theme_id }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  path: ${{ env.THEME_PULL_DIR }}
+                  nodelete: "1"
+
+            - name: Initial base JSON sync into source tree (first run only)
+              if: steps.marker.outputs.extracted_value == ''
+              env:
+                  DRY_RUN: "false"
+                  WRITE_REPORT: "true"
+                  REPORT_PATH: "/tmp/pr-json-initial-sync.report.json"
+              run: |
+                  set -euo pipefail
+                  node .iamota-actions/.github/scripts/shopify/sync-shopify-json.mjs
+                  test -f /tmp/pr-json-initial-sync.report.json && cat /tmp/pr-json-initial-sync.report.json || true
+
+            - name: Determine delete behavior
+              id: deleteflag
+              run: |
+                  set -euo pipefail
+                  ALLOW_DELETE="false"
+                  if git log -1 --pretty=%B | grep -q '\[Allow Delete\]'; then
+                      ALLOW_DELETE="true"
+                  fi
+                  echo "allow_delete=${ALLOW_DELETE}" >> "$GITHUB_OUTPUT"
+
+            - name: Prepare theme (install + build + resolve dist)
+              id: prepare
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@main
+              env:
+                  GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
+              with:
+                  theme_src: ${{ env.THEME_SRC }}
+                  theme_dist: ${{ env.THEME_DIST }}
+                  build_install_command: ${{ env.BUILD_INSTALL_COMMAND }}
+                  build_command: ${{ env.BUILD_COMMAND }}
+
+            - name: Overlay THEME_DIST into pulled base theme using deploy-style ignores
+              run: |
+                  set -euo pipefail
+
+                  IGNORE_ARGS=()
+                  if [ -f ".shopifyignore" ]; then
+                      IGNORE_ARGS+=(--exclude-from=".shopifyignore")
+                  fi
+
+                  IFS=',' read -r -a IG <<< "${SHOPIFY_IGNORE}"
+                  for g in "${IG[@]}"; do
+                      g_trim="$(echo "${g}" | xargs)"
+                      if [ -n "${g_trim}" ]; then
+                          IGNORE_ARGS+=(--exclude "${g_trim}")
+                      fi
+                  done
+
+                  DELETE_ARGS=()
+                  if [ "${{ steps.deleteflag.outputs.allow_delete }}" = "true" ]; then
+                      DELETE_ARGS+=(--delete)
+                  fi
+
+                  rsync -a "${DELETE_ARGS[@]}" "${IGNORE_ARGS[@]}" \
+                      "${{ steps.prepare.outputs.theme_dist_effective }}/" \
+                      "${THEME_PULL_DIR%/}/"
+
+            - name: Prepare preview backup filename
+              if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
+              run: |
+                  set -euo pipefail
+                  PR_NUMBER="${{ github.event.pull_request.number }}"
+                  BRANCH="${{ github.event.pull_request.head.ref }}"
+                  THEME_ID="${{ steps.marker.outputs.extracted_value }}"
+                  TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d_%H%M%S_%Z')"
+                  REPO_NAME="$(basename "${{ github.repository }}")"
+                  SAFE_BRANCH="$(echo "${BRANCH}" | tr '/' '_')"
+                  ZIP_NAME="${REPO_NAME}__PR${PR_NUMBER}__${SAFE_BRANCH}__preview_theme_${THEME_ID}__${TS}.zip"
+                  echo "PREVIEW_BACKUP_DIR=preview_backup" >> "$GITHUB_ENV"
+                  echo "PREVIEW_BACKUP_ZIP=${ZIP_NAME}" >> "$GITHUB_ENV"
+                  echo "PREVIEW_S3_DEST=shopify-preview-backups/${ZIP_NAME}" >> "$GITHUB_ENV"
+
+            - name: Pull existing preview theme for backup
+              if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@main
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ steps.marker.outputs.extracted_value }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  output_dir: ${{ env.PREVIEW_BACKUP_DIR }}
+                  zip_output: ${{ env.PREVIEW_BACKUP_ZIP }}
+
+            - name: Configure AWS credentials (optional)
+              if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Upload preview backup zip to S3 (optional)
+              if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@main
+              with:
+                  file: ${{ env.PREVIEW_BACKUP_ZIP }}
+                  bucket: ${{ env.AWS_S3_BUCKET }}
+                  dest_path: ${{ env.PREVIEW_S3_DEST }}
+
+            - name: Upload preview backup artifact (optional)
+              if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@main
+              with:
+                  name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}
+                  path: ${{ env.PREVIEW_BACKUP_ZIP }}
+
+            - name: Create preview theme (duplicate base) if missing
+              if: steps.marker.outputs.extracted_value == ''
+              id: createtheme
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@main
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  base_theme_id: ${{ env.SHOPIFY_PREVIEW_BASE_ID }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  name: iamota (${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}
+
+            - name: Determine preview theme id
+              id: finaltheme
+              run: |
+                  set -euo pipefail
+                  if [ -n "${{ steps.marker.outputs.extracted_value }}" ]; then
+                      echo "theme_id=${{ steps.marker.outputs.extracted_value }}" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "theme_id=${{ steps.createtheme.outputs.theme_id }}" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Push preview theme and capture preview URL
+              id: push
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@main
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ steps.finaltheme.outputs.theme_id }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  path: ${{ env.THEME_PULL_DIR }}
+                  json: "1"
+
+            - name: Rename preview theme to canonical name
+              run: |
+                  set -euo pipefail
+                  PR_NUMBER="${{ github.event.pull_request.number }}"
+                  BRANCH="${{ github.event.pull_request.head.ref }}"
+                  NAME="iamota (${BRANCH}) PR#${PR_NUMBER}"
+                  THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
+                  shopify theme rename \
+                      --store "${SHOPIFY_STORE}" \
+                      --theme "${THEME_ID}" \
+                      --name "${NAME}" \
+                      --password "${SHOPIFY_THEME_ACCESS_TOKEN}" \
+                      --no-color
+
+            - name: Build preview comment body
+              id: preview_comment
+              run: |
+                  set -euo pipefail
+                  THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
+                  PREVIEW_URL="${{ steps.push.outputs.preview_url }}"
+                  SRC_STORE="${{ steps.source.outputs.source_store_slug }}"
+                  SRC_THEME="${{ steps.source.outputs.source_theme_id }}"
+                  BASE_REF="${{ github.base_ref }}"
+                  BRANCH="${{ github.event.pull_request.head.ref }}"
+                  HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+                  BODY="$(printf '%s\n' \
+                    "<!-- iamota-shopify-preview:theme_id=${THEME_ID} -->" \
+                    "[OK] **Shopify preview generated** from base \`${SRC_STORE}#${SRC_THEME}\` overlaid with branch \`${BRANCH}\` output." \
+                    "" \
+                    "- Preview: ${PREVIEW_URL}" \
+                    "- Theme ID: \`${THEME_ID}\`" \
+                    "- Base branch: \`${BASE_REF}\`" \
+                    "- PR head: \`${HEAD_SHA}\`" \
+                  )"
+
+                  {
+                    echo "body<<EOF"
+                    printf '%s\n' "${BODY}"
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Sync PR comment marker
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@main
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ github.event.pull_request.number }}
+                  marker: iamota-shopify-preview
+                  body: ${{ steps.preview_comment.outputs.body }}
+                  refresh_after_comments: "75"
+
+            - name: Remove Sync JSON label
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-label-remove@main
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ github.event.pull_request.number }}
+                  label: "Sync JSON"
+
+    shopify_theme_preview_cleanup:
+        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main' && (inputs.SHOPIFY_PRODUCTION_THEME_ID == '' || inputs.SHOPIFY_THEME_ID == '' || inputs.SHOPIFY_THEME_ID != inputs.SHOPIFY_PRODUCTION_THEME_ID)
+        runs-on: ubuntu-latest
+        env:
+            SHOPIFY_STORE: ${{ inputs.SHOPIFY_STORE }}
+            SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            SHOPIFY_CLI_TTY: "0"
+
+        steps:
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@main
+              with:
+                  ref: main
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Validate required Shopify values
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN secret")
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required Shopify values: ${MISSING[*]}"
+                      exit 1
+                  fi
+
+            - name: Setup Node + Install Shopify CLI
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@main
+
+            - name: Find preview theme id from marker
+              id: marker
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@main
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ github.event.pull_request.number }}
+                  marker: iamota-shopify-preview
+                  extract_regex: theme_id=(\d+)
+
+            - name: Delete preview theme (if exists)
+              if: steps.marker.outputs.extracted_value != ''
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@main
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ steps.marker.outputs.extracted_value }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+
+            - name: Build cleanup comment body
+              id: cleanup_comment
+              run: |
+                  set -euo pipefail
+                  THEME_ID="${{ steps.marker.outputs.extracted_value }}"
+                  if [ -n "${THEME_ID}" ]; then
+                      BODY="<!-- iamota-shopify-preview -->[CLEANUP] Preview theme deleted: \`${THEME_ID}\`"
+                  else
+                      BODY="<!-- iamota-shopify-preview -->[CLEANUP] No preview theme found to delete."
+                  fi
+                  {
+                    echo "body<<EOF"
+                    printf '%s\n' "${BODY}"
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Sync cleanup comment marker
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@main
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ github.event.pull_request.number }}
+                  marker: iamota-shopify-preview
+                  body: ${{ steps.cleanup_comment.outputs.body }}
+
+            - name: Remove Sync JSON label
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-label-remove@main
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ github.event.pull_request.number }}
+                  label: "Sync JSON"

@@ -74,7 +74,35 @@ jobs:
 ```
 
 ```yaml
-name: Shopify PR Preview
+name: Shopify JSON Sync Manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        type: string
+        required: false
+        default: ""
+      source_theme_id:
+        type: string
+        required: false
+        default: ""
+
+jobs:
+  run:
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-manual.yml@v1
+    with:
+      target_branch: ${{ github.event.inputs.target_branch != '' && github.event.inputs.target_branch || github.ref_name }}
+      source_theme_id: ${{ github.event.inputs.source_theme_id != '' && github.event.inputs.source_theme_id || vars.SHOPIFY_PRODUCTION_THEME_ID || vars.SHOPIFY_THEME_ID || '' }}
+      theme_src: ${{ vars.THEME_SRC || 'src' }}
+      theme_pull_dir: ${{ vars.THEME_PULL_DIR || '_remote_theme' }}
+      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
+    secrets:
+      SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+```
+
+```yaml
+name: Shopify Theme Preview
 
 on:
   pull_request:
@@ -82,7 +110,7 @@ on:
 
 jobs:
   run:
-    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-preview-pr.yml@v1
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-preview.yml@v1
     with:
       theme_src: ${{ vars.THEME_SRC || 'src' }}
       theme_dist: ${{ vars.THEME_DIST || '' }}
@@ -108,6 +136,7 @@ Required Shopify vars:
 
 - `SHOPIFY_STORE`
 - `SHOPIFY_THEME_ID`
+- `SHOPIFY_PRODUCTION_THEME_ID` (recommended for production/manual sync source)
 
 Required Shopify secret:
 

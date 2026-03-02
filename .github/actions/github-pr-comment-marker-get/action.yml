@@ -1,0 +1,83 @@
+name: "GitHub PR Comment Marker Get"
+description: "Resolve and read a marker-based PR comment value from helper scripts"
+inputs:
+    repo:
+        required: true
+    pr:
+        required: true
+    marker:
+        required: true
+    extract_regex:
+        required: false
+        default: ""
+    refresh_after_comments:
+        required: false
+        default: "0"
+    scripts_root:
+        required: false
+        default: ".iamota-actions/.github/scripts/github"
+outputs:
+    extracted_value:
+        value: ${{ steps.run.outputs.extracted_value }}
+    should_refresh:
+        value: ${{ steps.run.outputs.should_refresh }}
+    newer_comment_count:
+        value: ${{ steps.run.outputs.newer_comment_count }}
+    raw_output:
+        value: ${{ steps.run.outputs.raw_output }}
+runs:
+    using: "composite"
+    steps:
+        - id: run
+          run: |
+              set -euo pipefail
+
+              ROOT="${{ inputs.scripts_root }}"
+              MARKER_GET=""
+              MARKER_KIND=""
+
+              if [ -f "${ROOT}/github-pr-comment-marker-get.mjs" ]; then
+                  MARKER_GET="${ROOT}/github-pr-comment-marker-get.mjs"
+                  MARKER_KIND="new"
+              elif [ -f "${ROOT}/github-get-comment-marker.mjs" ]; then
+                  MARKER_GET="${ROOT}/github-get-comment-marker.mjs"
+                  MARKER_KIND="legacy_json"
+              elif [ -f "${ROOT}/github-find-preview-theme-id.mjs" ]; then
+                  MARKER_GET="${ROOT}/github-find-preview-theme-id.mjs"
+                  MARKER_KIND="legacy_raw"
+              else
+                  echo "No marker-get script found under ${ROOT}"
+                  exit 1
+              fi
+
+              if [ "${MARKER_KIND}" = "new" ] || [ "${MARKER_KIND}" = "legacy_json" ]; then
+                  OUT="$(
+                    node "${MARKER_GET}" \
+                      --repo "${{ inputs.repo }}" \
+                      --pr "${{ inputs.pr }}" \
+                      --marker "${{ inputs.marker }}" \
+                      --extract-regex "${{ inputs.extract_regex }}" \
+                      --refresh-after-comments "${{ inputs.refresh_after_comments }}"
+                  )"
+              else
+                  OUT="$(
+                    node "${MARKER_GET}" \
+                      --repo "${{ inputs.repo }}" \
+                      --pr "${{ inputs.pr }}" \
+                      --marker "${{ inputs.marker }}"
+                  )"
+              fi
+
+              EXTRACTED_VALUE="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{d=d.trim();if(!d){process.stdout.write('');return;}try{const j=JSON.parse(d);process.stdout.write(String(j.extracted_value||j.theme_id||''));}catch{process.stdout.write(d);} });")"
+              SHOULD_REFRESH="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d.trim());process.stdout.write(String(Boolean(j.should_refresh)));}catch{process.stdout.write('false');}});")"
+              NEWER_COMMENT_COUNT="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d.trim());process.stdout.write(String(Number(j.newer_comment_count||0)));}catch{process.stdout.write('0');}});")"
+
+              echo "extracted_value=${EXTRACTED_VALUE}" >> "$GITHUB_OUTPUT"
+              echo "should_refresh=${SHOULD_REFRESH}" >> "$GITHUB_OUTPUT"
+              echo "newer_comment_count=${NEWER_COMMENT_COUNT}" >> "$GITHUB_OUTPUT"
+              {
+                echo "raw_output<<EOF"
+                printf '%s\n' "${OUT}"
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+          shell: bash
