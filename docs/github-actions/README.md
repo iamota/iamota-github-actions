@@ -22,6 +22,10 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 
 - `.github/workflows/github-actions-lint.yml`
 
+### Internal Release Workflow
+
+- `.github/workflows/release-semver-tags.yml`
+
 ### Composite Actions
 
 - `.github/actions/aws-s3-upload/action.yml`
