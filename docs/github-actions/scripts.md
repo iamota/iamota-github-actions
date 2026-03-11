@@ -1,6 +1,18 @@
 # Scripts Reference
 
-## Shopify Sync Script
+## Shopify Scripts
+
+### `.github/scripts/shopify/shopify-theme-id-resolve.mjs`
+
+Purpose:
+
+- Resolves theme id inputs.
+- Supports literal IDs and the alias `live`.
+
+Behavior:
+
+- When input is `live`, runs `shopify theme list --role main` and resolves the single main theme ID.
+- Fails if zero or multiple main theme IDs are returned.
 
 ### `.github/scripts/shopify/sync-shopify-json.mjs`
 
@@ -9,7 +21,7 @@ Purpose:
 - Synchronizes remote pulled Shopify JSON files into repository layout.
 - Supports dry-run, duplicate basename handling, optional report output.
 
-Primary env vars:
+Primary environment variables:
 
 - `THEME_PULL_DIR`
 - `THEME_SRC`
@@ -25,60 +37,62 @@ Output:
 - Prints compact totals JSON.
 - Optionally writes detailed report JSON when `WRITE_REPORT=true`.
 
-## GitHub Helper Scripts
+## GitHub Scripts
 
 ### `.github/scripts/github/github-api-lib.mjs`
 
-Shared GitHub API primitives:
+Shared GitHub API utilities:
 
 - authenticated request helper
-- paginated GET traversal (Link header support)
+- pagination helper for REST list endpoints
+
+### `.github/scripts/github/github-pr-comment-add.mjs`
+
+Creates a new PR comment.
+
+Arguments:
+
+- `--repo`
+- `--pr`
+- `--body`
 
 ### `.github/scripts/github/github-pr-comment-lib.mjs`
 
 Shared PR comment helpers:
 
 - list PR comments
-- marker matching
-- value extraction
-- marker sync (set) with refresh threshold support
+- exact marker matching
+- regex value extraction
+- marker comment sync logic (create/update/refresh)
 
 ### `.github/scripts/github/github-pr-comment-marker-get.mjs`
 
-Finds the latest marker comment and returns metadata JSON.
+Reads latest matching marker comment and emits metadata JSON.
 
 Supports:
 
 - optional value extraction via regex (`--extract-regex`)
-- staleness detection by comment count (`--refresh-after-comments`)
+- staleness detection via comment threshold (`--refresh-after-comments`)
 
 ### `.github/scripts/github/github-pr-comment-marker-set.mjs`
 
-Creates or updates a marker-based PR comment for idempotent bot messaging.
+Create/update/refresh marker comment.
 
 Supports:
 
-- optional comment refresh via `--refresh-after-comments N`:
-  creates a new marker comment when existing marker has at least `N` newer comments.
+- `--refresh-after-comments N` to force a new marker comment when old marker has at least `N` newer comments.
 
 ### `.github/scripts/github/github-pr-guard-core.mjs`
 
-Shared utility library for PR guard scripts.
+Shared core for guard workflows:
 
-Responsibilities:
-
-- guard flow orchestration (build body, label checks, compare logic)
-- marker comment cleanup/set via shared comment library
-- stale acknowledgement label removal
-- standardized diff snippet rendering
+- changed-file detection and formatting
+- acknowledgement-label handling
+- marker comment lifecycle
 
 ### `.github/scripts/github/github-pr-guard-shopify-locale.mjs`
 
-Locale guard runner built on `github-pr-guard-core.mjs`.
-
-Guarded files:
-
-- `^src/locales/.*\.json$`
+Locale guard runner built on guard core.
 
 Default acknowledgement label:
 
@@ -86,11 +100,7 @@ Default acknowledgement label:
 
 ### `.github/scripts/github/github-pr-guard-shopify-theme-settings.mjs`
 
-Theme settings guard runner built on `github-pr-guard-core.mjs`.
-
-Guarded files:
-
-- `^(src/)?config/settings_data\.json$`
+Theme settings guard runner built on guard core.
 
 Default acknowledgement label:
 

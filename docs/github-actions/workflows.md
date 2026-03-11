@@ -1,52 +1,60 @@
 # Workflows Reference
 
+## Multi-Store Contract
+
+Store-aware workflows use the same resolution model:
+
+- `SHOPIFY_STORE` accepts:
+  - single store string: `store1` or `store1.myshopify.com`
+  - JSON array: `["store1","store2"]` (must be valid JSON)
+- Store-scoped values can be JSON objects keyed by slug or full host:
+  - `{"store1":"123","store2":"456"}`
+  - `{"store1.myshopify.com":"123","store2.myshopify.com":"456"}`
+- Non-object values are treated as scalars and applied to all stores.
+- Theme-id inputs also support the alias `live` (resolved to current main theme id at runtime).
+
+Resolution behavior:
+
+- `shopify-theme-backup`, `shopify-theme-deploy`, `shopify-theme-backup-deploy`, `shopify-theme-preview`, and lighthouse in `shopify-theme-ci` run as store matrix jobs.
+- `shopify-json-sync-production` and `shopify-json-sync-dev` use the first resolved store as the master source.
+
 ## Reusable Workflows
-
-### Multi-Store Inputs (Supported)
-
-For store-aware workflows, you can pass:
-
-- Scalar values: `SHOPIFY_STORE=store1.myshopify.com`
-- CSV stores: `SHOPIFY_STORE=store1.myshopify.com,store2.myshopify.com`
-- JSON array stores: `SHOPIFY_STORE=["store1.myshopify.com","store2.myshopify.com"]`
-- Store-keyed values:
-  - `SHOPIFY_THEME_ID={"store1.myshopify.com":"123","store2.myshopify.com":"456"}`
-  - `CI_RUN_LIGHTHOUSE={"store1.myshopify.com":"true","store2.myshopify.com":"false"}`
-
-Resolution rules:
-
-- Backup/deploy/preview workflows run per store (matrix).
-- JSON sync workflows use the first resolved store as the master source.
-- Scalar values apply to all stores.
 
 ### `.github/workflows/github-warn-merge-conflicts.yml`
 
 Purpose:
 
-- Detect merge conflicts on PRs and push-related PRs.
-- Post bot comments when conflicts appear and when they are resolved.
+- Detect merge conflicts on PRs (and related branch activity).
+- Create/update bot comments when conflict state changes.
+- Fail the run when conflicts exist.
+
+Inputs: none  
+Secrets: none
 
 ### `.github/workflows/github-warn-possible-conflicts.yml`
 
 Purpose:
 
-- Detect likely overlap/coordination risk across active branches.
-- Open/update tracking issues with context and diff snippets.
+- Scan active branches for probable overlap against the current branch.
+- Open/update tracking issues with candidate conflict files and snippets.
+
+Inputs: none  
+Secrets: none
 
 ### `.github/workflows/shopify-theme-backup.yml`
 
 Purpose:
 
-- Backup current Shopify theme
-- Optionally upload backup zip to S3
+- Pull Shopify theme files and produce timestamped backups.
+- Optionally upload backup zips to S3.
 
 Inputs:
 
 - `branch` (required)
-- `SHOPIFY_STORE` (required)
+- `SHOPIFY_STORE` (optional, but required at runtime)
 - `SHOPIFY_THEME_ID` (required)
-- `aws_region` (default `us-west-2`)
-- `aws_s3_bucket` (default empty)
+- `aws_region` (optional, default `us-west-2`)
+- `aws_s3_bucket` (optional)
 
 Secrets:
 
@@ -58,17 +66,18 @@ Secrets:
 
 Purpose:
 
-- Resolve build output and deploy theme to Shopify
+- Build/prepare theme output and deploy to Shopify.
 
 Inputs:
 
 - `branch` (required)
-- `SHOPIFY_STORE` (required)
+- `SHOPIFY_STORE` (optional, but required at runtime)
 - `SHOPIFY_THEME_ID` (required)
-- `theme_src` (default `.`)
-- `theme_dist` (default empty; auto-resolves to `./dist` when webpack exists, otherwise `theme_src`)
-- `build_install_command` (default `npm ci`)
-- `build_command` (default `npx webpack --env target=${GITHUB_BRANCH}`)
+- `theme_src` (optional, default `.`)
+- `theme_dist` (optional)
+- `theme_path` (optional legacy alias)
+- `build_install_command` (optional, default `npm ci`)
+- `build_command` (optional, default `npx webpack --env target=${GITHUB_BRANCH}`)
 
 Secrets:
 
@@ -76,29 +85,24 @@ Secrets:
 
 Notes:
 
-- Self-aware build behavior:
-  - if repo root has `package.json`, runs install command
-  - if repo root has `webpack.config.js`, runs build command
-- `--allow-live` is enabled only on production/prod branch names.
-- Deletes are blocked by default and enabled only when commit message contains `[Allow Delete]`.
+- Uses `shopify-theme-prepare` to auto-resolve effective output path.
+- `--allow-live` enabled only for production/prod branch names.
+- Deletes are blocked by default; enabled only if commit message contains `[Allow Delete]`.
 
 ### `.github/workflows/shopify-theme-backup-deploy.yml`
 
 Purpose:
 
-- Orchestrates backup then deploy with strict ordering (`deploy` needs `backup`)
+- Orchestrate backup then deploy in order (`deploy` depends on `backup`).
 
 Inputs:
 
 - `branch` (required)
-- `SHOPIFY_STORE` (required)
+- `SHOPIFY_STORE` (optional, but required at runtime)
 - `SHOPIFY_THEME_ID` (required)
-- `theme_src` (default `.`)
-- `theme_dist` (default empty; auto-resolves to `./dist` when webpack exists, otherwise `theme_src`)
-- `build_install_command` (default `npm ci`)
-- `build_command` (default `npx webpack --env target=${GITHUB_BRANCH}`)
-- `aws_region` (default `us-west-2`)
-- `aws_s3_bucket` (default empty)
+- `theme_src`, `theme_dist`, `theme_path`
+- `build_install_command`, `build_command`
+- `aws_region`, `aws_s3_bucket`
 
 Secrets:
 
@@ -106,146 +110,136 @@ Secrets:
 - `AWS_ACCESS_KEY_ID` (optional)
 - `AWS_SECRET_ACCESS_KEY` (optional)
 
+### `.github/workflows/shopify-theme-ci.yml`
+
+Purpose:
+
+- Central CI pipeline for theme quality checks.
+
+Inputs:
+
+- Build roots: `theme_src`, `theme_dist`, `build_install_command`, `build_command`
+- Store metadata: `shopify_store`, `shopify_theme_id`
+- Lighthouse mode: `lighthouse_align_with_production_json`
+- Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_a11y`, `run_lighthouse`
+- Theme check tuning: `theme_check_fail_level`, `theme_check_config_path`, `theme_check_verbose`, `theme_check_auto_correct`
+
+Secrets:
+
+- `SHOPIFY_THEME_ACCESS_TOKEN` (optional; needed for lighthouse alignment mode)
+- `LHCI_GITHUB_APP_TOKEN` (optional; needed for lighthouse)
+
 Notes:
 
-- Thin orchestration layer that delegates to:
-  - `shopify-theme-backup.yml`
-  - `shopify-theme-deploy.yml`
+- Prepare stage builds once; consumers test against prepared output.
+- Store-agnostic jobs run once; lighthouse runs per store when enabled.
 
 ### `.github/workflows/shopify-json-sync-production.yml`
 
 Purpose:
 
-- Pull remote production theme and sync JSON files into `production_branch`
-- Commit and push JSON updates directly to production branch when changed
+- Pull JSON-oriented view of Shopify theme source.
+- Sync remote JSON into `production_branch` and push commit when changed.
 
 Inputs:
 
-- `production_branch`
-- `theme_src`, `theme_pull_dir`
-- `SHOPIFY_STORE` (required; first store is the master source)
-- `SHOPIFY_PRODUCTION_THEME_ID` (preferred) or `SHOPIFY_THEME_ID` (fallback)
+- `production_branch` (optional, default `production`)
+- `theme_src` (optional, default `.`)
+- `theme_pull_dir` (optional, default `_remote_theme`)
+- `SHOPIFY_STORE` (optional, but required at runtime)
+- `SHOPIFY_PRODUCTION_THEME_ID` (preferred)
+- `SHOPIFY_THEME_ID` (fallback)
 
 Secrets:
 
 - `SHOPIFY_THEME_ACCESS_TOKEN` (required)
-
-Notes:
-
-- Uses `sync-shopify-json.mjs` auto-discovery of top-level folders in pulled remote theme.
+- `IAMOTA_ACTIONS_READ_TOKEN` (optional, for private helper checkout)
 
 ### `.github/workflows/shopify-json-sync-dev.yml`
 
 Purpose:
 
-- Monitors divergence between `production_branch` and `default_branch`
-- Reuses and refreshes an existing generated `Shopify JSON Sync` PR when present
-- Creates a new PR only when none exists for the branch pair
-- Enables auto-merge on that PR
+- Keep a sync PR from `production_branch` to `default_branch` up to date.
+- Reuse/open PRs titled `Shopify JSON Sync...` and attempt to enable auto-merge.
 
 Inputs:
 
-- `production_branch`, `default_branch`
-- `shopify_store`, `shopify_theme_id`, `shopify_theme_name` (optional metadata; first store is used when multiple provided)
+- `production_branch` (optional)
+- `default_branch` (optional)
+- `shopify_store` (optional metadata)
+- `shopify_theme_id` (optional metadata)
+- `shopify_theme_name` (optional metadata)
+
+Secrets: none
 
 Notes:
 
-- No Shopify credentials required.
-- Safe to run on a schedule and/or manually.
-
-### `.github/workflows/shopify-json-sync-manual.yml`
-
-Purpose:
-
-- Run on-demand JSON sync from a chosen Shopify source theme into a chosen target branch.
-
-Inputs:
-
-- `target_branch` (required)
-- `source_theme_id` (required; scalar or store-keyed object, resolved from first store)
-- `theme_src`, `theme_pull_dir`
-- `SHOPIFY_STORE` (required; first store is the master source)
-
-Secrets:
-
-- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
-- `IAMOTA_ACTIONS_READ_TOKEN` (optional for private helper checkout)
+- Uses `gh` + `GITHUB_TOKEN`; caller must grant `contents: write` + `pull-requests: write`.
+- Auto-merge success still depends on repository Actions permissions.
 
 ### `.github/workflows/shopify-theme-preview.yml`
 
 Purpose:
 
-- PR preview theme lifecycle (create/reuse/push/comment/cleanup)
-- Creates preview from duplicated base theme, then pushes branch output
+- PR preview lifecycle per store: resolve/create preview theme, optional backup, build/push, comment sync, and cleanup on close.
 
 Inputs:
 
+- `production_branch` (optional)
 - `theme_src`, `theme_dist`
 - `build_install_command`, `build_command`
 - `enable_preview_backup`
 - `aws_region`, `aws_s3_bucket`
 - `shopify_ignore`
-- `SHOPIFY_STORE` (required; supports multi-store matrix)
-- `SHOPIFY_PREVIEW_BASE_THEME_ID` (preferred source + create base)
-- `SHOPIFY_PRODUCTION_THEME_ID` (fallback source when preview base not set)
+- `SHOPIFY_STORE`
+- `SHOPIFY_THEME_ID` (optional metadata)
+- `SHOPIFY_PRODUCTION_THEME_ID` (fallback source)
+- `SHOPIFY_PREVIEW_BASE_THEME_ID` (preferred source/base)
 
 Secrets:
 
 - `SHOPIFY_THEME_ACCESS_TOKEN` (required)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (optional)
+- `IAMOTA_ACTIONS_READ_TOKEN` (optional)
 
 Notes:
 
-- Preview behavior:
-  - resolves/creates preview theme per store using PR comment marker
-  - builds theme output
-  - pushes branch output to preview theme (including `shopify_ignore` when set)
-- Backs up existing preview themes before overwrite when enabled.
-- Uses shared comment marker helpers for create/update/cleanup.
-
-### `.github/workflows/shopify-theme-ci.yml`
-
-Purpose:
-
-- Runs theme quality gates (theme check, lint, test, a11y, lighthouse).
-
-Notes:
-
-- Store-agnostic checks run once against prepared theme output.
-- Lighthouse runs per resolved store when multi-store input is provided.
+- Per-store marker comments prevent cross-store preview ID collisions.
+- Cleanup posts a new historical cleanup comment and clears marker theme_id for reopen freshness.
+- Cleanup tolerates missing/deleted preview themes.
 
 ### `.github/workflows/shopify-warn-locale-edits.yml`
 
 Purpose:
 
-- PR guard for `src/locales/*.json` edits.
-- Requires explicit acknowledgement label before passing.
+- Guard PRs touching locale JSON files.
 
 Inputs:
 
-- `ack_label` (default `I will manually deploy locales`)
+- `ack_label` (optional, default `I will manually deploy locales`)
+
+Secrets:
+
+- `IAMOTA_ACTIONS_READ_TOKEN` (optional)
 
 ### `.github/workflows/shopify-warn-theme-settings-edits.yml`
 
 Purpose:
 
-- PR guard for `config/settings_data.json` edits.
-- Requires explicit acknowledgement label before passing.
+- Guard PRs touching `config/settings_data.json`.
 
 Inputs:
 
-- `ack_label` (default `I will manually deploy theme settings`)
+- `ack_label` (optional, default `I will manually deploy theme settings`)
 
-## Recommended Direction
+Secrets:
 
-Use these workflows for all integrations:
+- `IAMOTA_ACTIONS_READ_TOKEN` (optional)
 
-- `shopify-theme-backup.yml` (backup-only entry point)
-- `shopify-theme-deploy.yml` (deploy-only entry point)
-- `shopify-theme-backup-deploy.yml`
-- `shopify-json-sync-production.yml`
-- `shopify-json-sync-dev.yml`
-- `shopify-json-sync-manual.yml`
-- `shopify-theme-preview.yml`
-- `shopify-warn-locale-edits.yml`
-- `shopify-warn-theme-settings-edits.yml`
+## Internal Validation
+
+### `.github/workflows/github-actions-lint.yml`
+
+Purpose:
+
+- Runs `actionlint` and `node --check` on `.github/scripts/**/*.mjs` for this repo.

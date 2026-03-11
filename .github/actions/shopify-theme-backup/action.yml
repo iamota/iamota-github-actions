@@ -28,13 +28,20 @@ runs:
                   exit 1
               fi
 
+              THEME_ID="$(
+                node "${GITHUB_ACTION_PATH}/../../scripts/shopify/shopify-theme-id-resolve.mjs" \
+                  --store "${{ inputs.store }}" \
+                  --theme-id "${{ inputs.theme_id }}" \
+                  --token "${{ inputs.token }}"
+              )"
+
               OUT_DIR="${{ inputs.output_dir }}"
               rm -rf "${OUT_DIR}"
               mkdir -p "${OUT_DIR}"
 
               shopify theme pull \
                   --store "${{ inputs.store }}" \
-                  --theme "${{ inputs.theme_id }}" \
+                  --theme "${THEME_ID}" \
                   --password "${{ inputs.token }}" \
                   --path "${OUT_DIR}" \
                   --nodelete \

@@ -31,10 +31,17 @@ runs:
         - id: push
           run: |
               set -euo pipefail
+              THEME_ID="$(
+                node "${GITHUB_ACTION_PATH}/../../scripts/shopify/shopify-theme-id-resolve.mjs" \
+                  --store "${{ inputs.store }}" \
+                  --theme-id "${{ inputs.theme_id }}" \
+                  --token "${{ inputs.token }}"
+              )"
+
               ARGS=(
                 theme push
                 --store "${{ inputs.store }}"
-                --theme "${{ inputs.theme_id }}"
+                --theme "${THEME_ID}"
                 --password "${{ inputs.token }}"
                 --path "${{ inputs.path }}"
                 --no-color

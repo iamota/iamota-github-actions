@@ -243,6 +243,13 @@ jobs:
                   SRC_STORE="${SRC_HOST%.myshopify.com}"
                   [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
 
+                  SOURCE_THEME_ID="$(
+                      node .iamota-actions/.github/scripts/shopify/shopify-theme-id-resolve.mjs \
+                          --store "${SRC_HOST}" \
+                          --theme-id "${SOURCE_THEME_ID}" \
+                          --token "${SHOPIFY_THEME_ACCESS_TOKEN}"
+                  )"
+
                   echo "source_theme_id=${SOURCE_THEME_ID}" >> "$GITHUB_OUTPUT"
                   echo "source_store_slug=${SRC_STORE}" >> "$GITHUB_OUTPUT"
                   echo "source_store_host=${SRC_HOST}" >> "$GITHUB_OUTPUT"

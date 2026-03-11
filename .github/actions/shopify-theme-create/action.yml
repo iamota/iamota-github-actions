@@ -20,10 +20,17 @@ runs:
           run: |
               set -euo pipefail
 
+              BASE_THEME_ID="$(
+                node "${GITHUB_ACTION_PATH}/../../scripts/shopify/shopify-theme-id-resolve.mjs" \
+                  --store "${{ inputs.store }}" \
+                  --theme-id "${{ inputs.base_theme_id }}" \
+                  --token "${{ inputs.token }}"
+              )"
+
               OUT="$(
                   shopify theme duplicate \
                       --store "${{ inputs.store }}" \
-                      --theme "${{ inputs.base_theme_id }}" \
+                      --theme "${BASE_THEME_ID}" \
                       --name "${{ inputs.name }}" \
                       --password "${{ inputs.token }}" \
                       --force \
