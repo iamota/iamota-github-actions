@@ -243,3 +243,24 @@ Secrets:
 Purpose:
 
 - Runs `actionlint` and `node --check` on `.github/scripts/**/*.mjs` for this repo.
+
+## Internal Release
+
+### `.github/workflows/release-semver-tags.yml`
+
+Purpose:
+
+- Auto-tag pushes on release branches named `v<major>.<minor>`.
+- Create immutable patch tags (`v1.0.0`, `v1.0.1`, ...).
+- Move floating line tag (`v1.0`) to latest patch in that line.
+- Move floating major tag (`v1`) to highest semantic version across all `v1.*.*` tags.
+
+Inputs: none
+Secrets: none
+
+Notes:
+
+- Runs on pushes to branches matching `v*.*`.
+- Supports release branch names `v<major>.<minor>` and `release/v<major>.<minor>`.
+- Validation enforces canonical version format: `v<major>.<minor>`.
+- Uses `contents: write` to create immutable tags and force-update floating tags.

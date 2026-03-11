@@ -4,6 +4,7 @@ on:
     push:
         branches:
             - "v*.*"
+            - "release/v*.*"
     workflow_dispatch: {}
 
 permissions:
@@ -26,16 +27,17 @@ jobs:
               run: |
                   set -euo pipefail
                   BRANCH="${GITHUB_REF_NAME}"
-                  if [[ ! "${BRANCH}" =~ ^v([0-9]+)\.([0-9]+)$ ]]; then
+                  CANONICAL_BRANCH="${BRANCH#release/}"
+                  if [[ ! "${CANONICAL_BRANCH}" =~ ^v([0-9]+)\.([0-9]+)$ ]]; then
                       echo "valid=false" >> "$GITHUB_OUTPUT"
-                      echo "Branch ${BRANCH} does not match v<major>.<minor>; skipping."
+                      echo "Branch ${BRANCH} does not match v<major>.<minor> or release/v<major>.<minor>; skipping."
                       exit 0
                   fi
 
                   echo "valid=true" >> "$GITHUB_OUTPUT"
                   echo "major=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
                   echo "minor=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
-                  echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+                  echo "branch=${CANONICAL_BRANCH}" >> "$GITHUB_OUTPUT"
 
             - name: Compute and update tags
               if: steps.meta.outputs.valid == 'true'
