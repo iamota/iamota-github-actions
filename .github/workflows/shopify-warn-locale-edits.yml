@@ -23,7 +23,7 @@ jobs:
 
         steps:
             - name: Checkout helper scripts
-              uses: ./.github/actions/iamota-helper-checkout
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
                   ref: matrix
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}

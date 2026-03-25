@@ -43,7 +43,7 @@ jobs:
             first_store: ${{ steps.stores.outputs.first_store }}
         steps:
             - id: stores
-              uses: ./.github/actions/shopify-multistore-matrix
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
               with:
                   stores: ${{ inputs.shopify_store }}
                   allow_empty: "true"
@@ -62,14 +62,14 @@ jobs:
         steps:
             - name: Resolve master theme id (metadata)
               id: resolve_theme_id
-              uses: ./.github/actions/shopify-multistore-resolve-value
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
 
             - name: Resolve master theme name (metadata)
               id: resolve_theme_name
-              uses: ./.github/actions/shopify-multistore-resolve-value
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_NAME }}
