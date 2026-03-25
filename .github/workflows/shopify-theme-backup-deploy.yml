@@ -58,7 +58,7 @@ concurrency:
 
 jobs:
     backup:
-        uses: ./.github/workflows/shopify-theme-backup.yml
+        uses: ./shopify-theme-backup.yml
         with:
             branch                    : ${{ inputs.branch }}
             SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
@@ -72,7 +72,7 @@ jobs:
 
     deploy:
         needs: [backup]
-        uses: ./.github/workflows/shopify-theme-deploy.yml
+        uses: ./shopify-theme-deploy.yml
         with:
             branch                    : ${{ inputs.branch }}
             SHOPIFY_STORE             : ${{ inputs.SHOPIFY_STORE }}
