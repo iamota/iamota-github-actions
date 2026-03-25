@@ -22,6 +22,9 @@ function parseStores(raw) {
             );
         }
         if (!Array.isArray(arr)) throw new Error("stores JSON must be an array");
+        if (!arr.every((x) => typeof x === "string")) {
+            throw new Error("stores JSON array must contain only strings");
+        }
         return arr.map((x) => normalizeStore(String(x ?? ""))).filter(Boolean);
     }
 
