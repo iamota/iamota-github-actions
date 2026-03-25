@@ -23,7 +23,7 @@ on:
                 default: ""
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
-                required: true
+                required: false
             AWS_ACCESS_KEY_ID:
                 required: false
             AWS_SECRET_ACCESS_KEY:
@@ -49,6 +49,7 @@ jobs:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
         runs-on: ubuntu-latest
+        environment: ${{ inputs.branch }}
         env:
             GITHUB_REPOSITORY         : ${{ github.repository }}
             GITHUB_BRANCH             : ${{ inputs.branch }}

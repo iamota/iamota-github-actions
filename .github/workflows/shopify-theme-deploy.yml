@@ -35,7 +35,7 @@ on:
                 default : "npx webpack --env target=${GITHUB_BRANCH}"
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
-                required: true
+                required: false
 
 permissions:
     contents: read
@@ -57,6 +57,7 @@ jobs:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
         runs-on: ubuntu-latest
+        environment: ${{ inputs.branch }}
         env:
             GITHUB_BRANCH             : ${{ inputs.branch }}
             GITHUB_SHA                : ${{ github.sha }}
