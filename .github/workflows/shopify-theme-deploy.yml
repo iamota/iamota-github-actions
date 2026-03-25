@@ -4,35 +4,51 @@ on:
     workflow_call:
         inputs:
             branch:
-                type    : string
+                type: string
                 required: true
             SHOPIFY_STORE:
-                type    : string
+                type: string
                 required: false
-                default : ""
+                default: ""
             SHOPIFY_THEME_ID:
-                type    : string
+                type: string
                 required: true
             theme_src:
-                type    : string
+                type: string
                 required: false
-                default : "."
+                default: "."
             theme_dist:
-                type    : string
+                type: string
                 required: false
-                default : ""
+                default: ""
             theme_path:
-                type    : string
+                type: string
                 required: false
-                default : ""
+                default: ""
             build_install_command:
-                type    : string
+                type: string
                 required: false
-                default : "npm ci"
+                default: "npm ci"
             build_command:
-                type    : string
+                type: string
                 required: false
-                default : "npx webpack --env target=${GITHUB_BRANCH}"
+                default: "npx webpack --env target=${GITHUB_BRANCH}"
+            allow_live:
+                type: string
+                required: false
+                default: ""
+            nodelete:
+                type: string
+                required: false
+                default: ""
+            ignore:
+                type: string
+                required: false
+                default: ""
+            json:
+                type: string
+                required: false
+                default: ""
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
                 required: false
@@ -59,15 +75,19 @@ jobs:
         runs-on: ubuntu-latest
         environment: ${{ inputs.branch }}
         env:
-            GITHUB_BRANCH             : ${{ inputs.branch }}
-            GITHUB_SHA                : ${{ github.sha }}
-            TARGET_STORE              : ${{ matrix.store }}
-            RAW_THEME_SRC             : ${{ inputs.theme_src }}
-            RAW_THEME_DIST            : ${{ inputs.theme_dist }}
-            RAW_THEME_PATH            : ${{ inputs.theme_path }}
-            RAW_BUILD_INSTALL_COMMAND : ${{ inputs.build_install_command }}
-            RAW_BUILD_COMMAND         : ${{ inputs.build_command }}
-            RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_THEME_ID }}
+            GITHUB_BRANCH: ${{ inputs.branch }}
+            GITHUB_SHA: ${{ github.sha }}
+            TARGET_STORE: ${{ matrix.store }}
+            RAW_THEME_SRC: ${{ inputs.theme_src }}
+            RAW_THEME_DIST: ${{ inputs.theme_dist }}
+            RAW_THEME_PATH: ${{ inputs.theme_path }}
+            RAW_BUILD_INSTALL_COMMAND: ${{ inputs.build_install_command }}
+            RAW_BUILD_COMMAND: ${{ inputs.build_command }}
+            RAW_ALLOW_LIVE: ${{ inputs.allow_live }}
+            RAW_NODELETE: ${{ inputs.nodelete }}
+            RAW_IGNORE: ${{ inputs.ignore }}
+            RAW_JSON: ${{ inputs.json }}
+            RAW_SHOPIFY_THEME_ID: ${{ inputs.SHOPIFY_THEME_ID }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 
         steps:
@@ -78,49 +98,77 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
 
             - name: Resolve theme source path
               id: resolve_theme_src
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_THEME_SRC }}
+                  raw: ${{ env.RAW_THEME_SRC }}
 
             - name: Resolve theme dist path
               id: resolve_theme_dist
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_THEME_DIST }}
+                  raw: ${{ env.RAW_THEME_DIST }}
 
             - name: Resolve explicit theme path
               id: resolve_theme_path
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_THEME_PATH }}
+                  raw: ${{ env.RAW_THEME_PATH }}
 
             - name: Resolve build install command
               id: resolve_build_install
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_BUILD_INSTALL_COMMAND }}
+                  raw: ${{ env.RAW_BUILD_INSTALL_COMMAND }}
 
             - name: Resolve build command
               id: resolve_build_command
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_BUILD_COMMAND }}
+                  raw: ${{ env.RAW_BUILD_COMMAND }}
+
+            - name: Resolve allow-live override
+              id: resolve_allow_live
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_ALLOW_LIVE }}
+
+            - name: Resolve nodelete override
+              id: resolve_nodelete
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_NODELETE }}
+
+            - name: Resolve ignore pattern
+              id: resolve_ignore
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_IGNORE }}
+
+            - name: Resolve JSON output mode
+              id: resolve_json
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_JSON }}
 
             - name: Resolve Shopify token
               id: resolve_token
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
 
             - name: Validate resolved Shopify values
               run: |
@@ -143,15 +191,25 @@ jobs:
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
-                  theme_src             : ${{ steps.resolve_theme_src.outputs.value }}
-                  theme_dist            : ${{ steps.resolve_theme_dist.outputs.value }}
-                  theme_path            : ${{ steps.resolve_theme_path.outputs.value }}
-                  build_install_command : ${{ steps.resolve_build_install.outputs.value }}
-                  build_command         : ${{ steps.resolve_build_command.outputs.value }}
+                  theme_src: ${{ steps.resolve_theme_src.outputs.value }}
+                  theme_dist: ${{ steps.resolve_theme_dist.outputs.value }}
+                  theme_path: ${{ steps.resolve_theme_path.outputs.value }}
+                  build_install_command: ${{ steps.resolve_build_install.outputs.value }}
+                  build_command: ${{ steps.resolve_build_command.outputs.value }}
 
             - name: Determine allow-live and nodelete flags safely
               run: |
                   set -euo pipefail
+
+                  normalize_flag() {
+                      local raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | xargs)"
+                      case "$raw" in
+                          "") echo "" ;;
+                          1|true|yes|y|on) echo "1" ;;
+                          0|false|no|n|off) echo "0" ;;
+                          *) echo "invalid" ;;
+                      esac
+                  }
 
                   ALLOW_LIVE="false"
                   if [[ "${GITHUB_BRANCH}" =~ ^[Pp]roduction$ || "${GITHUB_BRANCH}" =~ ^[Pp]rod$ ]]; then
@@ -164,23 +222,53 @@ jobs:
                   fi
 
                   if [ "${ALLOW_LIVE}" = "true" ]; then
-                      echo "ALLOW_LIVE_INPUT=1" >> "$GITHUB_ENV"
+                      ALLOW_LIVE_INPUT="1"
                   else
-                      echo "ALLOW_LIVE_INPUT=0" >> "$GITHUB_ENV"
+                      ALLOW_LIVE_INPUT="0"
                   fi
 
                   if [ "${ALLOW_DELETE}" = "true" ]; then
-                      echo "NODELETE_INPUT=0" >> "$GITHUB_ENV"
+                      NODELETE_INPUT="0"
                   else
-                      echo "NODELETE_INPUT=1" >> "$GITHUB_ENV"
+                      NODELETE_INPUT="1"
                   fi
+
+                  ALLOW_LIVE_OVERRIDE_RAW='${{ steps.resolve_allow_live.outputs.value }}'
+                  NODELETE_OVERRIDE_RAW='${{ steps.resolve_nodelete.outputs.value }}'
+
+                  ALLOW_LIVE_OVERRIDE="$(normalize_flag "${ALLOW_LIVE_OVERRIDE_RAW}")"
+                  NODELETE_OVERRIDE="$(normalize_flag "${NODELETE_OVERRIDE_RAW}")"
+
+                  if [ "${ALLOW_LIVE_OVERRIDE}" = "invalid" ]; then
+                      echo "Invalid allow_live override: '${ALLOW_LIVE_OVERRIDE_RAW}'. Use 1/0, true/false, yes/no, on/off."
+                      exit 1
+                  fi
+                  if [ "${NODELETE_OVERRIDE}" = "invalid" ]; then
+                      echo "Invalid nodelete override: '${NODELETE_OVERRIDE_RAW}'. Use 1/0, true/false, yes/no, on/off."
+                      exit 1
+                  fi
+
+                  if [ -n "${ALLOW_LIVE_OVERRIDE}" ]; then
+                      ALLOW_LIVE_INPUT="${ALLOW_LIVE_OVERRIDE}"
+                  fi
+                  if [ -n "${NODELETE_OVERRIDE}" ]; then
+                      NODELETE_INPUT="${NODELETE_OVERRIDE}"
+                  fi
+
+                  echo "allow_live: branch_default=${ALLOW_LIVE} override='${ALLOW_LIVE_OVERRIDE_RAW}' effective=${ALLOW_LIVE_INPUT}"
+                  echo "nodelete  : commit_default_allow_delete=${ALLOW_DELETE} override='${NODELETE_OVERRIDE_RAW}' effective=${NODELETE_INPUT}"
+
+                  echo "ALLOW_LIVE_INPUT=${ALLOW_LIVE_INPUT}" >> "$GITHUB_ENV"
+                  echo "NODELETE_INPUT=${NODELETE_INPUT}" >> "$GITHUB_ENV"
 
             - name: Deploy
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@v1
               with:
-                  store     : ${{ env.TARGET_STORE }}
-                  theme_id  : ${{ steps.resolve_theme_id.outputs.value }}
-                  token     : ${{ steps.resolve_token.outputs.value }}
-                  path      : ${{ steps.prepare.outputs.theme_dist_effective }}
+                  store: ${{ env.TARGET_STORE }}
+                  theme_id: ${{ steps.resolve_theme_id.outputs.value }}
+                  token: ${{ steps.resolve_token.outputs.value }}
+                  path: ${{ steps.prepare.outputs.theme_dist_effective }}
                   allow_live: ${{ env.ALLOW_LIVE_INPUT }}
-                  nodelete  : ${{ env.NODELETE_INPUT }}
+                  nodelete: ${{ env.NODELETE_INPUT }}
+                  ignore: ${{ steps.resolve_ignore.outputs.value }}
+                  json: ${{ steps.resolve_json.outputs.value }}
