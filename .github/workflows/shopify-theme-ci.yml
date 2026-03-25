@@ -67,6 +67,10 @@ on:
         type: string
         required: false
         default: "true"
+      run_prepare:
+        type: string
+        required: false
+        default: "true"
     secrets:
       SHOPIFY_THEME_ACCESS_TOKEN:
         required: false
@@ -97,6 +101,7 @@ jobs:
       run_test: ${{ steps.out.outputs.run_test }}
       run_a11y: ${{ steps.out.outputs.run_a11y }}
       run_lighthouse: ${{ steps.out.outputs.run_lighthouse }}
+      run_prepare: ${{ steps.out.outputs.run_prepare }}
     steps:
       - id: stores
         uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matrix
@@ -194,6 +199,12 @@ jobs:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_lighthouse }}
 
+      - id: resolve_run_prepare
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.run_prepare }}
+
       - id: out
         run: |
           {
@@ -212,10 +223,11 @@ jobs:
             echo "run_test=${{ steps.resolve_run_test.outputs.value != '' && steps.resolve_run_test.outputs.value || 'true' }}"
             echo "run_a11y=${{ steps.resolve_run_a11y.outputs.value != '' && steps.resolve_run_a11y.outputs.value || 'true' }}"
             echo "run_lighthouse=${{ steps.resolve_run_lighthouse.outputs.value != '' && steps.resolve_run_lighthouse.outputs.value || 'true' }}"
+            echo "run_prepare=${{ steps.resolve_run_prepare.outputs.value != '' && steps.resolve_run_prepare.outputs.value || 'true' }}"
           } >> "$GITHUB_OUTPUT"
 
   prepare:
-    if: needs.resolve_inputs.outputs.run_theme_check == 'true' || needs.resolve_inputs.outputs.run_a11y == 'true' || needs.resolve_inputs.outputs.run_lighthouse == 'true'
+    if: needs.resolve_inputs.outputs.run_prepare == 'true'
     needs: [resolve_inputs]
     runs-on: ubuntu-latest
     outputs:
