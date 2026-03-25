@@ -237,7 +237,7 @@ Examples:
 ## 8) Version Pinning Strategy
 
 - Use stable tags (`@v1`) for production repositories.
-- Use branch pins (for example `@matrix`) only for controlled rollout/testing.
+- Use stable tags (for example `@v1`) for production repositories.
 - After validating branch changes, cut/update the release tag used by consumers.
 
 ## 9) Remove Legacy Overlapping Workflows

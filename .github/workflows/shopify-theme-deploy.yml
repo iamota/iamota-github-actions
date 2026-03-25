@@ -47,7 +47,7 @@ jobs:
             matrix_json: ${{ steps.stores.outputs.matrix_json }}
         steps:
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@matrix
+              uses: ./.github/actions/shopify-multistore-matrix
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
 
@@ -74,49 +74,49 @@ jobs:
 
             - name: Resolve theme id
               id: resolve_theme_id
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
 
             - name: Resolve theme source path
               id: resolve_theme_src
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_THEME_SRC }}
 
             - name: Resolve theme dist path
               id: resolve_theme_dist
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_THEME_DIST }}
 
             - name: Resolve explicit theme path
               id: resolve_theme_path
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_THEME_PATH }}
 
             - name: Resolve build install command
               id: resolve_build_install
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_BUILD_INSTALL_COMMAND }}
 
             - name: Resolve build command
               id: resolve_build_command
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_BUILD_COMMAND }}
 
             - name: Resolve Shopify token
               id: resolve_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@matrix
+              uses: ./.github/actions/shopify-multistore-resolve-value
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
@@ -134,11 +134,11 @@ jobs:
                   fi
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@matrix
+              uses: ./.github/actions/shopify-cli-install
 
             - name: Prepare theme (install + build + resolve dist)
               id: prepare
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@matrix
+              uses: ./.github/actions/shopify-theme-prepare
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
@@ -175,7 +175,7 @@ jobs:
                   fi
 
             - name: Deploy
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@matrix
+              uses: ./.github/actions/shopify-theme-push
               with:
                   store     : ${{ env.TARGET_STORE }}
                   theme_id  : ${{ steps.resolve_theme_id.outputs.value }}
