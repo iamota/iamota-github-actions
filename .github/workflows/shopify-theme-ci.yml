@@ -234,7 +234,7 @@ jobs:
       theme_root   : ${{ steps.root.outputs.theme_dist_effective }}
       artifact_name: ${{ steps.meta.outputs.artifact_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Prepare theme (install + build + resolve dist)
         id: root
@@ -285,7 +285,7 @@ jobs:
     needs: [resolve_inputs]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: NPM install (self-aware)
         uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
@@ -319,7 +319,7 @@ jobs:
     needs: [resolve_inputs]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: NPM install (self-aware)
         uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
@@ -347,7 +347,7 @@ jobs:
     needs: [resolve_inputs, prepare]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: NPM install (self-aware)
         uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
@@ -429,7 +429,7 @@ jobs:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LHCI_GITHUB_APP_TOKEN }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check lighthouse prerequisites
         id: prereq
