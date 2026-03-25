@@ -251,7 +251,7 @@ jobs:
           echo "artifact_name=shopify-theme-ci-root" >> "$GITHUB_OUTPUT"
 
       - name: Upload prepared theme root
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.artifact_name }}
           path: ${{ steps.root.outputs.theme_dist_effective }}
