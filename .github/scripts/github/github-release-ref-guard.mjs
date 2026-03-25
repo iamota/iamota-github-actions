@@ -77,7 +77,7 @@ function formatIssueBody({ branchName, expectedMajor, mismatches }) {
     ];
 
     const rows = mismatches.slice(0, 200).map((m) =>
-        `- ${m.file}:${m.line} expected @v${expectedMajor}, found @v${m.major}  \\`${m.snippet}\\``
+        `- ${m.file}:${m.line} expected @v${expectedMajor}, found @v${m.major}  \`${m.snippet}\``
     );
 
     if (mismatches.length > 200) {
