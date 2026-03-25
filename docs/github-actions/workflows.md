@@ -89,27 +89,6 @@ Notes:
 - `--allow-live` enabled only for production/prod branch names.
 - Deletes are blocked by default; enabled only if commit message contains `[Allow Delete]`.
 
-### `.github/workflows/shopify-theme-backup-deploy.yml`
-
-Purpose:
-
-- Orchestrate backup then deploy in order (`deploy` depends on `backup`).
-
-Inputs:
-
-- `branch` (required)
-- `SHOPIFY_STORE` (optional, but required at runtime)
-- `SHOPIFY_THEME_ID` (required)
-- `theme_src`, `theme_dist`, `theme_path`
-- `build_install_command`, `build_command`
-- `aws_region`, `aws_s3_bucket`
-
-Secrets:
-
-- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
-- `AWS_ACCESS_KEY_ID` (optional)
-- `AWS_SECRET_ACCESS_KEY` (optional)
-
 ### `.github/workflows/shopify-theme-ci.yml`
 
 Purpose:
@@ -263,4 +242,6 @@ Notes:
 - Runs on pushes to branches matching `v*.*`.
 - Supports release branch names `v<major>.<minor>` and `release/v<major>.<minor>`.
 - Validation enforces canonical version format: `v<major>.<minor>`.
+- Runs release ref guard script before tagging and fails when internal `@vN` refs conflict with branch major.
+- On mismatch, creates/updates a repository issue with file/line details.
 - Uses `contents: write` to create immutable tags and force-update floating tags.

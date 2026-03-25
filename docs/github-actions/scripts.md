@@ -46,6 +46,17 @@ Shared GitHub API utilities:
 - authenticated request helper
 - pagination helper for REST list endpoints
 
+### `.github/scripts/github/github-release-ref-guard.mjs`
+
+Release branch guard for internal semver pins.
+
+Behavior:
+
+- Parses current branch as `release/v<major>[.<minor>]` or `v<major>[.<minor>]`.
+- Scans internal `uses: iamota/iamota-github-actions/...@vN` references under `.github/workflows` and `.github/actions`.
+- Fails when any `@vN` major conflicts with branch major.
+- Creates or updates a reminder issue with mismatch file/line details.
+
 ### `.github/scripts/github/github-pr-comment-add.mjs`
 
 Creates a new PR comment.
