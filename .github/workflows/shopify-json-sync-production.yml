@@ -48,6 +48,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             first_store: ${{ steps.stores.outputs.first_store }}
+            first_store_index: ${{ steps.stores.outputs.first_store_index }}
         steps:
             - id: stores
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
@@ -61,11 +62,14 @@ jobs:
         env:
             PRODUCTION_BRANCH         : ${{ inputs.production_branch }}
             MASTER_STORE              : ${{ needs.resolve_master_store.outputs.first_store }}
+            MASTER_STORE_INDEX        : ${{ needs.resolve_master_store.outputs.first_store_index }}
             RAW_THEME_SRC             : ${{ inputs.theme_src }}
             RAW_THEME_PULL_DIR        : ${{ inputs.theme_pull_dir }}
             RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_PRODUCTION_THEME_ID != '' && inputs.SHOPIFY_PRODUCTION_THEME_ID || inputs.SHOPIFY_THEME_ID }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', needs.resolve_master_store.outputs.first_store_index)] }}
             RAW_IAMOTA_ACTIONS_READ_TOKEN: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+            RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED: ${{ secrets[format('IAMOTA_ACTIONS_READ_TOKEN_{0}', needs.resolve_master_store.outputs.first_store_index)] }}
             SHOPIFY_CLI_TTY           : "0"
 
         steps:
@@ -91,18 +95,60 @@ jobs:
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
 
             - name: Resolve master Shopify token
-              id: resolve_shopify_token
+              id: resolve_shopify_token_fallback
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
 
+            - name: Resolve indexed master Shopify token
+              id: resolve_shopify_token_indexed
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "value<<EOF"
+                      printf '%s\n' "${RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED}"
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Resolve effective master Shopify token
+              id: resolve_shopify_token
+              run: |
+                  set -euo pipefail
+                  VALUE="${{ steps.resolve_shopify_token_indexed.outputs.value != '' && steps.resolve_shopify_token_indexed.outputs.value || steps.resolve_shopify_token_fallback.outputs.value }}"
+                  {
+                      echo "value<<EOF"
+                      printf '%s\n' "${VALUE}"
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
             - name: Resolve helper checkout token (optional)
-              id: resolve_helper_token
+              id: resolve_helper_token_fallback
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
+
+            - name: Resolve indexed helper checkout token (optional)
+              id: resolve_helper_token_indexed
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "value<<EOF"
+                      printf '%s\n' "${RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED}"
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Resolve effective helper checkout token (optional)
+              id: resolve_helper_token
+              run: |
+                  set -euo pipefail
+                  VALUE="${{ steps.resolve_helper_token_indexed.outputs.value != '' && steps.resolve_helper_token_indexed.outputs.value || steps.resolve_helper_token_fallback.outputs.value }}"
+                  {
+                      echo "value<<EOF"
+                      printf '%s\n' "${VALUE}"
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: Export resolved source settings
               run: |

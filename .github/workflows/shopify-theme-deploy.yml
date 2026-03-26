@@ -75,19 +75,20 @@ jobs:
         runs-on: ubuntu-latest
         environment: ${{ inputs.branch }}
         env:
-            GITHUB_BRANCH: ${{ inputs.branch }}
-            GITHUB_SHA: ${{ github.sha }}
-            TARGET_STORE: ${{ matrix.store }}
-            RAW_THEME_SRC: ${{ inputs.theme_src }}
-            RAW_THEME_DIST: ${{ inputs.theme_dist }}
-            RAW_THEME_PATH: ${{ inputs.theme_path }}
-            RAW_BUILD_INSTALL_COMMAND: ${{ inputs.build_install_command }}
-            RAW_BUILD_COMMAND: ${{ inputs.build_command }}
-            RAW_ALLOW_LIVE: ${{ inputs.allow_live }}
-            RAW_NODELETE: ${{ inputs.nodelete }}
-            RAW_IGNORE: ${{ inputs.ignore }}
-            RAW_JSON: ${{ inputs.json }}
-            RAW_SHOPIFY_THEME_ID: ${{ inputs.SHOPIFY_THEME_ID }}
+            GITHUB_BRANCH                 : ${{ inputs.branch }}
+            GITHUB_SHA                    : ${{ github.sha }}
+            TARGET_STORE                  : ${{ matrix.store }}
+            TARGET_STORE_INDEX            : ${{ matrix.store_index }}
+            RAW_THEME_SRC                 : ${{ inputs.theme_src }}
+            RAW_THEME_DIST                : ${{ inputs.theme_dist }}
+            RAW_THEME_PATH                : ${{ inputs.theme_path }}
+            RAW_BUILD_INSTALL_COMMAND     : ${{ inputs.build_install_command }}
+            RAW_BUILD_COMMAND             : ${{ inputs.build_command }}
+            RAW_ALLOW_LIVE                : ${{ inputs.allow_live }}
+            RAW_NODELETE                  : ${{ inputs.nodelete }}
+            RAW_IGNORE                    : ${{ inputs.ignore }}
+            RAW_JSON                      : ${{ inputs.json }}
+            RAW_SHOPIFY_THEME_ID          : ${{ inputs.SHOPIFY_THEME_ID }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 
         steps:
@@ -170,13 +171,36 @@ jobs:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
 
+            - name: Resolve indexed Shopify token
+              id: resolve_token_indexed
+              env:
+                  INDEXED_VALUE: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "value<<EOF"
+                      printf '%s\n' "${INDEXED_VALUE}"
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Resolve effective Shopify token
+              id: resolve_token_effective
+              run: |
+                  set -euo pipefail
+                  VALUE="${{ steps.resolve_token_indexed.outputs.value != '' && steps.resolve_token_indexed.outputs.value || steps.resolve_token.outputs.value }}"
+                  {
+                      echo "value<<EOF"
+                      printf '%s\n' "${VALUE}"
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
             - name: Validate resolved Shopify values
               run: |
                   set -euo pipefail
                   MISSING=()
                   [ -n "${TARGET_STORE:-}" ] || MISSING+=("SHOPIFY_STORE (resolved target store)")
                   [ -n "${{ steps.resolve_theme_id.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ID (resolved)")
-                  [ -n "${{ steps.resolve_token.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN (resolved)")
+                  [ -n "${{ steps.resolve_token_effective.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN (resolved)")
                   if [ "${#MISSING[@]}" -gt 0 ]; then
                       echo "Missing required resolved values: ${MISSING[*]}"
                       exit 1
@@ -264,11 +288,11 @@ jobs:
             - name: Deploy
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@v1
               with:
-                  store: ${{ env.TARGET_STORE }}
-                  theme_id: ${{ steps.resolve_theme_id.outputs.value }}
-                  token: ${{ steps.resolve_token.outputs.value }}
-                  path: ${{ steps.prepare.outputs.theme_dist_effective }}
+                  store     : ${{ env.TARGET_STORE }}
+                  theme_id  : ${{ steps.resolve_theme_id.outputs.value }}
+                  token     : ${{ steps.resolve_token_effective.outputs.value }}
+                  path      : ${{ steps.prepare.outputs.theme_dist_effective }}
                   allow_live: ${{ env.ALLOW_LIVE_INPUT }}
-                  nodelete: ${{ env.NODELETE_INPUT }}
-                  ignore: ${{ steps.resolve_ignore.outputs.value }}
-                  json: ${{ steps.resolve_json.outputs.value }}
+                  nodelete  : ${{ env.NODELETE_INPUT }}
+                  ignore    : ${{ steps.resolve_ignore.outputs.value }}
+                  json      : ${{ steps.resolve_json.outputs.value }}

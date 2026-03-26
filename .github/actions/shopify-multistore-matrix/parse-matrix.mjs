@@ -58,8 +58,9 @@ function main() {
             JSON.stringify(
                 {
                     stores_json: "[]",
-                    matrix_json: JSON.stringify({ include: [{ store: "", store_slug: "" }] }),
+                    matrix_json: JSON.stringify({ include: [{ store: "", store_slug: "", store_index: "" }] }),
                     first_store: "",
+                    first_store_index: "",
                 },
                 null,
                 2
@@ -68,9 +69,9 @@ function main() {
         return;
     }
 
-    const include = stores.map((store) => {
+    const include = stores.map((store, index) => {
         const slug = store.replace(/\.myshopify\.com$/i, "");
-        return { store, store_slug: slug };
+        return { store, store_slug: slug, store_index: String(index + 1) };
     });
 
     process.stdout.write(
@@ -79,6 +80,7 @@ function main() {
                 stores_json: JSON.stringify(stores),
                 matrix_json: JSON.stringify({ include }),
                 first_store: stores[0] || "",
+                first_store_index: stores.length > 0 ? "1" : "",
             },
             null,
             2
