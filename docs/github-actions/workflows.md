@@ -100,7 +100,7 @@ Inputs:
 - Build roots: `theme_src`, `theme_dist`, `build_install_command`, `build_command`
 - Store metadata: `shopify_store`, `shopify_theme_id`
 - Lighthouse mode: `lighthouse_align_with_production_json`
-- Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_a11y`, `run_lighthouse`
+- Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_lighthouse`
 - Theme check tuning: `theme_check_fail_level`, `theme_check_config_path`, `theme_check_verbose`, `theme_check_auto_correct`
 
 Secrets:
@@ -110,7 +110,7 @@ Secrets:
 
 Notes:
 
-- Prepare stage builds once; consumers test against prepared output.
+- Prepare stage builds once; `theme_check`, `test`, and lighthouse consume the prepared output.
 - Store-agnostic jobs run once; lighthouse runs per store when enabled.
 
 ### `.github/workflows/shopify-json-sync-production.yml`
