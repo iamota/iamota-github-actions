@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download prepared theme root
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.prepare.outputs.artifact_name }}
           path: _ci_theme_root
@@ -317,7 +317,7 @@ jobs:
           if_package_json: "1"
 
       - name: Download prepared theme root
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.prepare.outputs.artifact_name }}
           path: _ci_theme_root
@@ -455,7 +455,7 @@ jobs:
 
       - name: Download prepared theme root
         if: steps.prereq.outputs.ready == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.prepare.outputs.artifact_name }}
           path: _ci_theme_root
@@ -494,3 +494,4 @@ jobs:
             exit 1
           fi
           echo "CI aggregate passed."
+
