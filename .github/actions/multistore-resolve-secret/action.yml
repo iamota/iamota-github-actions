@@ -1,0 +1,34 @@
+name: "Multistore Resolve Secret"
+description: "Resolve named, indexed, store-scoped JSON, or scalar secret values for a specific store"
+inputs:
+    store:
+        required: true
+    raw:
+        required: false
+        default: ""
+    raw_named:
+        required: false
+        default: ""
+    raw_indexed:
+        required: false
+        default: ""
+outputs:
+    value:
+        description: "Resolved secret value"
+        value: ${{ steps.resolve.outputs.value }}
+    source:
+        description: "Resolution source: named, indexed, store_scoped, scalar, or empty"
+        value: ${{ steps.resolve.outputs.source }}
+runs:
+    using: "composite"
+    steps:
+        - id: resolve
+          env:
+              INPUT_STORE: ${{ inputs.store }}
+              INPUT_RAW: ${{ inputs.raw }}
+              INPUT_RAW_NAMED: ${{ inputs.raw_named }}
+              INPUT_RAW_INDEXED: ${{ inputs.raw_indexed }}
+          run: |
+              set -euo pipefail
+              node "${GITHUB_ACTION_PATH}/resolve-secret.mjs" "${INPUT_STORE}" "${INPUT_RAW}" "${INPUT_RAW_NAMED}" "${INPUT_RAW_INDEXED}"
+          shell: bash

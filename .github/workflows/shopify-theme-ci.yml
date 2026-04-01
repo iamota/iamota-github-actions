@@ -349,6 +349,7 @@ jobs:
     env:
       TARGET_STORE                  : ${{ matrix.store }}
       TARGET_STORE_INDEX            : ${{ matrix.store_index }}
+      TARGET_STORE_SECRET_KEY       : ${{ matrix.store_secret_key }}
       RAW_SHOPIFY_THEME_ID          : ${{ inputs.shopify_theme_id }}
       RAW_LIGHTHOUSE_ALIGN          : ${{ inputs.lighthouse_align_with_production_json }}
       RAW_RUN_LIGHTHOUSE            : ${{ inputs.run_lighthouse }}
@@ -376,58 +377,23 @@ jobs:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LIGHTHOUSE_ALIGN }}
 
-      - name: Resolve store-scoped Shopify token
+      - name: Resolve effective Shopify token
         id: resolve_store_shopify_token
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+          raw_named: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN__{0}', matrix.store_secret_key)] }}
+          raw_indexed: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
 
-      - name: Resolve store-scoped LHCI token
+      - name: Resolve effective LHCI token
         id: resolve_store_lhci_token
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LHCI_GITHUB_APP_TOKEN }}
-
-      - name: Resolve indexed Shopify token
-        id: resolve_indexed_shopify_token
-        env:
-          INDEXED_VALUE: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
-        run: |
-          set -euo pipefail
-          {
-            echo "value<<EOF"
-            printf '%s\n' "${INDEXED_VALUE}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Resolve indexed LHCI token
-        id: resolve_indexed_lhci_token
-        env:
-          INDEXED_VALUE: ${{ secrets[format('LHCI_GITHUB_APP_TOKEN_{0}', matrix.store_index)] }}
-        run: |
-          set -euo pipefail
-          {
-            echo "value<<EOF"
-            printf '%s\n' "${INDEXED_VALUE}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Resolve effective store secrets
-        id: resolve_effective_secrets
-        run: |
-          set -euo pipefail
-          SHOPIFY_TOKEN="${{ steps.resolve_indexed_shopify_token.outputs.value != '' && steps.resolve_indexed_shopify_token.outputs.value || steps.resolve_store_shopify_token.outputs.value }}"
-          LHCI_TOKEN="${{ steps.resolve_indexed_lhci_token.outputs.value != '' && steps.resolve_indexed_lhci_token.outputs.value || steps.resolve_store_lhci_token.outputs.value }}"
-          {
-            echo "shopify_token<<EOF"
-            printf '%s\n' "${SHOPIFY_TOKEN}"
-            echo "EOF"
-            echo "lhci_token<<EOF"
-            printf '%s\n' "${LHCI_TOKEN}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          raw_named: ${{ secrets[format('LHCI_GITHUB_APP_TOKEN__{0}', matrix.store_secret_key)] }}
+          raw_indexed: ${{ secrets[format('LHCI_GITHUB_APP_TOKEN_{0}', matrix.store_index)] }}
 
       - uses: actions/checkout@v5
 
@@ -442,9 +408,9 @@ jobs:
           fi
 
           MISSING=()
-          [ -n "${{ steps.resolve_effective_secrets.outputs.shopify_token }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
+          [ -n "${{ steps.resolve_store_shopify_token.outputs.value }}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
           [ -n "${TARGET_STORE}" ] || MISSING+=("shopify_store input")
-          [ -n "${{ steps.resolve_effective_secrets.outputs.lhci_token }}" ] || MISSING+=("LHCI_GITHUB_APP_TOKEN")
+          [ -n "${{ steps.resolve_store_lhci_token.outputs.value }}" ] || MISSING+=("LHCI_GITHUB_APP_TOKEN")
 
           if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -469,9 +435,9 @@ jobs:
         if: steps.prereq.outputs.ready == 'true'
         uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@v1
         with:
-          access_token: ${{ steps.resolve_effective_secrets.outputs.shopify_token }}
+          access_token: ${{ steps.resolve_store_shopify_token.outputs.value }}
           store: ${{ env.TARGET_STORE }}
-          lhci_github_app_token: ${{ steps.resolve_effective_secrets.outputs.lhci_token }}
+          lhci_github_app_token: ${{ steps.resolve_store_lhci_token.outputs.value }}
           theme_root: _ci_theme_root
           pull_theme: ${{ steps.resolve_store_lh_align.outputs.value == 'true' && steps.resolve_store_theme_id.outputs.value || '' }}
 

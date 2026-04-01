@@ -8,6 +8,12 @@ function normalizeStore(v) {
     return s;
 }
 
+function toSecretKey(v) {
+    const slug = normalizeStore(v).replace(/\.myshopify\.com$/i, "");
+    if (!slug) return "";
+    return slug.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+}
+
 function parseStores(raw) {
     const s = String(raw ?? "").trim();
     if (!s) return [];
@@ -58,9 +64,10 @@ function main() {
             JSON.stringify(
                 {
                     stores_json: "[]",
-                    matrix_json: JSON.stringify({ include: [{ store: "", store_slug: "", store_index: "" }] }),
+                    matrix_json: JSON.stringify({ include: [{ store: "", store_slug: "", store_secret_key: "", store_index: "" }] }),
                     first_store: "",
                     first_store_index: "",
+                    first_store_secret_key: "",
                 },
                 null,
                 2
@@ -71,7 +78,7 @@ function main() {
 
     const include = stores.map((store, index) => {
         const slug = store.replace(/\.myshopify\.com$/i, "");
-        return { store, store_slug: slug, store_index: String(index + 1) };
+        return { store, store_slug: slug, store_secret_key: toSecretKey(store), store_index: String(index + 1) };
     });
 
     process.stdout.write(
@@ -81,6 +88,7 @@ function main() {
                 matrix_json: JSON.stringify({ include }),
                 first_store: stores[0] || "",
                 first_store_index: stores.length > 0 ? "1" : "",
+                first_store_secret_key: stores.length > 0 ? toSecretKey(stores[0]) : "",
             },
             null,
             2

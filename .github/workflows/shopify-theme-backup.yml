@@ -57,6 +57,7 @@ jobs:
             TARGET_STORE              : ${{ matrix.store }}
             TARGET_STORE_SLUG         : ${{ matrix.store_slug }}
             TARGET_STORE_INDEX        : ${{ matrix.store_index }}
+            TARGET_STORE_SECRET_KEY   : ${{ matrix.store_secret_key }}
             RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_THEME_ID }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
             RAW_AWS_REGION            : ${{ inputs.aws_region }}
@@ -74,12 +75,14 @@ jobs:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
 
-            - name: Resolve Shopify token
+            - name: Resolve effective Shopify token
               id: resolve_theme_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+                  raw_named: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
 
             - name: Resolve AWS region
               id: resolve_aws_region
@@ -95,74 +98,24 @@ jobs:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_S3_BUCKET }}
 
-            - name: Resolve AWS access key id
+            - name: Resolve effective AWS access key id
               id: resolve_aws_key
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_AWS_ACCESS_KEY_ID }}
+                  raw: ${{ env.RAW_AWS_ACCESS_KEY_ID }}
+                  raw_named: ${{ secrets[format('AWS_ACCESS_KEY_ID__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('AWS_ACCESS_KEY_ID_{0}', matrix.store_index)] }}
 
-            - name: Resolve AWS secret access key
+            - name: Resolve effective AWS secret access key
               id: resolve_aws_secret
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
-                  raw  : ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
+                  raw: ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
+                  raw_named: ${{ secrets[format('AWS_SECRET_ACCESS_KEY__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_{0}', matrix.store_index)] }}
 
-            - name: Resolve indexed Shopify token
-              id: resolve_theme_token_indexed
-              env:
-                  INDEXED_VALUE: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${INDEXED_VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve indexed AWS access key id
-              id: resolve_aws_key_indexed
-              env:
-                  INDEXED_VALUE: ${{ secrets[format('AWS_ACCESS_KEY_ID_{0}', matrix.store_index)] }}
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${INDEXED_VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve indexed AWS secret access key
-              id: resolve_aws_secret_indexed
-              env:
-                  INDEXED_VALUE: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_{0}', matrix.store_index)] }}
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${INDEXED_VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve effective secrets
-              id: resolve_effective_secrets
-              run: |
-                  set -euo pipefail
-                  THEME_TOKEN="${{ steps.resolve_theme_token_indexed.outputs.value != '' && steps.resolve_theme_token_indexed.outputs.value || steps.resolve_theme_token.outputs.value }}"
-                  AWS_KEY="${{ steps.resolve_aws_key_indexed.outputs.value != '' && steps.resolve_aws_key_indexed.outputs.value || steps.resolve_aws_key.outputs.value }}"
-                  AWS_SECRET="${{ steps.resolve_aws_secret_indexed.outputs.value != '' && steps.resolve_aws_secret_indexed.outputs.value || steps.resolve_aws_secret.outputs.value }}"
-                  {
-                      echo "theme_token<<EOF"
-                      printf '%s\n' "${THEME_TOKEN}"
-                      echo "EOF"
-                      echo "aws_access_key_id<<EOF"
-                      printf '%s\n' "${AWS_KEY}"
-                      echo "EOF"
-                      echo "aws_secret_access_key<<EOF"
-                      printf '%s\n' "${AWS_SECRET}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
 
             - name: Export resolved env values
               run: |
@@ -170,11 +123,11 @@ jobs:
                   {
                       echo "SHOPIFY_STORE=${TARGET_STORE}"
                       echo "SHOPIFY_THEME_ID=${{ steps.resolve_theme_id.outputs.value }}"
-                      echo "SHOPIFY_THEME_ACCESS_TOKEN=${{ steps.resolve_effective_secrets.outputs.theme_token }}"
+                      echo "SHOPIFY_THEME_ACCESS_TOKEN=${{ steps.resolve_theme_token.outputs.value }}"
                       echo "AWS_REGION=${{ steps.resolve_aws_region.outputs.value }}"
                       echo "AWS_S3_BUCKET=${{ steps.resolve_aws_bucket.outputs.value }}"
-                      echo "AWS_ACCESS_KEY_ID=${{ steps.resolve_effective_secrets.outputs.aws_access_key_id }}"
-                      echo "AWS_SECRET_ACCESS_KEY=${{ steps.resolve_effective_secrets.outputs.aws_secret_access_key }}"
+                      echo "AWS_ACCESS_KEY_ID=${{ steps.resolve_aws_key.outputs.value }}"
+                      echo "AWS_SECRET_ACCESS_KEY=${{ steps.resolve_aws_secret.outputs.value }}"
                   } >> "$GITHUB_ENV"
 
             - name: Setup Node + Install Shopify CLI

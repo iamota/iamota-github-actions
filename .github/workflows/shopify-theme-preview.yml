@@ -95,6 +95,7 @@ jobs:
             TARGET_STORE                          : ${{ matrix.store }}
             TARGET_STORE_SLUG                     : ${{ matrix.store_slug }}
             TARGET_STORE_INDEX                    : ${{ matrix.store_index }}
+            TARGET_STORE_SECRET_KEY               : ${{ matrix.store_secret_key }}
             RAW_THEME_SRC                         : ${{ inputs.theme_src }}
             RAW_THEME_DIST                        : ${{ inputs.theme_dist }}
             RAW_BUILD_INSTALL_COMMAND             : ${{ inputs.build_install_command }}
@@ -104,15 +105,19 @@ jobs:
             RAW_AWS_REGION                        : ${{ inputs.aws_region }}
             RAW_AWS_S3_BUCKET                     : ${{ inputs.aws_s3_bucket }}
             RAW_AWS_ACCESS_KEY_ID                 : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            RAW_AWS_ACCESS_KEY_ID_NAMED           : ${{ secrets[format('AWS_ACCESS_KEY_ID__{0}', matrix.store_secret_key)] }}
             RAW_AWS_ACCESS_KEY_ID_INDEXED         : ${{ secrets[format('AWS_ACCESS_KEY_ID_{0}', matrix.store_index)] }}
             RAW_AWS_SECRET_ACCESS_KEY             : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            RAW_AWS_SECRET_ACCESS_KEY_NAMED       : ${{ secrets[format('AWS_SECRET_ACCESS_KEY__{0}', matrix.store_secret_key)] }}
             RAW_AWS_SECRET_ACCESS_KEY_INDEXED     : ${{ secrets[format('AWS_SECRET_ACCESS_KEY_{0}', matrix.store_index)] }}
             RAW_SHOPIFY_THEME_ID                  : ${{ inputs.SHOPIFY_THEME_ID }}
             RAW_SHOPIFY_PRODUCTION_THEME_ID       : ${{ inputs.SHOPIFY_PRODUCTION_THEME_ID }}
             RAW_SHOPIFY_PREVIEW_BASE_ID           : ${{ inputs.SHOPIFY_PREVIEW_BASE_THEME_ID }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN        : ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN_NAMED  : ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN__{0}', matrix.store_secret_key)] }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
             RAW_IAMOTA_ACTIONS_READ_TOKEN         : ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+            RAW_IAMOTA_ACTIONS_READ_TOKEN_NAMED   : ${{ secrets[format('IAMOTA_ACTIONS_READ_TOKEN__{0}', matrix.store_secret_key)] }}
             RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED : ${{ secrets[format('IAMOTA_ACTIONS_READ_TOKEN_{0}', matrix.store_index)] }}
             SHOPIFY_CLI_TTY                       : "0"
 
@@ -122,7 +127,38 @@ jobs:
               with:
                   fetch-depth: 0
 
+            - name: Resolve effective AWS access key id
+              id: resolve_aws_access_key_id
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_AWS_ACCESS_KEY_ID }}
+                  raw_named: ${{ env.RAW_AWS_ACCESS_KEY_ID_NAMED }}
+                  raw_indexed: ${{ env.RAW_AWS_ACCESS_KEY_ID_INDEXED }}
+
+            - name: Resolve effective AWS secret access key
+              id: resolve_aws_secret_access_key
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
+                  raw_named: ${{ env.RAW_AWS_SECRET_ACCESS_KEY_NAMED }}
+                  raw_indexed: ${{ env.RAW_AWS_SECRET_ACCESS_KEY_INDEXED }}
+
+            - name: Resolve effective Shopify token
+              id: resolve_shopify_theme_access_token
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+                  raw_named: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_NAMED }}
+                  raw_indexed: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED }}
+
             - name: Resolve store-scoped values
+              env:
+                  RESOLVED_AWS_ACCESS_KEY_ID: ${{ steps.resolve_aws_access_key_id.outputs.value }}
+                  RESOLVED_AWS_SECRET_ACCESS_KEY: ${{ steps.resolve_aws_secret_access_key.outputs.value }}
+                  RESOLVED_SHOPIFY_THEME_ACCESS_TOKEN: ${{ steps.resolve_shopify_theme_access_token.outputs.value }}
               run: |
                   set -euo pipefail
                   node - <<'NODE'
@@ -178,12 +214,12 @@ jobs:
                     ENABLE_PREVIEW_BACKUP: resolveValue(process.env.RAW_ENABLE_PREVIEW_BACKUP, store) || "true",
                     AWS_REGION: resolveValue(process.env.RAW_AWS_REGION, store) || "us-west-2",
                     AWS_S3_BUCKET: resolveValue(process.env.RAW_AWS_S3_BUCKET, store) || "",
-                    AWS_ACCESS_KEY_ID: process.env.RAW_AWS_ACCESS_KEY_ID_INDEXED || resolveValue(process.env.RAW_AWS_ACCESS_KEY_ID, store) || "",
-                    AWS_SECRET_ACCESS_KEY: process.env.RAW_AWS_SECRET_ACCESS_KEY_INDEXED || resolveValue(process.env.RAW_AWS_SECRET_ACCESS_KEY, store) || "",
+                    AWS_ACCESS_KEY_ID: process.env.RESOLVED_AWS_ACCESS_KEY_ID || "",
+                    AWS_SECRET_ACCESS_KEY: process.env.RESOLVED_AWS_SECRET_ACCESS_KEY || "",
                     SHOPIFY_THEME_ID: resolveValue(process.env.RAW_SHOPIFY_THEME_ID, store) || "",
                     SHOPIFY_PRODUCTION_THEME_ID: productionThemeId,
                     SHOPIFY_PREVIEW_BASE_ID: previewBaseId || productionThemeId || "",
-                    SHOPIFY_THEME_ACCESS_TOKEN: process.env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED || resolveValue(process.env.RAW_SHOPIFY_THEME_ACCESS_TOKEN, store) || "",
+                    SHOPIFY_THEME_ACCESS_TOKEN: process.env.RESOLVED_SHOPIFY_THEME_ACCESS_TOKEN || "",
                     PREVIEW_MARKER: marker,
                   };
 
@@ -206,33 +242,14 @@ jobs:
                         exit 1
                     fi
 
-            - name: Resolve helper checkout token (optional)
-              id: resolve_helper_token_fallback
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+            - name: Resolve effective helper checkout token (optional)
+              id: resolve_helper_token
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
-
-            - name: Resolve indexed helper checkout token (optional)
-              id: resolve_helper_token_indexed
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve effective helper checkout token (optional)
-              id: resolve_helper_token
-              run: |
-                  set -euo pipefail
-                  VALUE="${{ steps.resolve_helper_token_indexed.outputs.value != '' && steps.resolve_helper_token_indexed.outputs.value || steps.resolve_helper_token_fallback.outputs.value }}"
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
+                  raw_named: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_NAMED }}
+                  raw_indexed: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED }}
 
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
@@ -587,40 +604,24 @@ jobs:
             TARGET_STORE                          : ${{ matrix.store }}
             TARGET_STORE_SLUG                     : ${{ matrix.store_slug }}
             TARGET_STORE_INDEX                    : ${{ matrix.store_index }}
+            TARGET_STORE_SECRET_KEY               : ${{ matrix.store_secret_key }}
             RAW_IAMOTA_ACTIONS_READ_TOKEN         : ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+            RAW_IAMOTA_ACTIONS_READ_TOKEN_NAMED   : ${{ secrets[format('IAMOTA_ACTIONS_READ_TOKEN__{0}', matrix.store_secret_key)] }}
             RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED : ${{ secrets[format('IAMOTA_ACTIONS_READ_TOKEN_{0}', matrix.store_index)] }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN        : ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN_NAMED  : ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN__{0}', matrix.store_secret_key)] }}
             RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
             SHOPIFY_CLI_TTY                       : "0"
 
         steps:
-            - name: Resolve helper checkout token (optional)
-              id: resolve_helper_token_fallback
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+            - name: Resolve effective helper checkout token (optional)
+              id: resolve_helper_token
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
-
-            - name: Resolve indexed helper checkout token (optional)
-              id: resolve_helper_token_indexed
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve effective helper checkout token (optional)
-              id: resolve_helper_token
-              run: |
-                  set -euo pipefail
-                  VALUE="${{ steps.resolve_helper_token_indexed.outputs.value != '' && steps.resolve_helper_token_indexed.outputs.value || steps.resolve_helper_token_fallback.outputs.value }}"
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
+                  raw_named: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_NAMED }}
+                  raw_indexed: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED }}
 
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
@@ -629,33 +630,14 @@ jobs:
                   token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
-            - name: Resolve store-scoped Shopify token
-              id: resolve_theme_token_fallback
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+            - name: Resolve effective Shopify token
+              id: resolve_theme_token
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
-
-            - name: Resolve indexed Shopify token
-              id: resolve_theme_token_indexed
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve effective Shopify token
-              id: resolve_theme_token
-              run: |
-                  set -euo pipefail
-                  VALUE="${{ steps.resolve_theme_token_indexed.outputs.value != '' && steps.resolve_theme_token_indexed.outputs.value || steps.resolve_theme_token_fallback.outputs.value }}"
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
+                  raw_named: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_NAMED }}
+                  raw_indexed: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED }}
 
             - name: Export cleanup resolved values
               run: |

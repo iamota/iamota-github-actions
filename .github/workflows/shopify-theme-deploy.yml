@@ -79,6 +79,7 @@ jobs:
             GITHUB_SHA                    : ${{ github.sha }}
             TARGET_STORE                  : ${{ matrix.store }}
             TARGET_STORE_INDEX            : ${{ matrix.store_index }}
+            TARGET_STORE_SECRET_KEY       : ${{ matrix.store_secret_key }}
             RAW_THEME_SRC                 : ${{ inputs.theme_src }}
             RAW_THEME_DIST                : ${{ inputs.theme_dist }}
             RAW_THEME_PATH                : ${{ inputs.theme_path }}
@@ -164,35 +165,14 @@ jobs:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_JSON }}
 
-            - name: Resolve Shopify token
-              id: resolve_token
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+            - name: Resolve effective Shopify token
+              id: resolve_token_effective
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
-
-            - name: Resolve indexed Shopify token
-              id: resolve_token_indexed
-              env:
-                  INDEXED_VALUE: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
-              run: |
-                  set -euo pipefail
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${INDEXED_VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
-
-            - name: Resolve effective Shopify token
-              id: resolve_token_effective
-              run: |
-                  set -euo pipefail
-                  VALUE="${{ steps.resolve_token_indexed.outputs.value != '' && steps.resolve_token_indexed.outputs.value || steps.resolve_token.outputs.value }}"
-                  {
-                      echo "value<<EOF"
-                      printf '%s\n' "${VALUE}"
-                      echo "EOF"
-                  } >> "$GITHUB_OUTPUT"
+                  raw_named: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
 
             - name: Validate resolved Shopify values
               run: |
