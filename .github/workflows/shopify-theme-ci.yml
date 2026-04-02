@@ -200,7 +200,7 @@ jobs:
             echo "theme_src=${{ steps.resolve_theme_src.outputs.value != '' && steps.resolve_theme_src.outputs.value || '.' }}"
             echo "theme_dist=${{ steps.resolve_theme_dist.outputs.value }}"
             echo "build_install_command=${{ steps.resolve_build_install.outputs.value != '' && steps.resolve_build_install.outputs.value || 'npm ci' }}"
-            echo "build_command=${{ steps.resolve_build_command.outputs.value != '' && steps.resolve_build_command.outputs.value || 'npx webpack --env target=lighthouse' }}"
+            echo "build_command=${{ steps.resolve_build_command.outputs.value != '' && steps.resolve_build_command.outputs.value || 'npx webpack --env target=ci' }}"
             echo "shopify_theme_id=${{ steps.resolve_shopify_theme_id.outputs.value }}"
             echo "lighthouse_align_with_production_json=${{ steps.resolve_lighthouse_align.outputs.value != '' && steps.resolve_lighthouse_align.outputs.value || 'false' }}"
             echo "run_theme_check=${{ steps.resolve_run_theme_check.outputs.value != '' && steps.resolve_run_theme_check.outputs.value || 'true' }}"
