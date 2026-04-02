@@ -37,6 +37,7 @@ Purpose:
 
 - Scan active branches for probable overlap against the current branch.
 - Open/update tracking issues with candidate conflict files and snippets.
+- Reconcile and close stale tracking issues when the branch pair no longer overlaps or one branch has been deleted.
 
 Inputs: none  
 Secrets: none

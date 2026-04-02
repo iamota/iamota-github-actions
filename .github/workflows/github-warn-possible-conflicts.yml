@@ -68,6 +68,7 @@ jobs:
             // -----------------------------------------------------------------------------
             const STATE_MARKER_START = '<!-- github-warn-possible-conflicts-state:';
             const STATE_MARKER_END = '-->';
+            const ISSUE_TITLE_RE = /^(?:⚠️ Potential conflict warning|⚠️ Branch overlap|ℹ️ Potential self-conflict warning|ℹ️ Self-overlap): (.+) ↔ (.+)$/;
 
             function parseStateFromBody(body) {
                 const empty = { notifiedFiles: [] };
@@ -110,6 +111,23 @@ jobs:
                 return (body.slice(0, start) + body.slice(end + STATE_MARKER_END.length)).trim();
             }
 
+            function parseConflictIssueTitle(title) {
+                const match = String(title || '').match(ISSUE_TITLE_RE);
+                if (!match) return null;
+                return {
+                    branchA: match[1],
+                    branchB: match[2],
+                };
+            }
+
+            function pairMatches(issueMeta, branchA, branchB) {
+                if (!issueMeta) return false;
+                return (
+                    (issueMeta.branchA === branchA && issueMeta.branchB === branchB) ||
+                    (issueMeta.branchA === branchB && issueMeta.branchB === branchA)
+                );
+            }
+
             // -----------------------------------------------------------------------------
             // Context
             // -----------------------------------------------------------------------------
@@ -129,12 +147,7 @@ jobs:
             // -----------------------------------------------------------------------------
             // Changed files on current branch vs default
             // -----------------------------------------------------------------------------
-            const currentChanged = changedFilesFromDefault('HEAD', `current branch ${CURRENT_BRANCH}`);
-            if (!currentChanged || currentChanged.length === 0) {
-                core.info('No changed files vs default branch; nothing to do.');
-                return;
-            }
-
+            const currentChanged = changedFilesFromDefault('HEAD', `current branch ${CURRENT_BRANCH}`) || [];
             core.info(`Changed files on ${CURRENT_BRANCH}: ${currentChanged.length}`);
 
             // -----------------------------------------------------------------------------
@@ -157,6 +170,15 @@ jobs:
                 .filter((b) => b.date >= cutoff)
                 .sort((a, b) => b.date - a.date)
                 .slice(0, GITHUB_WARN_POSSIBLE_CONFLICTS_MAX_BRANCHES);
+
+            const remoteBranchNames = new Set(
+                rawBranches
+                    .map((line) => line.split('\t')[1])
+                    .filter(Boolean)
+                    .filter((ref) => ref.startsWith('origin/'))
+                    .filter((ref) => !ref.endsWith('/HEAD'))
+                    .map((ref) => ref.replace(/^origin\//, ''))
+            );
 
             core.info(`Candidate branches (lookback ${GITHUB_WARN_POSSIBLE_CONFLICTS_LOOKBACK_DAYS}d, capped ${GITHUB_WARN_POSSIBLE_CONFLICTS_MAX_BRANCHES}): ${candidates.length}`);
 
@@ -220,6 +242,15 @@ jobs:
                 return uniq(lines(`git diff --name-only ${defaultRef}...${targetRef}`));
             }
 
+            const changedFilesCache = new Map();
+
+            function getChangedFilesCached(targetRef, label) {
+                if (changedFilesCache.has(targetRef)) return changedFilesCache.get(targetRef);
+                const changed = changedFilesFromDefault(targetRef, label);
+                changedFilesCache.set(targetRef, changed);
+                return changed;
+            }
+
             // -----------------------------------------------------------------------------
             // GitHub API helpers + caching
             // -----------------------------------------------------------------------------
@@ -246,26 +277,26 @@ jobs:
                 return login;
             }
 
-            async function findExistingIssueByTitle(title) {
-                const q = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open in:title "${title.replace(/"/g, '\\"')}"`;
-                const res = await github.rest.search.issuesAndPullRequests({ q, per_page: 10 });
-                const match = res.data.items.find((i) => i.title === title);
-                if (!match) return null;
-
-                const full = await github.rest.issues.get({
+            async function listOpenConflictIssues() {
+                const openIssues = await github.paginate(github.rest.issues.listForRepo, {
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    issue_number: match.number,
+                    state: 'open',
+                    per_page: 100,
                 });
-                return full.data;
+
+                return openIssues
+                    .filter((issue) => !issue.pull_request)
+                    .map((issue) => {
+                        const parsed = parseConflictIssueTitle(issue.title);
+                        if (!parsed) return null;
+                        return { ...issue, ...parsed };
+                    })
+                    .filter(Boolean);
             }
 
-            async function findExistingIssueByTitles(titles) {
-                for (const title of titles) {
-                    const issue = await findExistingIssueByTitle(title);
-                    if (issue) return issue;
-                }
-                return null;
+            function findExistingIssueForPair(openConflictIssues, branchA, branchB) {
+                return openConflictIssues.find((issue) => issue.state === 'open' && pairMatches(issue, branchA, branchB)) || null;
             }
 
             function normalizeAssignees(logins) {
@@ -332,6 +363,65 @@ jobs:
                 core.info(`Updated issue #${issue_number}`);
             }
 
+            async function commentAndCloseIssue(issue, reason) {
+                const body = [
+                    '✅ Possible conflict warning resolved.',
+                    '',
+                    reason,
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body,
+                });
+
+                await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    state: 'closed',
+                });
+
+                issue.state = 'closed';
+                core.info(`Closed issue #${issue.number}: ${reason}`);
+            }
+
+            async function reconcileStaleIssues(openConflictIssues) {
+                for (const issue of openConflictIssues) {
+                    if (issue.state !== 'open') continue;
+                    if (issue.branchA !== CURRENT_BRANCH && issue.branchB !== CURRENT_BRANCH) continue;
+
+                    const otherBranch = issue.branchA === CURRENT_BRANCH ? issue.branchB : issue.branchA;
+                    if (!remoteBranchNames.has(otherBranch)) {
+                        await commentAndCloseIssue(
+                            issue,
+                            `Branch \`${otherBranch}\` no longer exists on \`origin\`, so this warning is no longer actionable.`
+                        );
+                        continue;
+                    }
+
+                    const otherRef = `origin/${otherBranch}`;
+                    const otherChanged = getChangedFilesCached(otherRef, `candidate branch ${otherBranch}`) || [];
+                    const overlapAll = intersect(currentChanged, otherChanged);
+                    if (overlapAll.length === 0) {
+                        await commentAndCloseIssue(
+                            issue,
+                            `No overlapping changed files remain between \`${CURRENT_BRANCH}\` and \`${otherBranch}\` relative to \`${DEFAULT_BRANCH}\`.`
+                        );
+                    }
+                }
+            }
+
+            const openConflictIssues = await listOpenConflictIssues();
+            await reconcileStaleIssues(openConflictIssues);
+
+            if (currentChanged.length === 0) {
+                core.info('No changed files vs default branch after reconciliation; nothing else to do.');
+                return;
+            }
+
             // -----------------------------------------------------------------------------
             // Main loop: compare to each candidate branch
             // -----------------------------------------------------------------------------
@@ -348,15 +438,8 @@ jobs:
                 const overlapCapped = overlapAll.slice(0, GITHUB_WARN_POSSIBLE_CONFLICTS_MAX_FILES_PER_PAIR);
 
                 const potentialTitle = `⚠️ Potential conflict warning: ${CURRENT_BRANCH} ↔ ${otherBranch}`;
-                const legacyTitle = `⚠️ Branch overlap: ${CURRENT_BRANCH} ↔ ${otherBranch}`;
                 const potentialSelfTitle = `ℹ️ Potential self-conflict warning: ${CURRENT_BRANCH} ↔ ${otherBranch}`;
-                const legacySelfTitle = `ℹ️ Self-overlap: ${CURRENT_BRANCH} ↔ ${otherBranch}`;
-                const existingIssue = await findExistingIssueByTitles([
-                    potentialTitle,
-                    legacyTitle,
-                    potentialSelfTitle,
-                    legacySelfTitle,
-                ]);
+                const existingIssue = findExistingIssueForPair(openConflictIssues, CURRENT_BRANCH, otherBranch);
 
                 const existingBody = existingIssue ? (existingIssue.body || '') : '';
                 const state = parseStateFromBody(existingBody);
