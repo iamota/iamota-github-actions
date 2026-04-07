@@ -32,7 +32,7 @@ on:
 
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
-                required: true
+                required: false
             IAMOTA_ACTIONS_READ_TOKEN:
                 required: false
 
