@@ -38,6 +38,9 @@ jobs:
 
       - name: Detect overlaps and open/update issues
         uses: actions/github-script@v8
+        env:
+          INPUT_BRANCH: ${{ inputs.branch }}
+          INPUT_FULL_SWEEP: ${{ inputs.full_sweep }}
         with:
           script: |
             const { execSync } = require('node:child_process');
@@ -141,8 +144,8 @@ jobs:
             // Context
             // -----------------------------------------------------------------------------
             const DEFAULT_BRANCH = context.payload.repository.default_branch;
-            const CURRENT_BRANCH = `${{ inputs.branch }}` || (context.ref || '').replace('refs/heads/', '');
-            const FULL_SWEEP = `${{ inputs.full_sweep && 'true' || 'false' }}` === 'true';
+            const CURRENT_BRANCH = process.env.INPUT_BRANCH || (context.ref || '').replace('refs/heads/', '');
+            const FULL_SWEEP = String(process.env.INPUT_FULL_SWEEP || '').toLowerCase() === 'true';
 
             if (!FULL_SWEEP && (!CURRENT_BRANCH || CURRENT_BRANCH === DEFAULT_BRANCH)) {
                 core.info(`Skipping: CURRENT_BRANCH='${CURRENT_BRANCH}', DEFAULT_BRANCH='${DEFAULT_BRANCH}'`);
