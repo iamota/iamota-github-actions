@@ -23,14 +23,14 @@ jobs:
 
         steps:
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@matrix
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
                   ref: matrix
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
             - name: Setup Node
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v5
               with:
                   node-version: "20"
 

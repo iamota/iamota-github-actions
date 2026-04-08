@@ -11,7 +11,6 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/workflows/shopify-json-sync-dev.yml`
 - `.github/workflows/shopify-json-sync-production.yml`
 - `.github/workflows/shopify-theme-backup.yml`
-- `.github/workflows/shopify-theme-backup-deploy.yml`
 - `.github/workflows/shopify-theme-ci.yml`
 - `.github/workflows/shopify-theme-deploy.yml`
 - `.github/workflows/shopify-theme-preview.yml`
@@ -21,6 +20,10 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 ### Internal Validation Workflow
 
 - `.github/workflows/github-actions-lint.yml`
+
+### Internal Release Workflow
+
+- `.github/workflows/release-semver-tags.yml`
 
 ### Composite Actions
 
@@ -50,6 +53,7 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/scripts/shopify/shopify-theme-id-resolve.mjs`
 - `.github/scripts/shopify/sync-shopify-json.mjs`
 - `.github/scripts/github/github-api-lib.mjs`
+- `.github/scripts/github/github-release-ref-guard.mjs`
 - `.github/scripts/github/github-pr-comment-add.mjs`
 - `.github/scripts/github/github-pr-comment-lib.mjs`
 - `.github/scripts/github/github-pr-comment-marker-get.mjs`

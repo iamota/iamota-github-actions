@@ -11,11 +11,17 @@ outputs:
         description: "JSON array of normalized store hosts"
         value: ${{ steps.parse.outputs.stores_json }}
     matrix_json:
-        description: "Matrix JSON in { include: [{store,store_slug}] } format"
+        description: "Matrix JSON in { include: [{store,store_slug,store_index}] } format"
         value: ${{ steps.parse.outputs.matrix_json }}
     first_store:
         description: "First normalized store host"
         value: ${{ steps.parse.outputs.first_store }}
+    first_store_index:
+        description: "One-based index for first normalized store host"
+        value: ${{ steps.parse.outputs.first_store_index }}
+    first_store_secret_key:
+        description: "Secret-safe key for first normalized store host"
+        value: ${{ steps.parse.outputs.first_store_secret_key }}
 runs:
     using: "composite"
     steps:
@@ -33,10 +39,14 @@ runs:
               STORES_JSON="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.stdout.write(String(j.stores_json||'[]'));});")"
               MATRIX_JSON="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.stdout.write(String(j.matrix_json||'{\"include\":[]}'));});")"
               FIRST_STORE="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.stdout.write(String(j.first_store||''));});")"
+              FIRST_STORE_INDEX="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.stdout.write(String(j.first_store_index||''));});")"
+              FIRST_STORE_SECRET_KEY="$(printf '%s' "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);process.stdout.write(String(j.first_store_secret_key||''));});")"
 
               {
                 echo "stores_json=${STORES_JSON}"
                 echo "matrix_json=${MATRIX_JSON}"
                 echo "first_store=${FIRST_STORE}"
+                echo "first_store_index=${FIRST_STORE_INDEX}"
+                echo "first_store_secret_key=${FIRST_STORE_SECRET_KEY}"
               } >> "$GITHUB_OUTPUT"
           shell: bash

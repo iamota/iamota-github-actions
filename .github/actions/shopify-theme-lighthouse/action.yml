@@ -9,6 +9,9 @@ inputs:
     required: true
   theme_root:
     required: true
+  pull_theme:
+    required: false
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -18,3 +21,4 @@ runs:
         store: ${{ inputs.store }}
         lhci_github_app_token: ${{ inputs.lhci_github_app_token }}
         theme_root: ${{ inputs.theme_root }}
+        pull_theme: ${{ inputs.pull_theme }}

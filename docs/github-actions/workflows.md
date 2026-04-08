@@ -37,6 +37,7 @@ Purpose:
 
 - Scan active branches for probable overlap against the current branch.
 - Open/update tracking issues with candidate conflict files and snippets.
+- Reconcile and close stale tracking issues when the branch pair no longer overlaps or one branch has been deleted.
 
 Inputs: none  
 Secrets: none
@@ -89,27 +90,6 @@ Notes:
 - `--allow-live` enabled only for production/prod branch names.
 - Deletes are blocked by default; enabled only if commit message contains `[Allow Delete]`.
 
-### `.github/workflows/shopify-theme-backup-deploy.yml`
-
-Purpose:
-
-- Orchestrate backup then deploy in order (`deploy` depends on `backup`).
-
-Inputs:
-
-- `branch` (required)
-- `SHOPIFY_STORE` (optional, but required at runtime)
-- `SHOPIFY_THEME_ID` (required)
-- `theme_src`, `theme_dist`, `theme_path`
-- `build_install_command`, `build_command`
-- `aws_region`, `aws_s3_bucket`
-
-Secrets:
-
-- `SHOPIFY_THEME_ACCESS_TOKEN` (required)
-- `AWS_ACCESS_KEY_ID` (optional)
-- `AWS_SECRET_ACCESS_KEY` (optional)
-
 ### `.github/workflows/shopify-theme-ci.yml`
 
 Purpose:
@@ -121,7 +101,7 @@ Inputs:
 - Build roots: `theme_src`, `theme_dist`, `build_install_command`, `build_command`
 - Store metadata: `shopify_store`, `shopify_theme_id`
 - Lighthouse mode: `lighthouse_align_with_production_json`
-- Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_a11y`, `run_lighthouse`
+- Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_lighthouse`
 - Theme check tuning: `theme_check_fail_level`, `theme_check_config_path`, `theme_check_verbose`, `theme_check_auto_correct`
 
 Secrets:
@@ -131,7 +111,7 @@ Secrets:
 
 Notes:
 
-- Prepare stage builds once; consumers test against prepared output.
+- Prepare stage builds once; `theme_check`, `test`, and lighthouse consume the prepared output.
 - Store-agnostic jobs run once; lighthouse runs per store when enabled.
 
 ### `.github/workflows/shopify-json-sync-production.yml`
@@ -243,3 +223,26 @@ Secrets:
 Purpose:
 
 - Runs `actionlint` and `node --check` on `.github/scripts/**/*.mjs` for this repo.
+
+## Internal Release
+
+### `.github/workflows/release-semver-tags.yml`
+
+Purpose:
+
+- Auto-tag pushes on release branches named `v<major>.<minor>`.
+- Create immutable patch tags (`v1.0.0`, `v1.0.1`, ...).
+- Move floating line tag (`v1.0`) to latest patch in that line.
+- Move floating major tag (`v1`) to highest semantic version across all `v1.*.*` tags.
+
+Inputs: none
+Secrets: none
+
+Notes:
+
+- Runs on pushes to branches matching `v*.*`.
+- Supports release branch names `v<major>.<minor>` and `release/v<major>.<minor>`.
+- Validation enforces canonical version format: `v<major>.<minor>`.
+- Runs release ref guard script before tagging and fails when internal `@vN` refs conflict with branch major.
+- On mismatch, creates/updates a repository issue with file/line details.
+- Uses `contents: write` to create immutable tags and force-update floating tags.

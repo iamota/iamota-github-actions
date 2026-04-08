@@ -4,10 +4,12 @@ on:
     push:
         branches:
             - "v*.*"
+            - "release/v*.*"
     workflow_dispatch: {}
 
 permissions:
     contents: write
+    issues: write
 
 concurrency:
     group: release-semver-tags
@@ -17,25 +19,33 @@ jobs:
     tag:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
               with:
                   fetch-depth: 0
+
+            - name: Guard internal release refs
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  node .github/scripts/github/github-release-ref-guard.mjs
 
             - name: Validate release branch format
               id: meta
               run: |
                   set -euo pipefail
                   BRANCH="${GITHUB_REF_NAME}"
-                  if [[ ! "${BRANCH}" =~ ^v([0-9]+)\.([0-9]+)$ ]]; then
+                  CANONICAL_BRANCH="${BRANCH#release/}"
+                  if [[ ! "${CANONICAL_BRANCH}" =~ ^v([0-9]+)\.([0-9]+)$ ]]; then
                       echo "valid=false" >> "$GITHUB_OUTPUT"
-                      echo "Branch ${BRANCH} does not match v<major>.<minor>; skipping."
+                      echo "Branch ${BRANCH} does not match v<major>.<minor> or release/v<major>.<minor>; skipping."
                       exit 0
                   fi
 
                   echo "valid=true" >> "$GITHUB_OUTPUT"
                   echo "major=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
                   echo "minor=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
-                  echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+                  echo "branch=${CANONICAL_BRANCH}" >> "$GITHUB_OUTPUT"
 
             - name: Compute and update tags
               if: steps.meta.outputs.valid == 'true'

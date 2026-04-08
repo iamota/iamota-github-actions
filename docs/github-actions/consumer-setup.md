@@ -104,8 +104,22 @@ permissions:
   contents: read
 
 jobs:
-  run:
-    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-backup-deploy.yml@v1
+  backup:
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-backup.yml@v1
+    with:
+      branch: ${{ github.ref_name }}
+      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
+      SHOPIFY_THEME_ID: ${{ vars.SHOPIFY_THEME_ID || '' }}
+      aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
+      aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
+    secrets:
+      SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  deploy:
+    needs: [backup]
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-deploy.yml@v1
     with:
       branch: ${{ github.ref_name }}
       SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
@@ -114,12 +128,8 @@ jobs:
       theme_dist: ${{ vars.THEME_DIST || '' }}
       build_install_command: ${{ vars.BUILD_INSTALL_COMMAND || 'npm ci' }}
       build_command: ${{ vars.BUILD_COMMAND || 'npx webpack --env target=${GITHUB_BRANCH}' }}
-      aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
-      aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
     secrets:
       SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
 ### Example: JSON Sync Production
@@ -215,7 +225,8 @@ jobs:
 
 Most Shopify repos should wire these wrappers:
 
-- `shopify-theme-backup-deploy.yml`
+- `shopify-theme-backup.yml`
+- `shopify-theme-deploy.yml`
 - `shopify-theme-ci.yml`
 - `shopify-theme-preview.yml`
 - `shopify-json-sync-production.yml`
@@ -237,7 +248,7 @@ Examples:
 ## 8) Version Pinning Strategy
 
 - Use stable tags (`@v1`) for production repositories.
-- Use branch pins (for example `@matrix`) only for controlled rollout/testing.
+- Use stable tags (for example `@v1`) for production repositories.
 - After validating branch changes, cut/update the release tag used by consumers.
 
 ## 9) Remove Legacy Overlapping Workflows
