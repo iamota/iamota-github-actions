@@ -1,14 +1,19 @@
 name: GitHub Warn Possible Conflicts
 
 on:
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      branch:
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
   issues: write
 
 concurrency:
-  group: github-warn-possible-conflicts-${{ github.repository }}-${{ github.ref_name }}
+  group: github-warn-possible-conflicts-${{ github.repository }}-${{ inputs.branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -132,7 +137,7 @@ jobs:
             // Context
             // -----------------------------------------------------------------------------
             const DEFAULT_BRANCH = context.payload.repository.default_branch;
-            const CURRENT_BRANCH = (context.ref || '').replace('refs/heads/', '');
+            const CURRENT_BRANCH = `${{ inputs.branch }}` || (context.ref || '').replace('refs/heads/', '');
 
             if (!CURRENT_BRANCH || CURRENT_BRANCH === DEFAULT_BRANCH) {
                 core.info(`Skipping: CURRENT_BRANCH='${CURRENT_BRANCH}', DEFAULT_BRANCH='${DEFAULT_BRANCH}'`);
@@ -143,12 +148,6 @@ jobs:
 
             core.info(`Default branch: ${DEFAULT_BRANCH}`);
             core.info(`Current branch: ${CURRENT_BRANCH}`);
-
-            // -----------------------------------------------------------------------------
-            // Changed files on current branch vs default
-            // -----------------------------------------------------------------------------
-            const currentChanged = changedFilesFromDefault('HEAD', `current branch ${CURRENT_BRANCH}`) || [];
-            core.info(`Changed files on ${CURRENT_BRANCH}: ${currentChanged.length}`);
 
             // -----------------------------------------------------------------------------
             // Candidate branches: remote branches updated recently (capped)
@@ -181,6 +180,18 @@ jobs:
             );
 
             core.info(`Candidate branches (lookback ${GITHUB_WARN_POSSIBLE_CONFLICTS_LOOKBACK_DAYS}d, capped ${GITHUB_WARN_POSSIBLE_CONFLICTS_MAX_BRANCHES}): ${candidates.length}`);
+
+            const currentRef = remoteBranchNames.has(CURRENT_BRANCH) ? `origin/${CURRENT_BRANCH}` : '';
+            const currentBranchExists = Boolean(currentRef);
+            const currentChanged = currentBranchExists
+                ? (changedFilesFromDefault(currentRef, `current branch ${CURRENT_BRANCH}`) || [])
+                : [];
+
+            if (!currentBranchExists) {
+                core.info(`Current branch ${CURRENT_BRANCH} does not exist on origin; reconciliation will close stale issues for it.`);
+            } else {
+                core.info(`Changed files on ${CURRENT_BRANCH}: ${currentChanged.length}`);
+            }
 
             // -----------------------------------------------------------------------------
             // Git helpers
@@ -393,6 +404,14 @@ jobs:
                     if (issue.state !== 'open') continue;
                     if (issue.branchA !== CURRENT_BRANCH && issue.branchB !== CURRENT_BRANCH) continue;
 
+                    if (!currentBranchExists) {
+                        await commentAndCloseIssue(
+                            issue,
+                            `Branch \`${CURRENT_BRANCH}\` no longer exists on \`origin\`, so this warning is no longer actionable.`
+                        );
+                        continue;
+                    }
+
                     const otherBranch = issue.branchA === CURRENT_BRANCH ? issue.branchB : issue.branchA;
                     if (!remoteBranchNames.has(otherBranch)) {
                         await commentAndCloseIssue(
@@ -417,7 +436,7 @@ jobs:
             const openConflictIssues = await listOpenConflictIssues();
             await reconcileStaleIssues(openConflictIssues);
 
-            if (currentChanged.length === 0) {
+            if (!currentBranchExists || currentChanged.length === 0) {
                 core.info('No changed files vs default branch after reconciliation; nothing else to do.');
                 return;
             }
