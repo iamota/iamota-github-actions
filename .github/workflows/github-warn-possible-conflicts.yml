@@ -7,13 +7,17 @@ on:
         type: string
         required: false
         default: ""
+      full_sweep:
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
   issues: write
 
 concurrency:
-  group: github-warn-possible-conflicts-${{ github.repository }}-${{ inputs.branch || github.ref_name }}
+  group: github-warn-possible-conflicts-${{ github.repository }}-${{ inputs.full_sweep && 'full-sweep' || inputs.branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -33,7 +37,7 @@ jobs:
           git fetch --all --prune
 
       - name: Detect overlaps and open/update issues
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { execSync } = require('node:child_process');
@@ -138,8 +142,9 @@ jobs:
             // -----------------------------------------------------------------------------
             const DEFAULT_BRANCH = context.payload.repository.default_branch;
             const CURRENT_BRANCH = `${{ inputs.branch }}` || (context.ref || '').replace('refs/heads/', '');
+            const FULL_SWEEP = `${{ inputs.full_sweep && 'true' || 'false' }}` === 'true';
 
-            if (!CURRENT_BRANCH || CURRENT_BRANCH === DEFAULT_BRANCH) {
+            if (!FULL_SWEEP && (!CURRENT_BRANCH || CURRENT_BRANCH === DEFAULT_BRANCH)) {
                 core.info(`Skipping: CURRENT_BRANCH='${CURRENT_BRANCH}', DEFAULT_BRANCH='${DEFAULT_BRANCH}'`);
                 return;
             }
@@ -147,7 +152,8 @@ jobs:
             const defaultRef = `origin/${DEFAULT_BRANCH}`;
 
             core.info(`Default branch: ${DEFAULT_BRANCH}`);
-            core.info(`Current branch: ${CURRENT_BRANCH}`);
+            core.info(`Current branch: ${CURRENT_BRANCH || '(none)'}`);
+            core.info(`Full sweep: ${FULL_SWEEP}`);
 
             // -----------------------------------------------------------------------------
             // Candidate branches: remote branches updated recently (capped)
@@ -181,16 +187,38 @@ jobs:
 
             core.info(`Candidate branches (lookback ${GITHUB_WARN_POSSIBLE_CONFLICTS_LOOKBACK_DAYS}d, capped ${GITHUB_WARN_POSSIBLE_CONFLICTS_MAX_BRANCHES}): ${candidates.length}`);
 
-            const currentRef = remoteBranchNames.has(CURRENT_BRANCH) ? `origin/${CURRENT_BRANCH}` : '';
-            const currentBranchExists = Boolean(currentRef);
-            const currentChanged = currentBranchExists
-                ? (changedFilesFromDefault(currentRef, `current branch ${CURRENT_BRANCH}`) || [])
-                : [];
+            function getBranchRef(branchName) {
+                if (!branchName || !remoteBranchNames.has(branchName)) return '';
+                return `origin/${branchName}`;
+            }
 
-            if (!currentBranchExists) {
-                core.info(`Current branch ${CURRENT_BRANCH} does not exist on origin; reconciliation will close stale issues for it.`);
-            } else {
-                core.info(`Changed files on ${CURRENT_BRANCH}: ${currentChanged.length}`);
+            const branchContextCache = new Map();
+
+            function getBranchContext(branchName) {
+                if (branchContextCache.has(branchName)) return branchContextCache.get(branchName);
+
+                const ref = getBranchRef(branchName);
+                const exists = Boolean(ref);
+                const changed = exists
+                    ? (changedFilesFromDefault(ref, `branch ${branchName}`) || [])
+                    : [];
+                const ctx = { branchName, ref, exists, changed };
+                branchContextCache.set(branchName, ctx);
+                return ctx;
+            }
+
+            const currentBranchContext = getBranchContext(CURRENT_BRANCH);
+            const currentRef = currentBranchContext.ref;
+            const currentBranchExists = currentBranchContext.exists;
+            const currentChanged = currentBranchContext.changed;
+            const scanRef = currentRef || 'HEAD';
+
+            if (CURRENT_BRANCH) {
+                if (!currentBranchExists) {
+                    core.info(`Current branch ${CURRENT_BRANCH} does not exist on origin; reconciliation will close stale issues for it.`);
+                } else {
+                    core.info(`Changed files on ${CURRENT_BRANCH}: ${currentChanged.length}`);
+                }
             }
 
             // -----------------------------------------------------------------------------
@@ -233,11 +261,11 @@ jobs:
                 ].join('\n');
             }
 
-            function detectActualConflict(otherRef) {
+            function detectActualConflict(baseRef, otherRef) {
                 try {
-                    const mergeBase = sh(`git merge-base HEAD ${otherRef}`);
+                    const mergeBase = sh(`git merge-base ${baseRef} ${otherRef}`);
                     if (!mergeBase) return false;
-                    const mergeTree = shSafe(`git merge-tree ${mergeBase} HEAD ${otherRef}`);
+                    const mergeTree = shSafe(`git merge-tree ${mergeBase} ${baseRef} ${otherRef}`);
                     return /<<<<<<<|>>>>>>>|changed in both|CONFLICT/i.test(mergeTree);
                 } catch {
                     return false;
@@ -402,32 +430,32 @@ jobs:
             async function reconcileStaleIssues(openConflictIssues) {
                 for (const issue of openConflictIssues) {
                     if (issue.state !== 'open') continue;
-                    if (issue.branchA !== CURRENT_BRANCH && issue.branchB !== CURRENT_BRANCH) continue;
+                    if (!FULL_SWEEP && issue.branchA !== CURRENT_BRANCH && issue.branchB !== CURRENT_BRANCH) continue;
 
-                    if (!currentBranchExists) {
+                    const branchAContext = getBranchContext(issue.branchA);
+                    const branchBContext = getBranchContext(issue.branchB);
+
+                    if (!branchAContext.exists) {
                         await commentAndCloseIssue(
                             issue,
-                            `Branch \`${CURRENT_BRANCH}\` no longer exists on \`origin\`, so this warning is no longer actionable.`
+                            `Branch \`${issue.branchA}\` no longer exists on \`origin\`, so this warning is no longer actionable.`
                         );
                         continue;
                     }
 
-                    const otherBranch = issue.branchA === CURRENT_BRANCH ? issue.branchB : issue.branchA;
-                    if (!remoteBranchNames.has(otherBranch)) {
+                    if (!branchBContext.exists) {
                         await commentAndCloseIssue(
                             issue,
-                            `Branch \`${otherBranch}\` no longer exists on \`origin\`, so this warning is no longer actionable.`
+                            `Branch \`${issue.branchB}\` no longer exists on \`origin\`, so this warning is no longer actionable.`
                         );
                         continue;
                     }
 
-                    const otherRef = `origin/${otherBranch}`;
-                    const otherChanged = getChangedFilesCached(otherRef, `candidate branch ${otherBranch}`) || [];
-                    const overlapAll = intersect(currentChanged, otherChanged);
+                    const overlapAll = intersect(branchAContext.changed, branchBContext.changed);
                     if (overlapAll.length === 0) {
                         await commentAndCloseIssue(
                             issue,
-                            `No overlapping changed files remain between \`${CURRENT_BRANCH}\` and \`${otherBranch}\` relative to \`${DEFAULT_BRANCH}\`.`
+                            `No overlapping changed files remain between \`${issue.branchA}\` and \`${issue.branchB}\` relative to \`${DEFAULT_BRANCH}\`.`
                         );
                     }
                 }
@@ -436,7 +464,7 @@ jobs:
             const openConflictIssues = await listOpenConflictIssues();
             await reconcileStaleIssues(openConflictIssues);
 
-            if (!currentBranchExists || currentChanged.length === 0) {
+            if (!CURRENT_BRANCH || !currentBranchExists || currentChanged.length === 0) {
                 core.info('No changed files vs default branch after reconciliation; nothing else to do.');
                 return;
             }
@@ -475,13 +503,13 @@ jobs:
                     continue;
                 }
 
-                const actualConflictDetected = detectActualConflict(otherRef);
+                const actualConflictDetected = detectActualConflict(scanRef, otherRef);
                 const perFile = [];
                 const touchedLogins = new Set();
 
                 for (let idx = 0; idx < newOverlap.length; idx++) {
                     const file = newOverlap[idx];
-                    const shaCurrent = lastTouchCommitSha('HEAD', file);
+                    const shaCurrent = lastTouchCommitSha(scanRef, file);
                     const shaOther = lastTouchCommitSha(otherRef, file);
 
                     const loginCurrent = await commitShaToLogin(shaCurrent);
@@ -493,13 +521,13 @@ jobs:
                     const hasDiffDetails = idx < GITHUB_WARN_POSSIBLE_CONFLICTS_MAX_FILES_WITH_DIFF_DETAILS;
                     const quotedFile = shellQuoteSingle(file);
                     const currentBranchDiff = hasDiffDetails
-                        ? diffSnippet(`git diff --unified=1 ${defaultRef}...HEAD -- ${quotedFile}`)
+                        ? diffSnippet(`git diff --unified=1 ${defaultRef}...${scanRef} -- ${quotedFile}`)
                         : '';
                     const otherBranchDiff = hasDiffDetails
                         ? diffSnippet(`git diff --unified=1 ${defaultRef}...${otherRef} -- ${quotedFile}`)
                         : '';
                     const betweenBranchesDiff = hasDiffDetails
-                        ? diffSnippet(`git diff --unified=1 ${otherRef}..HEAD -- ${quotedFile}`)
+                        ? diffSnippet(`git diff --unified=1 ${otherRef}..${scanRef} -- ${quotedFile}`)
                         : '';
 
                     perFile.push({
@@ -524,7 +552,7 @@ jobs:
 
                 const buildSectionBody = () => {
                     const bodyLines = [];
-                    bodyLines.push(`Detected on push to \`${CURRENT_BRANCH}\` (default: \`${DEFAULT_BRANCH}\`).`);
+                    bodyLines.push(`Detected while scanning \`${CURRENT_BRANCH}\` (default: \`${DEFAULT_BRANCH}\`).`);
                     bodyLines.push('');
                     bodyLines.push(
                         actualConflictDetected
