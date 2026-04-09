@@ -75,6 +75,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   resolve_inputs:
@@ -246,7 +248,7 @@ jobs:
           if-no-files-found: error
 
   theme_check:
-    if: needs.resolve_inputs.outputs.run_theme_check == 'true'
+    if: needs.resolve_inputs.outputs.run_theme_check != 'false'
     needs: [resolve_inputs, prepare]
     runs-on: ubuntu-latest
     steps:
@@ -259,14 +261,314 @@ jobs:
       - name: Setup Node + Install Shopify CLI
         uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
 
-      - name: Theme Check
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-check@v1
+      - name: Run Theme Check JSON
+        id: theme_check_run
+        env:
+          THEME_CHECK_MODE: ${{ needs.resolve_inputs.outputs.run_theme_check }}
+          THEME_CHECK_FAIL_LEVEL: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
+          THEME_CHECK_CONFIG_PATH: ${{ needs.resolve_inputs.outputs.theme_check_config_path }}
+          THEME_CHECK_VERBOSE: ${{ needs.resolve_inputs.outputs.theme_check_verbose }}
+          THEME_CHECK_AUTO_CORRECT: ${{ needs.resolve_inputs.outputs.theme_check_auto_correct }}
+        run: |
+          set -euo pipefail
+
+          MODE="$(printf '%s' "${THEME_CHECK_MODE}" | tr '[:upper:]' '[:lower:]')"
+          case "${MODE}" in
+            true|log) ;;
+            *)
+              echo "Unsupported run_theme_check value: ${THEME_CHECK_MODE}. Expected one of: false, log, true."
+              exit 1
+              ;;
+          esac
+
+          mkdir -p _ci_reports
+          JSON_OUT="_ci_reports/theme-check.json"
+          STDERR_OUT="_ci_reports/theme-check.stderr.log"
+
+          ARGS=(
+            theme check
+            --path "_ci_theme_root"
+            --output json
+          )
+
+          if [ "${MODE}" != "log" ]; then
+            ARGS+=(--fail-level "${THEME_CHECK_FAIL_LEVEL}")
+          fi
+
+          if [ -n "${THEME_CHECK_CONFIG_PATH}" ]; then
+            ARGS+=(--config "${THEME_CHECK_CONFIG_PATH}")
+          fi
+          if [ "${THEME_CHECK_VERBOSE}" = "true" ]; then
+            ARGS+=(--verbose)
+          fi
+          if [ "${THEME_CHECK_AUTO_CORRECT}" = "true" ]; then
+            ARGS+=(--auto-correct)
+          fi
+
+          set +e
+          shopify "${ARGS[@]}" >"${JSON_OUT}" 2>"${STDERR_OUT}"
+          EXIT_CODE=$?
+          set -e
+
+          {
+            echo "mode=${MODE}"
+            echo "exit_code=${EXIT_CODE}"
+            echo "json_path=${JSON_OUT}"
+            echo "stderr_path=${STDERR_OUT}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Theme Check exit code: ${EXIT_CODE}"
+          echo "Theme Check JSON output:"
+          cat "${JSON_OUT}" || true
+
+          if [ -s "${STDERR_OUT}" ]; then
+            echo "Theme Check stderr:"
+            cat "${STDERR_OUT}"
+          fi
+
+      - name: Build Theme Check report
+        id: theme_check_report
+        env:
+          JSON_PATH: ${{ steps.theme_check_run.outputs.json_path }}
+          STDERR_PATH: ${{ steps.theme_check_run.outputs.stderr_path }}
+          THEME_ROOT: _ci_theme_root
+          THEME_CHECK_MODE: ${{ steps.theme_check_run.outputs.mode }}
+          THEME_CHECK_FAIL_LEVEL: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
+          THEME_CHECK_EXIT_CODE: ${{ steps.theme_check_run.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const jsonPath = process.env.JSON_PATH;
+          const stderrPath = process.env.STDERR_PATH;
+          const themeRoot = process.env.THEME_ROOT || "";
+          const mode = String(process.env.THEME_CHECK_MODE || "").toLowerCase();
+          const failLevel = String(process.env.THEME_CHECK_FAIL_LEVEL || "error").toLowerCase();
+          const exitCode = Number(process.env.THEME_CHECK_EXIT_CODE || "0");
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY || "";
+          const outputPath = process.env.GITHUB_OUTPUT;
+
+          const thresholdMap = { error: 2, suggestion: 1, style: 0 };
+          const severityMap = { error: 2, warning: 1, info: 0 };
+          const threshold = Object.prototype.hasOwnProperty.call(thresholdMap, failLevel) ? thresholdMap[failLevel] : 2;
+
+          function appendOutput(name, value) {
+            fs.appendFileSync(outputPath, `${name}<<EOF\n${value}\nEOF\n`);
+          }
+
+          function normalizeSlashes(value) {
+            return String(value || "").replace(/\\/g, "/");
+          }
+
+          function relativeThemePath(filePath) {
+            const raw = normalizeSlashes(filePath);
+            const root = normalizeSlashes(path.resolve(themeRoot));
+            if (!raw) return "(unknown file)";
+            if (root && raw.toLowerCase().startsWith(root.toLowerCase() + "/")) {
+              return raw.slice(root.length + 1);
+            }
+            if (root && raw.toLowerCase() === root.toLowerCase()) {
+              return ".";
+            }
+            return raw;
+          }
+
+          function readJsonReport() {
+            const raw = fs.existsSync(jsonPath) ? fs.readFileSync(jsonPath, "utf8").trim() : "";
+            if (!raw) {
+              throw new Error(`Theme Check JSON output was empty (exit code ${exitCode}).`);
+            }
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+              throw new Error("Theme Check JSON output was not an array.");
+            }
+            return parsed;
+          }
+
+          const report = readJsonReport();
+          const allOffenses = [];
+          const severityCounts = { error: 0, warning: 0, info: 0 };
+
+          for (const fileEntry of report) {
+            const filePath = relativeThemePath(fileEntry?.path || "");
+            for (const offense of fileEntry?.offenses || []) {
+              const severity = String(offense?.severity || "info").toLowerCase();
+              if (Object.prototype.hasOwnProperty.call(severityCounts, severity)) {
+                severityCounts[severity] += 1;
+              }
+              allOffenses.push({
+                filePath,
+                check: String(offense?.check || "ThemeCheck"),
+                severity,
+                message: String(offense?.message || ""),
+                startRow: Number(offense?.start_row || 0),
+                startColumn: Number(offense?.start_column || 0),
+              });
+            }
+          }
+
+          const matched = allOffenses
+            .filter((offense) => (severityMap[offense.severity] ?? 0) >= threshold)
+            .sort((a, b) =>
+              (severityMap[b.severity] ?? 0) - (severityMap[a.severity] ?? 0) ||
+              a.filePath.localeCompare(b.filePath) ||
+              a.startRow - b.startRow ||
+              a.startColumn - b.startColumn
+            );
+
+          const belowThreshold = allOffenses
+            .filter((offense) => (severityMap[offense.severity] ?? 0) < threshold)
+            .sort((a, b) =>
+              (severityMap[b.severity] ?? 0) - (severityMap[a.severity] ?? 0) ||
+              a.filePath.localeCompare(b.filePath) ||
+              a.startRow - b.startRow ||
+              a.startColumn - b.startColumn
+            );
+
+          const shouldFail = mode === "true" && (matched.length > 0 || exitCode !== 0);
+          const headline = matched.length > 0
+            ? `Found ${matched.length} Theme Check offense(s) at or above \`${failLevel}\`.`
+            : `No Theme Check offenses found at or above \`${failLevel}\`.`;
+
+          const commentLines = [
+            "<!-- iamota-theme-check -->",
+            "## Theme Check",
+            "",
+            `${headline}`,
+            "",
+            `Mode: \`${mode}\``,
+            `Fail level: \`${failLevel}\``,
+            `CLI exit code: \`${exitCode}\``,
+            `Total offenses: \`${allOffenses.length}\``,
+            `Severity totals: error \`${severityCounts.error}\`, warning \`${severityCounts.warning}\`, info \`${severityCounts.info}\``,
+          ];
+
+          if (matched.length > 0) {
+            commentLines.push("", `### Failures (${Math.min(matched.length, 50)} shown)`, "");
+            for (const offense of matched.slice(0, 50)) {
+              const location = offense.startRow > 0
+                ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
+                : "";
+              commentLines.push(`- \`${offense.filePath}${location}\` [${offense.severity}] \`${offense.check}\` - ${offense.message}`);
+            }
+            if (matched.length > 50) {
+              commentLines.push("", `_Additional offenses omitted: ${matched.length - 50}_`);
+            }
+          } else {
+            commentLines.push("", "No blocking Theme Check findings to report for this run.");
+          }
+
+          if (belowThreshold.length > 0) {
+            commentLines.push("", "<details>", `<summary>Warnings and lower-severity findings (${Math.min(belowThreshold.length, 50)} shown of ${belowThreshold.length})</summary>`, "");
+            for (const offense of belowThreshold.slice(0, 50)) {
+              const location = offense.startRow > 0
+                ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
+                : "";
+              commentLines.push(`- \`${offense.filePath}${location}\` [${offense.severity}] \`${offense.check}\` - ${offense.message}`);
+            }
+            if (belowThreshold.length > 50) {
+              commentLines.push("", `_Additional lower-severity offenses omitted: ${belowThreshold.length - 50}_`);
+            }
+            commentLines.push("", "</details>");
+          }
+
+          const stderrRaw = fs.existsSync(stderrPath) ? fs.readFileSync(stderrPath, "utf8").trim() : "";
+          if (stderrRaw) {
+            commentLines.push("", "<details>", "<summary>Theme Check stderr</summary>", "", "```text");
+            commentLines.push(...stderrRaw.split("\n").slice(0, 40));
+            if (stderrRaw.split("\n").length > 40) {
+              commentLines.push("... (truncated)");
+            }
+            commentLines.push("```", "</details>");
+          }
+
+          const summaryLines = [
+            "## Theme Check",
+            "",
+            headline,
+            "",
+            `Mode: \`${mode}\``,
+            `Fail level: \`${failLevel}\``,
+            `CLI exit code: \`${exitCode}\``,
+          ];
+          if (matched.length > 0) {
+            summaryLines.push("", `Top failures (${Math.min(matched.length, 20)} shown):`, "");
+            for (const offense of matched.slice(0, 20)) {
+              const location = offense.startRow > 0
+                ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
+                : "";
+              summaryLines.push(`- \`${offense.filePath}${location}\` [${offense.severity}] \`${offense.check}\` - ${offense.message}`);
+            }
+          }
+          if (belowThreshold.length > 0) {
+            summaryLines.push("", `Lower-severity findings not counted toward fail level: ${belowThreshold.length}`);
+          }
+
+          if (summaryPath) {
+            fs.appendFileSync(summaryPath, `${summaryLines.join("\n")}\n`);
+          }
+
+          const commentPath = "_ci_reports/theme-check-comment.md";
+          fs.writeFileSync(commentPath, `${commentLines.join("\n")}\n`);
+
+          appendOutput("comment_path", commentPath);
+          appendOutput("matched_count", String(matched.length));
+          appendOutput("all_count", String(allOffenses.length));
+          appendOutput("should_fail", shouldFail ? "true" : "false");
+          NODE
+
+      - name: Sync Theme Check PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          THEME_CHECK_COMMENT_PATH: ${{ steps.theme_check_report.outputs.comment_path }}
         with:
-          path: _ci_theme_root
-          fail_level  : ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
-          config_path : ${{ needs.resolve_inputs.outputs.theme_check_config_path }}
-          verbose     : ${{ needs.resolve_inputs.outputs.theme_check_verbose }}
-          auto_correct: ${{ needs.resolve_inputs.outputs.theme_check_auto_correct }}
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('node:fs');
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.payload.pull_request.number;
+            const marker = '<!-- iamota-theme-check -->';
+            const body = fs.readFileSync(process.env.THEME_CHECK_COMMENT_PATH, 'utf8');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments
+              .filter((comment) => comment.user?.type === 'Bot' && String(comment.body || '').includes(marker))
+              .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))[0];
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+              core.info(`Updated Theme Check PR comment ${existing.id}.`);
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+              core.info('Created Theme Check PR comment.');
+            }
+
+      - name: Fail Theme Check job when configured
+        if: steps.theme_check_report.outputs.should_fail == 'true'
+        run: |
+          echo "Theme Check reported offenses at or above the configured fail level."
+          exit 1
 
   lint:
     if: needs.resolve_inputs.outputs.run_lint == 'true'
