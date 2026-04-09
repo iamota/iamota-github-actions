@@ -8,7 +8,7 @@ inputs:
     ref:
         description: "Ref to checkout from helper repository"
         required: false
-        default: "main"
+        default: ""
     token:
         description: "Optional token with read access to helper repository"
         required: false
@@ -30,13 +30,19 @@ runs:
           run: |
               set -euo pipefail
               REF_IN="${{ inputs.ref }}"
+              REPOSITORY_IN="${{ inputs.repository }}"
               if [ -n "${REF_IN}" ]; then
                   echo "ref=${REF_IN}" >> "$GITHUB_OUTPUT"
                   exit 0
               fi
 
+              if [ -n "${GITHUB_ACTION_REF:-}" ] && [ -n "${GITHUB_ACTION_REPOSITORY:-}" ] && [ "${GITHUB_ACTION_REPOSITORY}" = "${REPOSITORY_IN}" ]; then
+                  echo "ref=${GITHUB_ACTION_REF}" >> "$GITHUB_OUTPUT"
+                  exit 0
+              fi
+
               WF_REF="${{ inputs.workflow_ref }}"
-              if [ -n "${WF_REF}" ] && [[ "${WF_REF}" == *"@"* ]]; then
+              if [ -n "${WF_REF}" ] && [[ "${WF_REF}" == "${REPOSITORY_IN}"* ]] && [[ "${WF_REF}" == *"@"* ]]; then
                   echo "ref=${WF_REF##*@}" >> "$GITHUB_OUTPUT"
               else
                   echo "ref=main" >> "$GITHUB_OUTPUT"
