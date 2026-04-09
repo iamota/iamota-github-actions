@@ -254,7 +254,7 @@ jobs:
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
-                  ref: matrix
+                  workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
@@ -626,7 +626,7 @@ jobs:
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
-                  ref: matrix
+                  workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ steps.resolve_helper_token.outputs.value }}
                   path: .iamota-actions
 
