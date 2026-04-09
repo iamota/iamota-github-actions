@@ -251,22 +251,6 @@ jobs:
                         exit 1
                     fi
 
-            - name: Resolve effective helper checkout token (optional)
-              id: resolve_helper_token
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
-              with:
-                  store: ${{ env.TARGET_STORE }}
-                  raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
-                  raw_named: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_NAMED }}
-                  raw_indexed: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED }}
-
-            - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
-              with:
-                  workflow_ref: ${{ github.workflow_ref }}
-                  token: ${{ steps.resolve_helper_token.outputs.value }}
-                  path: .iamota-actions
-
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
 
@@ -296,7 +280,7 @@ jobs:
                   [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
 
                   SOURCE_THEME_ID="$(
-                      node .iamota-actions/.github/scripts/shopify/shopify-theme-id-resolve.mjs \
+                      node "${GITHUB_ACTION_PATH}/../../scripts/shopify/shopify-theme-id-resolve.mjs" \
                           --store "${SRC_HOST}" \
                           --theme-id "${SOURCE_THEME_ID}" \
                           --token "${SHOPIFY_THEME_ACCESS_TOKEN}"
@@ -625,22 +609,6 @@ jobs:
             SHOPIFY_CLI_TTY                       : "0"
 
         steps:
-            - name: Resolve effective helper checkout token (optional)
-              id: resolve_helper_token
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
-              with:
-                  store: ${{ env.TARGET_STORE }}
-                  raw: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
-                  raw_named: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_NAMED }}
-                  raw_indexed: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN_INDEXED }}
-
-            - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
-              with:
-                  workflow_ref: ${{ github.workflow_ref }}
-                  token: ${{ steps.resolve_helper_token.outputs.value }}
-                  path: .iamota-actions
-
             - name: Resolve effective Shopify token
               id: resolve_theme_token
               uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
