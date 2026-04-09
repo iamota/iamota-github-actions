@@ -331,6 +331,7 @@ jobs:
           JSON_PATH: ${{ steps.theme_check_run.outputs.json_path }}
           STDERR_PATH: ${{ steps.theme_check_run.outputs.stderr_path }}
           THEME_ROOT: _ci_theme_root
+          THEME_SRC: ${{ needs.resolve_inputs.outputs.theme_src }}
           THEME_CHECK_MODE: ${{ steps.theme_check_run.outputs.mode }}
           THEME_CHECK_FAIL_LEVEL: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
           THEME_CHECK_EXIT_CODE: ${{ steps.theme_check_run.outputs.exit_code }}
@@ -347,6 +348,7 @@ jobs:
           const jsonPath = process.env.JSON_PATH;
           const stderrPath = process.env.STDERR_PATH;
           const themeRoot = process.env.THEME_ROOT || "";
+          const themeSrc = String(process.env.THEME_SRC || "").replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
           const mode = String(process.env.THEME_CHECK_MODE || "").toLowerCase();
           const failLevel = String(process.env.THEME_CHECK_FAIL_LEVEL || "error").toLowerCase();
           const exitCode = Number(process.env.THEME_CHECK_EXIT_CODE || "0");
@@ -383,8 +385,9 @@ jobs:
           function fileUrl(filePath, line) {
             if (!fileLinkRef || !filePath || filePath === "(unknown file)") return "";
             const cleanPath = String(filePath).replace(/^\.\/+/, "");
+            const repoPath = themeSrc && themeSrc !== "." ? `${themeSrc}/${cleanPath}` : cleanPath;
             const lineAnchor = Number(line) > 0 ? `#L${Number(line)}` : "";
-            return `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/blob/${fileLinkRef}/${cleanPath}${lineAnchor}`;
+            return `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/blob/${fileLinkRef}/${repoPath}${lineAnchor}`;
           }
 
           function severityEmoji(severity) {
@@ -498,6 +501,9 @@ jobs:
             commentLines.push("```", "</details>");
           }
 
+          const SUMMARY_MAX_ITEMS = 1500;
+          let summaryRemaining = SUMMARY_MAX_ITEMS;
+
           const summaryLines = [
             "## Theme Check",
             "",
@@ -511,15 +517,20 @@ jobs:
           ];
 
           for (const group of summaryGroups) {
-            summaryLines.push("", "<details>", `<summary>${group.title}</summary>`, "");
+            const shownItems = group.items.slice(0, Math.max(0, summaryRemaining));
+            summaryLines.push("", "<details>", `<summary>${group.title}${shownItems.length !== group.items.length ? ` (${shownItems.length} shown of ${group.items.length})` : ""}</summary>`, "");
             if (group.items.length === 0) {
               summaryLines.push("None.");
             } else {
-              for (const offense of group.items) {
+              for (const offense of shownItems) {
                 summaryLines.push(offenseLine(offense));
+              }
+              if (shownItems.length < group.items.length) {
+                summaryLines.push("", `_Additional ${group.items.length - shownItems.length} item(s) omitted. See Full Logs above or run Theme Check locally for the complete list._`);
               }
             }
             summaryLines.push("", "</details>");
+            summaryRemaining -= shownItems.length;
           }
 
           if (summaryPath) {
