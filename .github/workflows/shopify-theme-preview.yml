@@ -279,8 +279,14 @@ jobs:
                   SRC_STORE="${SRC_HOST%.myshopify.com}"
                   [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
 
+                  SCRIPT_PATH="${GITHUB_WORKSPACE}/.github/scripts/shopify/shopify-theme-id-resolve.mjs"
+                  if [ ! -f "${SCRIPT_PATH}" ]; then
+                      echo "Required helper script not found: ${SCRIPT_PATH}"
+                      exit 1
+                  fi
+
                   SOURCE_THEME_ID="$(
-                      node "${GITHUB_ACTION_PATH}/../../scripts/shopify/shopify-theme-id-resolve.mjs" \
+                      node "${SCRIPT_PATH}" \
                           --store "${SRC_HOST}" \
                           --theme-id "${SOURCE_THEME_ID}" \
                           --token "${SHOPIFY_THEME_ACCESS_TOKEN}"
