@@ -337,6 +337,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
+          FILE_LINK_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           node - <<'NODE'
@@ -352,6 +353,7 @@ jobs:
           const summaryPath = process.env.GITHUB_STEP_SUMMARY || "";
           const outputPath = process.env.GITHUB_OUTPUT;
           const runUrl = `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/actions/runs/${process.env.GITHUB_RUN_ID || ""}`;
+          const fileLinkRef = process.env.FILE_LINK_REF || "";
 
           const thresholdMap = { error: 2, suggestion: 1, style: 0 };
           const severityMap = { error: 2, warning: 1, info: 0 };
@@ -376,6 +378,29 @@ jobs:
               return ".";
             }
             return raw;
+          }
+
+          function fileUrl(filePath, line) {
+            if (!fileLinkRef || !filePath || filePath === "(unknown file)") return "";
+            const cleanPath = String(filePath).replace(/^\.\/+/, "");
+            const lineAnchor = Number(line) > 0 ? `#L${Number(line)}` : "";
+            return `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/blob/${fileLinkRef}/${cleanPath}${lineAnchor}`;
+          }
+
+          function severityEmoji(severity) {
+            if (severity === "error") return '<span title="Error">❌</span>';
+            if (severity === "warning") return '<span title="Warning">⚠️</span>';
+            return '<span title="Info">ℹ️</span>';
+          }
+
+          function offenseLine(offense) {
+            const location = offense.startRow > 0
+              ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
+              : "";
+            const label = `${offense.filePath}${location}`;
+            const url = fileUrl(offense.filePath, offense.startRow);
+            const linkedLabel = url ? `[\`${label}\`](${url})` : `\`${label}\``;
+            return `- ${severityEmoji(offense.severity)} ${linkedLabel} \`${offense.check}\` - ${offense.message}`;
           }
 
           function readJsonReport() {
@@ -431,10 +456,13 @@ jobs:
             );
 
           const shouldFail = mode === "true" && (matched.length > 0 || exitCode !== 0);
-          const headline = matched.length > 0
-            ? `Found ${matched.length} Theme Check offense(s) at or above \`${failLevel}\`.`
-            : `No Theme Check offenses found at or above \`${failLevel}\`.`;
-          const countSummary = `Theme Check found \`${severityCounts.error}\` errors, \`${severityCounts.warning}\` warnings, \`${severityCounts.info}\` info.`;
+          const countSummary = `Theme Check found \`${severityCounts.error}\` errors, \`${severityCounts.warning}\` warnings, \`${severityCounts.info}\` info. [Full Logs](${runUrl})`;
+
+          const bySeverity = {
+            error: allOffenses.filter((offense) => offense.severity === "error"),
+            warning: allOffenses.filter((offense) => offense.severity === "warning"),
+            info: allOffenses.filter((offense) => offense.severity === "info"),
+          };
 
           const commentLines = [
             "<!-- iamota-theme-check -->",
@@ -443,37 +471,22 @@ jobs:
             countSummary,
           ];
 
-          if (matched.length > 0) {
-            commentLines.push("", "<details>", `<summary>Failures (${Math.min(matched.length, 50)} shown of ${matched.length})</summary>`, "");
-            for (const offense of matched.slice(0, 50)) {
-              const location = offense.startRow > 0
-                ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
-                : "";
-              commentLines.push(`- \`${offense.filePath}${location}\` [${offense.severity}] \`${offense.check}\` - ${offense.message}`);
-            }
-            if (matched.length > 50) {
-              commentLines.push("", `_Additional offenses omitted: ${matched.length - 50}_`);
-            }
-            commentLines.push("", "</details>");
-          } else {
-            commentLines.push("", "No blocking Theme Check findings to report for this run.");
-          }
+          const commentGroups = [
+            { key: "error", title: "Failures", items: matched },
+            { key: "warning", title: "Warnings and lower-severity findings", items: belowThreshold },
+          ];
 
-          if (belowThreshold.length > 0) {
-            commentLines.push("", "<details>", `<summary>Warnings and lower-severity findings (${Math.min(belowThreshold.length, 50)} shown of ${belowThreshold.length})</summary>`, "");
-            for (const offense of belowThreshold.slice(0, 50)) {
-              const location = offense.startRow > 0
-                ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
-                : "";
-              commentLines.push(`- \`${offense.filePath}${location}\` [${offense.severity}] \`${offense.check}\` - ${offense.message}`);
+          for (const group of commentGroups) {
+            if (group.items.length === 0) continue;
+            commentLines.push("", "<details>", `<summary>${group.title} (${Math.min(group.items.length, 50)} shown of ${group.items.length})</summary>`, "");
+            for (const offense of group.items.slice(0, 50)) {
+              commentLines.push(offenseLine(offense));
             }
-            if (belowThreshold.length > 50) {
-              commentLines.push("", `_Additional lower-severity offenses omitted: ${belowThreshold.length - 50}_`);
+            if (group.items.length > 50) {
+              commentLines.push("", `_Additional offenses omitted: ${group.items.length - 50}_`);
             }
             commentLines.push("", "</details>");
           }
-
-          commentLines.push("", `Full Theme Check logs: ${runUrl}`);
 
           const stderrRaw = fs.existsSync(stderrPath) ? fs.readFileSync(stderrPath, "utf8").trim() : "";
           if (stderrRaw) {
@@ -490,17 +503,23 @@ jobs:
             "",
             countSummary,
           ];
-          if (matched.length > 0) {
-            summaryLines.push("", `Top failures (${Math.min(matched.length, 20)} shown):`, "");
-            for (const offense of matched.slice(0, 20)) {
-              const location = offense.startRow > 0
-                ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
-                : "";
-              summaryLines.push(`- \`${offense.filePath}${location}\` [${offense.severity}] \`${offense.check}\` - ${offense.message}`);
+
+          const summaryGroups = [
+            { key: "error", title: `${bySeverity.error.length} Errors`, items: bySeverity.error },
+            { key: "warning", title: `${bySeverity.warning.length} Warnings`, items: bySeverity.warning },
+            { key: "info", title: `${bySeverity.info.length} Info`, items: bySeverity.info },
+          ];
+
+          for (const group of summaryGroups) {
+            summaryLines.push("", "<details>", `<summary>${group.title}</summary>`, "");
+            if (group.items.length === 0) {
+              summaryLines.push("None.");
+            } else {
+              for (const offense of group.items) {
+                summaryLines.push(offenseLine(offense));
+              }
             }
-          }
-          if (belowThreshold.length > 0) {
-            summaryLines.push("", `Lower-severity findings not counted toward fail level: ${belowThreshold.length}`);
+            summaryLines.push("", "</details>");
           }
 
           if (summaryPath) {
