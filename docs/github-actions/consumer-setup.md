@@ -32,6 +32,7 @@ Repository/org secrets:
 
 ### Common additional variables
 
+- `THEME_ROOT`
 - `SHOPIFY_THEME_ID`
 - `SHOPIFY_PRODUCTION_THEME_ID`
 - `SHOPIFY_PREVIEW_BASE_THEME_ID`
@@ -124,7 +125,8 @@ jobs:
       branch: ${{ github.ref_name }}
       SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
       SHOPIFY_THEME_ID: ${{ vars.SHOPIFY_THEME_ID || '' }}
-      theme_src: ${{ vars.THEME_SRC || '.' }}
+      theme_root: ${{ vars.THEME_ROOT || '' }}
+      theme_src: ${{ vars.THEME_SRC || '' }}
       theme_dist: ${{ vars.THEME_DIST || '' }}
       build_install_command: ${{ vars.BUILD_INSTALL_COMMAND || 'npm ci' }}
       build_command: ${{ vars.BUILD_COMMAND || 'npx webpack --env target=${GITHUB_BRANCH}' }}
@@ -151,7 +153,8 @@ jobs:
     uses: iamota/iamota-github-actions/.github/workflows/shopify-json-sync-production.yml@v1
     with:
       production_branch: ${{ vars.PRODUCTION_BRANCH || 'production' }}
-      theme_src: ${{ vars.THEME_SRC || '.' }}
+      theme_root: ${{ vars.THEME_ROOT || '' }}
+      theme_src: ${{ vars.THEME_SRC || '' }}
       theme_pull_dir: ${{ vars.THEME_PULL_DIR || '_remote_theme' }}
       SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
       SHOPIFY_PRODUCTION_THEME_ID: ${{ vars.SHOPIFY_PRODUCTION_THEME_ID || vars.SHOPIFY_THEME_ID || '' }}
@@ -203,7 +206,8 @@ jobs:
     uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-preview.yml@v1
     with:
       production_branch: ${{ vars.PRODUCTION_BRANCH || 'production' }}
-      theme_src: ${{ vars.THEME_SRC || '.' }}
+      theme_root: ${{ vars.THEME_ROOT || '' }}
+      theme_src: ${{ vars.THEME_SRC || '' }}
       theme_dist: ${{ vars.THEME_DIST || '' }}
       build_install_command: ${{ vars.BUILD_INSTALL_COMMAND || 'npm ci' }}
       build_command: ${{ vars.BUILD_COMMAND || 'npx webpack --env target=${GITHUB_BRANCH}' }}

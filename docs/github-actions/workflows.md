@@ -74,9 +74,9 @@ Inputs:
 - `branch` (required)
 - `SHOPIFY_STORE` (optional, but required at runtime)
 - `SHOPIFY_THEME_ID` (required)
-- `theme_src` (optional, default `.`)
+- `theme_root` (optional, default repo root)
+- `theme_src` (optional)
 - `theme_dist` (optional)
-- `theme_path` (optional legacy alias)
 - `build_install_command` (optional, default `npm ci`)
 - `build_command` (optional, default `npx webpack --env target=${GITHUB_BRANCH}`)
 
@@ -98,7 +98,7 @@ Purpose:
 
 Inputs:
 
-- Build roots: `theme_src`, `theme_dist`, `build_install_command`, `build_command`
+- Build roots: `theme_root`, `theme_src`, `theme_dist`, `build_install_command`, `build_command`
 - Store metadata: `shopify_store`, `shopify_theme_id`
 - Lighthouse mode: `lighthouse_align_with_production_json`
 - Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_lighthouse`
@@ -124,7 +124,8 @@ Purpose:
 Inputs:
 
 - `production_branch` (optional, default `production`)
-- `theme_src` (optional, default `.`)
+- `theme_root` (optional, default repo root)
+- `theme_src` (optional)
 - `theme_pull_dir` (optional, default `_remote_theme`)
 - `SHOPIFY_STORE` (optional, but required at runtime)
 - `SHOPIFY_PRODUCTION_THEME_ID` (preferred)
@@ -166,7 +167,7 @@ Purpose:
 Inputs:
 
 - `production_branch` (optional)
-- `theme_src`, `theme_dist`
+- `theme_root`, `theme_src`, `theme_dist`
 - `build_install_command`, `build_command`
 - `enable_preview_backup`
 - `aws_region`, `aws_s3_bucket`

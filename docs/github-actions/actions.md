@@ -170,14 +170,16 @@ Runs self-aware install/build and resolves effective theme output path.
 
 Inputs:
 
-- `theme_src` (optional, default `.`)
+- `theme_root` (optional, default repo root)
+- `theme_src` (optional; defaults to `theme_root` for subfolder themes, otherwise `src` when present, otherwise repo root)
 - `theme_dist` (optional)
-- `theme_path` (optional legacy alias)
 - `build_install_command` (optional)
 - `build_command` (optional)
 
 Outputs:
 
+- `theme_root_effective`
+- `theme_src_effective`
 - `theme_dist_effective`
 - `webpack_ran`
 - `npm_install_ran`

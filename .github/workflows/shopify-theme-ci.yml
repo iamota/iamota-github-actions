@@ -3,10 +3,14 @@ name: Shopify Theme CI
 on:
   workflow_call:
     inputs:
+      theme_root:
+        type: string
+        required: false
+        default: ""
       theme_src:
         type: string
         required: false
-        default: "."
+        default: ""
       theme_dist:
         type: string
         required: false
@@ -83,6 +87,7 @@ jobs:
     outputs:
       matrix_json                          : ${{ steps.stores.outputs.matrix_json }}
       first_store                          : ${{ steps.stores.outputs.first_store }}
+      theme_root                           : ${{ steps.out.outputs.theme_root }}
       theme_src                            : ${{ steps.out.outputs.theme_src }}
       theme_dist                           : ${{ steps.out.outputs.theme_dist }}
       build_install_command                : ${{ steps.out.outputs.build_install_command }}
@@ -104,6 +109,12 @@ jobs:
         with:
           stores: ${{ inputs.shopify_store }}
           allow_empty: "true"
+
+      - id: resolve_theme_root
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.theme_root }}
 
       - id: resolve_theme_src
         uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
@@ -198,7 +209,8 @@ jobs:
       - id: out
         run: |
           {
-            echo "theme_src=${{ steps.resolve_theme_src.outputs.value != '' && steps.resolve_theme_src.outputs.value || '.' }}"
+            echo "theme_root=${{ steps.resolve_theme_root.outputs.value != '' && steps.resolve_theme_root.outputs.value || '.' }}"
+            echo "theme_src=${{ steps.resolve_theme_src.outputs.value }}"
             echo "theme_dist=${{ steps.resolve_theme_dist.outputs.value }}"
             echo "build_install_command=${{ steps.resolve_build_install.outputs.value != '' && steps.resolve_build_install.outputs.value || 'npm ci' }}"
             echo "build_command=${{ steps.resolve_build_command.outputs.value != '' && steps.resolve_build_command.outputs.value || 'npx webpack --env target=ci' }}"
@@ -221,6 +233,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       theme_root   : ${{ steps.root.outputs.theme_dist_effective }}
+      theme_root_effective: ${{ steps.root.outputs.theme_root_effective }}
+      theme_src_effective: ${{ steps.root.outputs.theme_src_effective }}
       artifact_name: ${{ steps.meta.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@v5
@@ -229,6 +243,7 @@ jobs:
         id: root
         uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@v1
         with:
+          theme_root           : ${{ needs.resolve_inputs.outputs.theme_root }}
           theme_src            : ${{ needs.resolve_inputs.outputs.theme_src }}
           theme_dist           : ${{ needs.resolve_inputs.outputs.theme_dist }}
           build_install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
@@ -331,7 +346,7 @@ jobs:
           JSON_PATH: ${{ steps.theme_check_run.outputs.json_path }}
           STDERR_PATH: ${{ steps.theme_check_run.outputs.stderr_path }}
           THEME_ROOT: _ci_theme_root
-          THEME_SRC: ${{ needs.resolve_inputs.outputs.theme_src }}
+          THEME_SRC: ${{ needs.prepare.outputs.theme_src_effective }}
           THEME_CHECK_MODE: ${{ steps.theme_check_run.outputs.mode }}
           THEME_CHECK_FAIL_LEVEL: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
           THEME_CHECK_EXIT_CODE: ${{ steps.theme_check_run.outputs.exit_code }}
@@ -607,17 +622,22 @@ jobs:
       - name: NPM install (self-aware)
         uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
         with:
-          working_directory: "."
+          working_directory: ${{ needs.resolve_inputs.outputs.theme_root }}
           install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
           if_package_json: "1"
 
       - name: Run lint script when available
         run: |
           set -euo pipefail
-          if [ ! -f package.json ]; then
+          ROOT="${{ needs.resolve_inputs.outputs.theme_root }}"
+          if [ -z "${ROOT}" ]; then
+            ROOT="."
+          fi
+          if [ ! -f "${ROOT}/package.json" ]; then
             echo "No package.json; skipping lint."
             exit 0
           fi
+          cd "${ROOT}"
           HAS_LINT="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.lint)?'1':'0')")"
           if [ "${HAS_LINT}" != "1" ]; then
             echo "No lint script; skipping."
@@ -641,7 +661,7 @@ jobs:
       - name: NPM install (self-aware)
         uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
         with:
-          working_directory: "."
+          working_directory: ${{ needs.resolve_inputs.outputs.theme_root }}
           install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
           if_package_json: "1"
 
@@ -653,14 +673,19 @@ jobs:
 
       - name: Run test script when available
         env:
-          THEME_ROOT: _ci_theme_root
-          THEME_DIST: _ci_theme_root
+          THEME_ROOT: ${{ github.workspace }}/_ci_theme_root
+          THEME_DIST: ${{ github.workspace }}/_ci_theme_root
         run: |
           set -euo pipefail
-          if [ ! -f package.json ]; then
+          ROOT="${{ needs.resolve_inputs.outputs.theme_root }}"
+          if [ -z "${ROOT}" ]; then
+            ROOT="."
+          fi
+          if [ ! -f "${ROOT}/package.json" ]; then
             echo "No package.json; skipping tests."
             exit 0
           fi
+          cd "${ROOT}"
           HAS_TEST="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.test)?'1':'0')")"
           if [ "${HAS_TEST}" != "1" ]; then
             echo "No test script; skipping."

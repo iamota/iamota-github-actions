@@ -13,15 +13,15 @@ on:
             SHOPIFY_THEME_ID:
                 type: string
                 required: true
-            theme_src:
-                type: string
-                required: false
-                default: "."
-            theme_dist:
+            theme_root:
                 type: string
                 required: false
                 default: ""
-            theme_path:
+            theme_src:
+                type: string
+                required: false
+                default: ""
+            theme_dist:
                 type: string
                 required: false
                 default: ""
@@ -80,9 +80,9 @@ jobs:
             TARGET_STORE                  : ${{ matrix.store }}
             TARGET_STORE_INDEX            : ${{ matrix.store_index }}
             TARGET_STORE_SECRET_KEY       : ${{ matrix.store_secret_key }}
+            RAW_THEME_ROOT                : ${{ inputs.theme_root }}
             RAW_THEME_SRC                 : ${{ inputs.theme_src }}
             RAW_THEME_DIST                : ${{ inputs.theme_dist }}
-            RAW_THEME_PATH                : ${{ inputs.theme_path }}
             RAW_BUILD_INSTALL_COMMAND     : ${{ inputs.build_install_command }}
             RAW_BUILD_COMMAND             : ${{ inputs.build_command }}
             RAW_ALLOW_LIVE                : ${{ inputs.allow_live }}
@@ -102,6 +102,13 @@ jobs:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
 
+            - name: Resolve theme root path
+              id: resolve_theme_root
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_THEME_ROOT }}
+
             - name: Resolve theme source path
               id: resolve_theme_src
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
@@ -115,13 +122,6 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_THEME_DIST }}
-
-            - name: Resolve explicit theme path
-              id: resolve_theme_path
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
-              with:
-                  store: ${{ env.TARGET_STORE }}
-                  raw: ${{ env.RAW_THEME_PATH }}
 
             - name: Resolve build install command
               id: resolve_build_install
@@ -195,9 +195,9 @@ jobs:
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
+                  theme_root: ${{ steps.resolve_theme_root.outputs.value }}
                   theme_src: ${{ steps.resolve_theme_src.outputs.value }}
                   theme_dist: ${{ steps.resolve_theme_dist.outputs.value }}
-                  theme_path: ${{ steps.resolve_theme_path.outputs.value }}
                   build_install_command: ${{ steps.resolve_build_install.outputs.value }}
                   build_command: ${{ steps.resolve_build_command.outputs.value }}
 

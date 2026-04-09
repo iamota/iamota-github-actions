@@ -7,10 +7,14 @@ on:
                 type: string
                 required: false
                 default: "production"
+            theme_root:
+                type: string
+                required: false
+                default: ""
             theme_src:
                 type: string
                 required: false
-                default: "."
+                default: ""
             theme_dist:
                 type: string
                 required: false
@@ -96,6 +100,7 @@ jobs:
             TARGET_STORE_SLUG                     : ${{ matrix.store_slug }}
             TARGET_STORE_INDEX                    : ${{ matrix.store_index }}
             TARGET_STORE_SECRET_KEY               : ${{ matrix.store_secret_key }}
+            RAW_THEME_ROOT                        : ${{ inputs.theme_root }}
             RAW_THEME_SRC                         : ${{ inputs.theme_src }}
             RAW_THEME_DIST                        : ${{ inputs.theme_dist }}
             RAW_BUILD_INSTALL_COMMAND             : ${{ inputs.build_install_command }}
@@ -204,9 +209,13 @@ jobs:
                   const productionThemeId = resolveValue(process.env.RAW_SHOPIFY_PRODUCTION_THEME_ID, store) || "";
                   const previewBaseId = resolveValue(process.env.RAW_SHOPIFY_PREVIEW_BASE_ID, store) || "";
 
+                  const resolvedThemeRoot = resolveValue(process.env.RAW_THEME_ROOT, store) || ".";
+                  const resolvedThemeSrc = resolveValue(process.env.RAW_THEME_SRC, store) || (resolvedThemeRoot !== "." ? resolvedThemeRoot : "src");
+
                   const values = {
                     SHOPIFY_STORE: store,
-                    THEME_SRC: resolveValue(process.env.RAW_THEME_SRC, store) || ".",
+                    THEME_ROOT: resolvedThemeRoot,
+                    THEME_SRC: resolvedThemeSrc,
                     THEME_DIST: resolveValue(process.env.RAW_THEME_DIST, store) || "",
                     BUILD_INSTALL_COMMAND: resolveValue(process.env.RAW_BUILD_INSTALL_COMMAND, store) || "npm ci",
                     BUILD_COMMAND: resolveValue(process.env.RAW_BUILD_COMMAND, store) || "npx webpack --env target=${GITHUB_BRANCH}",
@@ -401,6 +410,7 @@ jobs:
               env:
                   GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
               with:
+                  theme_root: ${{ env.THEME_ROOT }}
                   theme_src: ${{ env.THEME_SRC }}
                   theme_dist: ${{ env.THEME_DIST }}
                   build_install_command: ${{ env.BUILD_INSTALL_COMMAND }}
@@ -410,7 +420,8 @@ jobs:
               run: |
                   set -euo pipefail
 
-                  SRC_ROOT="${THEME_SRC#./}"
+                  SRC_ROOT="${{ steps.prepare.outputs.theme_src_effective }}"
+                  SRC_ROOT="${SRC_ROOT#./}"
                   SRC_ROOT="${SRC_ROOT%/}"
                   [ -n "${SRC_ROOT}" ] || SRC_ROOT="."
 

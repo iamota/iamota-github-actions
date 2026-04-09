@@ -7,11 +7,15 @@ on:
                 type: string
                 required: false
                 default: "production"
+            theme_root:
+                type: string
+                required: false
+                default: ""
 
             theme_src:
                 type: string
                 required: false
-                default: "."
+                default: ""
 
             theme_pull_dir:
                 type: string
@@ -65,6 +69,7 @@ jobs:
             MASTER_STORE              : ${{ needs.resolve_master_store.outputs.first_store }}
             MASTER_STORE_INDEX        : ${{ needs.resolve_master_store.outputs.first_store_index }}
             MASTER_STORE_SECRET_KEY   : ${{ needs.resolve_master_store.outputs.first_store_secret_key }}
+            RAW_THEME_ROOT            : ${{ inputs.theme_root }}
             RAW_THEME_SRC             : ${{ inputs.theme_src }}
             RAW_THEME_PULL_DIR        : ${{ inputs.theme_pull_dir }}
             RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_PRODUCTION_THEME_ID != '' && inputs.SHOPIFY_PRODUCTION_THEME_ID || inputs.SHOPIFY_THEME_ID }}
@@ -77,6 +82,13 @@ jobs:
             SHOPIFY_CLI_TTY           : "0"
 
         steps:
+            - name: Resolve master theme root path
+              id: resolve_theme_root
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.MASTER_STORE }}
+                  raw: ${{ env.RAW_THEME_ROOT }}
+
             - name: Resolve master theme source path
               id: resolve_theme_src
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
@@ -119,8 +131,21 @@ jobs:
             - name: Export resolved source settings
               run: |
                   set -euo pipefail
+                  THEME_ROOT_VALUE="${{ steps.resolve_theme_root.outputs.value }}"
+                  if [ -z "${THEME_ROOT_VALUE}" ]; then
+                      THEME_ROOT_VALUE="."
+                  fi
+                  THEME_SRC_VALUE="${{ steps.resolve_theme_src.outputs.value }}"
+                  if [ -z "${THEME_SRC_VALUE}" ]; then
+                      if [ "${THEME_ROOT_VALUE}" != "." ]; then
+                          THEME_SRC_VALUE="${THEME_ROOT_VALUE}"
+                      else
+                          THEME_SRC_VALUE="src"
+                      fi
+                  fi
                   {
-                      echo "THEME_SRC=${{ steps.resolve_theme_src.outputs.value != '' && steps.resolve_theme_src.outputs.value || '.' }}"
+                      echo "THEME_ROOT=${THEME_ROOT_VALUE}"
+                      echo "THEME_SRC=${THEME_SRC_VALUE}"
                       echo "THEME_PULL_DIR=${{ steps.resolve_theme_pull_dir.outputs.value != '' && steps.resolve_theme_pull_dir.outputs.value || '_remote_theme' }}"
                       echo "SHOPIFY_STORE=${MASTER_STORE}"
                       echo "SHOPIFY_THEME_ID=${{ steps.resolve_theme_id.outputs.value }}"
