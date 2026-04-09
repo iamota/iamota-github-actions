@@ -254,6 +254,12 @@ jobs:
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
 
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  workflow_ref: ${{ github.workflow_ref }}
+                  token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
+
             - name: Resolve source theme id and store metadata
               id: source
               run: |
@@ -279,7 +285,7 @@ jobs:
                   SRC_STORE="${SRC_HOST%.myshopify.com}"
                   [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
 
-                  SCRIPT_PATH="${GITHUB_WORKSPACE}/.github/scripts/shopify/shopify-theme-id-resolve.mjs"
+                  SCRIPT_PATH="${GITHUB_WORKSPACE}/.iamota-actions/.github/scripts/shopify/shopify-theme-id-resolve.mjs"
                   if [ ! -f "${SCRIPT_PATH}" ]; then
                       echo "Required helper script not found: ${SCRIPT_PATH}"
                       exit 1
@@ -646,6 +652,12 @@ jobs:
 
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  workflow_ref: ${{ github.workflow_ref }}
+                  token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
 
             - name: Find preview theme id from marker
               id: marker
