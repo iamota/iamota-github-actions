@@ -334,6 +334,9 @@ jobs:
           THEME_CHECK_MODE: ${{ steps.theme_check_run.outputs.mode }}
           THEME_CHECK_FAIL_LEVEL: ${{ needs.resolve_inputs.outputs.theme_check_fail_level }}
           THEME_CHECK_EXIT_CODE: ${{ steps.theme_check_run.outputs.exit_code }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
           node - <<'NODE'
@@ -348,6 +351,7 @@ jobs:
           const exitCode = Number(process.env.THEME_CHECK_EXIT_CODE || "0");
           const summaryPath = process.env.GITHUB_STEP_SUMMARY || "";
           const outputPath = process.env.GITHUB_OUTPUT;
+          const runUrl = `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/actions/runs/${process.env.GITHUB_RUN_ID || ""}`;
 
           const thresholdMap = { error: 2, suggestion: 1, style: 0 };
           const severityMap = { error: 2, warning: 1, info: 0 };
@@ -430,22 +434,17 @@ jobs:
           const headline = matched.length > 0
             ? `Found ${matched.length} Theme Check offense(s) at or above \`${failLevel}\`.`
             : `No Theme Check offenses found at or above \`${failLevel}\`.`;
+          const countSummary = `Theme Check found \`${severityCounts.error}\` errors, \`${severityCounts.warning}\` warnings, \`${severityCounts.info}\` info.`;
 
           const commentLines = [
             "<!-- iamota-theme-check -->",
             "## Theme Check",
             "",
-            `${headline}`,
-            "",
-            `Mode: \`${mode}\``,
-            `Fail level: \`${failLevel}\``,
-            `CLI exit code: \`${exitCode}\``,
-            `Total offenses: \`${allOffenses.length}\``,
-            `Severity totals: error \`${severityCounts.error}\`, warning \`${severityCounts.warning}\`, info \`${severityCounts.info}\``,
+            countSummary,
           ];
 
           if (matched.length > 0) {
-            commentLines.push("", `### Failures (${Math.min(matched.length, 50)} shown)`, "");
+            commentLines.push("", "<details>", `<summary>Failures (${Math.min(matched.length, 50)} shown of ${matched.length})</summary>`, "");
             for (const offense of matched.slice(0, 50)) {
               const location = offense.startRow > 0
                 ? `:${offense.startRow}${offense.startColumn > 0 ? `:${offense.startColumn}` : ""}`
@@ -455,6 +454,7 @@ jobs:
             if (matched.length > 50) {
               commentLines.push("", `_Additional offenses omitted: ${matched.length - 50}_`);
             }
+            commentLines.push("", "</details>");
           } else {
             commentLines.push("", "No blocking Theme Check findings to report for this run.");
           }
@@ -473,6 +473,8 @@ jobs:
             commentLines.push("", "</details>");
           }
 
+          commentLines.push("", `Full Theme Check logs: ${runUrl}`);
+
           const stderrRaw = fs.existsSync(stderrPath) ? fs.readFileSync(stderrPath, "utf8").trim() : "";
           if (stderrRaw) {
             commentLines.push("", "<details>", "<summary>Theme Check stderr</summary>", "", "```text");
@@ -486,11 +488,7 @@ jobs:
           const summaryLines = [
             "## Theme Check",
             "",
-            headline,
-            "",
-            `Mode: \`${mode}\``,
-            `Fail level: \`${failLevel}\``,
-            `CLI exit code: \`${exitCode}\``,
+            countSummary,
           ];
           if (matched.length > 0) {
             summaryLines.push("", `Top failures (${Math.min(matched.length, 20)} shown):`, "");
