@@ -255,10 +255,26 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
 
             - name: Checkout helper scripts
+              id: helper_checkout
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
                   workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Verify helper checkout
+              run: |
+                  set -euo pipefail
+                  echo "Helper checkout ref: ${{ steps.helper_checkout.outputs.ref }}"
+                  echo "Workspace: ${GITHUB_WORKSPACE}"
+                  if [ -d "${GITHUB_WORKSPACE}/.iamota-actions" ]; then
+                      git -C "${GITHUB_WORKSPACE}/.iamota-actions" rev-parse HEAD || true
+                      find "${GITHUB_WORKSPACE}/.iamota-actions/.github/scripts" -maxdepth 3 -type f | sort || true
+                  else
+                      echo ".iamota-actions directory is missing after helper checkout."
+                      ls -la "${GITHUB_WORKSPACE}" || true
+                      exit 1
+                  fi
 
             - name: Resolve source theme id and store metadata
               id: source
@@ -287,6 +303,11 @@ jobs:
 
                   SCRIPT_PATH="${GITHUB_WORKSPACE}/.iamota-actions/.github/scripts/shopify/shopify-theme-id-resolve.mjs"
                   if [ ! -f "${SCRIPT_PATH}" ]; then
+                      echo "Helper checkout ref: ${{ steps.helper_checkout.outputs.ref }}"
+                      echo "Workspace: ${GITHUB_WORKSPACE}"
+                      ls -la "${GITHUB_WORKSPACE}" || true
+                      ls -la "${GITHUB_WORKSPACE}/.iamota-actions" || true
+                      find "${GITHUB_WORKSPACE}/.iamota-actions/.github/scripts" -maxdepth 3 -type f | sort || true
                       echo "Required helper script not found: ${SCRIPT_PATH}"
                       exit 1
                   fi
@@ -654,10 +675,26 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
 
             - name: Checkout helper scripts
+              id: helper_checkout
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
                   workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Verify helper checkout
+              run: |
+                  set -euo pipefail
+                  echo "Helper checkout ref: ${{ steps.helper_checkout.outputs.ref }}"
+                  echo "Workspace: ${GITHUB_WORKSPACE}"
+                  if [ -d "${GITHUB_WORKSPACE}/.iamota-actions" ]; then
+                      git -C "${GITHUB_WORKSPACE}/.iamota-actions" rev-parse HEAD || true
+                      find "${GITHUB_WORKSPACE}/.iamota-actions/.github/scripts" -maxdepth 3 -type f | sort || true
+                  else
+                      echo ".iamota-actions directory is missing after helper checkout."
+                      ls -la "${GITHUB_WORKSPACE}" || true
+                      exit 1
+                  fi
 
             - name: Find preview theme id from marker
               id: marker
