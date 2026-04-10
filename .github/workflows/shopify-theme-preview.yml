@@ -7,6 +7,10 @@ on:
                 type: string
                 required: false
                 default: "production"
+            non_preview_branches:
+                type: string
+                required: false
+                default: '["dev","production","prod","main","master"]'
             theme_root:
                 type: string
                 required: false
@@ -82,18 +86,61 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             matrix_json: ${{ steps.stores.outputs.matrix_json }}
+            skip_preview: ${{ steps.branch_policy.outputs.skip_preview }}
         steps:
             - id: stores
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
+            - id: branch_policy
+              env:
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+                  PRODUCTION_BRANCH: ${{ inputs.production_branch }}
+                  NON_PREVIEW_BRANCHES: ${{ inputs.non_preview_branches }}
+              run: |
+                  set -euo pipefail
+                  SKIP_PREVIEW="$(
+                      node - <<'NODE'
+                      const head = String(process.env.HEAD_REF || "").trim().toLowerCase();
+                      const productionBranch = String(process.env.PRODUCTION_BRANCH || "").trim().toLowerCase();
+                      const raw = String(process.env.NON_PREVIEW_BRANCHES || "").trim();
+
+                      function globToRegExp(glob) {
+                        const escaped = String(glob)
+                          .replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
+                          .replace(/\*/g, ".*");
+                        return new RegExp(`^${escaped}$`);
+                      }
+
+                      let branches = [];
+                      try {
+                        branches = raw ? JSON.parse(raw) : [];
+                      } catch {
+                        throw new Error(`Invalid non_preview_branches JSON array: ${raw}`);
+                      }
+
+                      if (!Array.isArray(branches) || !branches.every((x) => typeof x === "string")) {
+                        throw new Error("non_preview_branches must be a JSON array of strings");
+                      }
+
+                      const blocked = new Set(
+                        [...branches, productionBranch]
+                          .map((x) => String(x || "").trim().toLowerCase())
+                          .filter(Boolean)
+                      );
+
+                      const skip = [...blocked].some((pattern) => globToRegExp(pattern).test(head));
+                      process.stdout.write(skip ? "true" : "false");
+                      NODE
+                  )"
+                  echo "skip_preview=${SKIP_PREVIEW}" >> "$GITHUB_OUTPUT"
 
     shopify_theme_preview:
         needs: [resolve_targets]
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main'
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.resolve_targets.outputs.skip_preview != 'true'
         runs-on: ubuntu-latest
         env:
             TARGET_STORE                          : ${{ matrix.store }}
@@ -625,7 +672,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
-        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.ref != inputs.production_branch && github.event.pull_request.base.ref != inputs.production_branch && github.event.pull_request.head.ref != 'main' && github.event.pull_request.base.ref != 'main'
+        if: github.event_name == 'pull_request' && github.event.action == 'closed' && needs.resolve_targets.outputs.skip_preview != 'true'
         runs-on: ubuntu-latest
         env:
             TARGET_STORE                          : ${{ matrix.store }}
