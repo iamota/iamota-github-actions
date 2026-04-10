@@ -206,6 +206,16 @@ jobs:
                   raw_named: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_NAMED }}
                   raw_indexed: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED }}
 
+            - name: Debug resolved Shopify token source
+              run: |
+                  set -euo pipefail
+                  echo "shopify token source=${{ steps.resolve_shopify_theme_access_token.outputs.source }}"
+                  if [ -n "${{ steps.resolve_shopify_theme_access_token.outputs.value }}" ]; then
+                      echo "shopify token resolved=yes"
+                  else
+                      echo "shopify token resolved=no"
+                  fi
+
             - name: Resolve store-scoped values
               env:
                   RESOLVED_AWS_ACCESS_KEY_ID: ${{ steps.resolve_aws_access_key_id.outputs.value }}
