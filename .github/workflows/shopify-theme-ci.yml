@@ -208,6 +208,25 @@ jobs:
 
       - id: out
         run: |
+          RAW_THEME_CHECK_FAIL_LEVEL="${{ steps.resolve_theme_check_fail_level.outputs.value }}"
+          NORMALIZED_THEME_CHECK_FAIL_LEVEL="$(printf '%s' "${RAW_THEME_CHECK_FAIL_LEVEL}" | tr '[:upper:]' '[:lower:]')"
+          case "${NORMALIZED_THEME_CHECK_FAIL_LEVEL}" in
+            "")
+              NORMALIZED_THEME_CHECK_FAIL_LEVEL="error"
+              ;;
+            error|suggestion|style)
+              ;;
+            warning)
+              NORMALIZED_THEME_CHECK_FAIL_LEVEL="suggestion"
+              ;;
+            info)
+              NORMALIZED_THEME_CHECK_FAIL_LEVEL="style"
+              ;;
+            *)
+              echo "Unsupported theme_check_fail_level: ${RAW_THEME_CHECK_FAIL_LEVEL}. Expected one of: error, warning, info, suggestion, style."
+              exit 1
+              ;;
+          esac
           {
             echo "theme_root=${{ steps.resolve_theme_root.outputs.value != '' && steps.resolve_theme_root.outputs.value || '.' }}"
             echo "theme_src=${{ steps.resolve_theme_src.outputs.value }}"
@@ -217,7 +236,7 @@ jobs:
             echo "shopify_theme_id=${{ steps.resolve_shopify_theme_id.outputs.value }}"
             echo "lighthouse_align_with_production_json=${{ steps.resolve_lighthouse_align.outputs.value != '' && steps.resolve_lighthouse_align.outputs.value || 'false' }}"
             echo "run_theme_check=${{ steps.resolve_run_theme_check.outputs.value != '' && steps.resolve_run_theme_check.outputs.value || 'true' }}"
-            echo "theme_check_fail_level=${{ steps.resolve_theme_check_fail_level.outputs.value != '' && steps.resolve_theme_check_fail_level.outputs.value || 'error' }}"
+            echo "theme_check_fail_level=${NORMALIZED_THEME_CHECK_FAIL_LEVEL}"
             echo "theme_check_config_path=${{ steps.resolve_theme_check_config_path.outputs.value }}"
             echo "theme_check_verbose=${{ steps.resolve_theme_check_verbose.outputs.value != '' && steps.resolve_theme_check_verbose.outputs.value || 'false' }}"
             echo "theme_check_auto_correct=${{ steps.resolve_theme_check_auto_correct.outputs.value != '' && steps.resolve_theme_check_auto_correct.outputs.value || 'false' }}"
@@ -372,7 +391,7 @@ jobs:
           const runUrl = `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/actions/runs/${process.env.GITHUB_RUN_ID || ""}`;
           const fileLinkRef = process.env.FILE_LINK_REF || "";
 
-          const thresholdMap = { error: 2, suggestion: 1, style: 0 };
+          const thresholdMap = { error: 2, warning: 1, suggestion: 1, info: 0, style: 0 };
           const severityMap = { error: 2, warning: 1, info: 0 };
           const threshold = Object.prototype.hasOwnProperty.call(thresholdMap, failLevel) ? thresholdMap[failLevel] : 2;
 

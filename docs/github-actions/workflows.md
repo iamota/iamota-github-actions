@@ -103,6 +103,7 @@ Inputs:
 - Lighthouse mode: `lighthouse_align_with_production_json`
 - Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_lighthouse`
 - Theme check tuning: `theme_check_fail_level`, `theme_check_config_path`, `theme_check_verbose`, `theme_check_auto_correct`
+  `theme_check_fail_level` accepts Shopify values `error|suggestion|style` and aliases `warning->suggestion`, `info->style`.
 
 Secrets:
 
