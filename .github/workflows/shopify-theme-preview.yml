@@ -206,16 +206,6 @@ jobs:
                   raw_named: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_NAMED }}
                   raw_indexed: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN_INDEXED }}
 
-            - name: Debug resolved Shopify token source
-              run: |
-                  set -euo pipefail
-                  echo "shopify token source=${{ steps.resolve_shopify_theme_access_token.outputs.source }}"
-                  if [ -n "${{ steps.resolve_shopify_theme_access_token.outputs.value }}" ]; then
-                      echo "shopify token resolved=yes"
-                  else
-                      echo "shopify token resolved=no"
-                  fi
-
             - name: Resolve store-scoped values
               env:
                   RESOLVED_AWS_ACCESS_KEY_ID: ${{ steps.resolve_aws_access_key_id.outputs.value }}
@@ -351,7 +341,7 @@ jobs:
                   SRC_HOST="${SRC_HOST#http://}"
                   SRC_HOST="${SRC_HOST%%/*}"
                   [ -n "${SRC_HOST}" ] || SRC_HOST="unknown-store.myshopify.com"
-                  if ! echo "${SRC_HOST}" | grep -q '\\.'; then
+                  if ! echo "${SRC_HOST}" | grep -q '\.'; then
                       SRC_HOST="${SRC_HOST}.myshopify.com"
                   fi
                   SRC_STORE="${SRC_HOST%.myshopify.com}"
@@ -666,15 +656,125 @@ jobs:
                     echo "EOF"
                   } >> "$GITHUB_OUTPUT"
 
-            - name: Sync PR comment marker
+            - name: Write preview summary payload
+              env:
+                  RESULT_MARKER: ${{ env.PREVIEW_MARKER }}
+                  RESULT_STORE_SLUG: ${{ steps.source.outputs.source_store_slug }}
+                  RESULT_STORE_HOST: ${{ steps.source.outputs.source_store_host }}
+                  RESULT_PREVIEW_THEME_NAME: ${{ steps.comment_meta.outputs.preview_theme_name }}
+                  RESULT_PREVIEW_THEME_ID: ${{ steps.finaltheme.outputs.theme_id }}
+                  RESULT_PREVIEW_URL: ${{ steps.push.outputs.preview_url }}
+                  RESULT_BASE_THEME_ID: ${{ steps.source.outputs.source_theme_id }}
+                  RESULT_SYNC_AT: ${{ steps.comment_meta.outputs.sync_at }}
+              run: |
+                  set -euo pipefail
+                  mkdir -p preview-summary
+                  node - <<'NODE'
+                  const fs = require("node:fs");
+
+                  const payload = {
+                    marker: process.env.RESULT_MARKER || "",
+                    store_slug: process.env.RESULT_STORE_SLUG || "",
+                    store_host: process.env.RESULT_STORE_HOST || "",
+                    preview_theme_name: process.env.RESULT_PREVIEW_THEME_NAME || "",
+                    preview_theme_id: process.env.RESULT_PREVIEW_THEME_ID || "",
+                    preview_url: process.env.RESULT_PREVIEW_URL || "",
+                    base_theme_id: process.env.RESULT_BASE_THEME_ID || "",
+                    sync_at: process.env.RESULT_SYNC_AT || "",
+                  };
+
+                  fs.writeFileSync(
+                    `preview-summary/${process.env.TARGET_STORE_SLUG}.json`,
+                    `${JSON.stringify(payload, null, 2)}\n`
+                  );
+                  NODE
+
+            - name: Upload preview summary payload
+              uses: actions/upload-artifact@v7
+              with:
+                  name: shopify-preview-summary-${{ env.TARGET_STORE_SLUG }}
+                  path: preview-summary/${{ env.TARGET_STORE_SLUG }}.json
+                  if-no-files-found: error
+
+    shopify_theme_preview_summary:
+        needs: [resolve_targets, shopify_theme_preview]
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.resolve_targets.outputs.skip_preview != 'true' && needs.shopify_theme_preview.result == 'success'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout helper scripts
+              id: helper_checkout
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Download preview summary payloads
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: shopify-preview-summary-*
+                  path: preview-summary
+                  merge-multiple: true
+
+            - name: Build preview summary comment body
+              id: summary_comment
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  node - <<'NODE' > preview-summary/body.md
+                  const fs = require("node:fs");
+                  const path = require("node:path");
+
+                  const dir = path.join(process.cwd(), "preview-summary");
+                  const files = fs.readdirSync(dir).filter((name) => name.endsWith(".json")).sort();
+                  const rows = files.map((name) => JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")));
+
+                  const lines = [];
+                  lines.push("<!-- iamota-shopify-preview-summary -->");
+                  for (const row of rows) {
+                    lines.push(`<!-- ${row.marker}:theme_id=${String(row.preview_theme_id || "").replace(/\D/g, "")} -->`);
+                  }
+                  lines.push("");
+                  lines.push("# Preview Themes");
+                  lines.push("");
+
+                  for (const row of rows) {
+                    const storeHost = String(row.store_host || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
+                    const storeSlug = String(row.store_slug || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
+                    const previewThemeId = String(row.preview_theme_id || "").replace(/\D/g, "") || "UNKNOWN_PREVIEW_THEME_ID";
+                    const baseThemeId = String(row.base_theme_id || "").replace(/\D/g, "") || "UNKNOWN_BASE_THEME_ID";
+                    const previewThemeName = row.preview_theme_name || "Preview Theme";
+                    const previewUrl = row.preview_url || "#";
+                    const syncAt = row.sync_at || "unknown-time";
+                    const adminStoreSlug = storeSlug.includes(".") ? storeSlug.split(".")[0] : storeSlug;
+                    const customizerUrl = `https://admin.shopify.com/store/${adminStoreSlug}/themes/${previewThemeId}/editor`;
+                    const editCodeUrl = `https://admin.shopify.com/store/${adminStoreSlug}/themes/${previewThemeId}`;
+                    const baseUrl = storeHost && baseThemeId !== "UNKNOWN_BASE_THEME_ID"
+                      ? `https://${storeHost}?preview_theme_id=${baseThemeId}`
+                      : "";
+                    const baseThemeRef = baseUrl ? `[base theme](${baseUrl}) (${baseThemeId})` : `base theme (${baseThemeId})`;
+
+                    lines.push(`- **[${previewThemeName}](${previewUrl})** (${previewThemeId}) - [[Preview](${previewUrl}) | [Customizer](${customizerUrl}) | [Edit Code](${editCodeUrl})]`);
+                    lines.push(`  Generated a Shopify preview theme on [${storeHost}](https://${storeHost}/admin) using the latest JSON content from ${baseThemeRef} @ ${syncAt}`);
+                    lines.push("");
+                  }
+
+                  process.stdout.write(lines.join("\n"));
+                  NODE
+                  {
+                    echo "body<<EOF"
+                    cat preview-summary/body.md
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Sync preview summary PR comment marker
               env:
                   GH_TOKEN: ${{ github.token }}
               uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@v1
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
-                  marker: ${{ env.PREVIEW_MARKER }}
-                  body: ${{ steps.preview_comment.outputs.body }}
+                  marker: iamota-shopify-preview-summary
+                  body: ${{ steps.summary_comment.outputs.body }}
                   refresh_after_comments: "75"
 
     shopify_theme_preview_cleanup:

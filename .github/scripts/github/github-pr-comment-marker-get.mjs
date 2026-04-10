@@ -1,4 +1,4 @@
-import { countNewerComments, extractByRegex, findLatestMarkerComment, listPrComments } from "./github-pr-comment-lib.mjs";
+import { countNewerComments, extractByRegexForMarker, findLatestMarkerComment, listPrComments } from "./github-pr-comment-lib.mjs";
 
 function arg(name) {
     const idx = process.argv.indexOf(name);
@@ -57,14 +57,14 @@ async function main() {
 
     process.stdout.write(
         JSON.stringify(
-            {
-                found: true,
-                comment_id: markerComment?.id || "",
-                extracted_value: extractByRegex(body, extractRegex),
-                newer_comment_count: newerCount,
-                should_refresh: shouldRefresh,
-                body: includeBody ? body : "",
-            },
+                {
+                    found: true,
+                    comment_id: markerComment?.id || "",
+                    extracted_value: extractByRegexForMarker(body, marker, extractRegex),
+                    newer_comment_count: newerCount,
+                    should_refresh: shouldRefresh,
+                    body: includeBody ? body : "",
+                },
             null,
             2
         )

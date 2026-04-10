@@ -53,6 +53,16 @@ export function extractByRegex(body, regexPattern) {
     return m[1] || m[0] || "";
 }
 
+export function extractByRegexForMarker(body, marker, regexPattern) {
+    if (!regexPattern) return "";
+    const text = String(body || "");
+    const line = text
+        .split(/\r?\n/)
+        .find((entry) => markerMatches(entry, marker));
+
+    return extractByRegex(line || text, regexPattern);
+}
+
 export async function syncMarkerComment({ repo, prNumber, marker, body, token, refreshAfterComments = 0 }) {
     const comments = await listPrComments(repo, prNumber, token);
     const existing = findLatestMarkerComment(comments, marker);
