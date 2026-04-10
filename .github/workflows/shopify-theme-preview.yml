@@ -753,8 +753,8 @@ jobs:
                       : "";
                     const baseThemeRef = baseUrl ? `[base theme](${baseUrl}) (${baseThemeId})` : `base theme (${baseThemeId})`;
 
-                    lines.push(`- **[${previewThemeName}](${previewUrl})** (${previewThemeId}) - [[Preview](${previewUrl}) | [Customizer](${customizerUrl}) | [Edit Code](${editCodeUrl})]`);
-                    lines.push(`  Generated a Shopify preview theme on [${storeHost}](https://${storeHost}/admin) using the latest JSON content from ${baseThemeRef} @ ${syncAt}`);
+                    lines.push(`- **[${storeSlug}](${previewUrl})** (${previewThemeId}) - [[Preview](${previewUrl}) | [Customizer](${customizerUrl}) | [Edit Code](${editCodeUrl})]`);
+                    lines.push(`  <sub>Generated Shopify preview theme **[${previewThemeName}](${previewUrl})** on [${storeHost}](https://${storeHost}/admin) using the latest JSON content from ${baseThemeRef} @ ${syncAt}</sub>`);
                     lines.push("");
                   }
 
