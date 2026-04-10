@@ -11,7 +11,7 @@ function normalizeStore(v) {
 function toSecretKey(v) {
     const slug = normalizeStore(v).replace(/\.myshopify\.com$/i, "");
     if (!slug) return "";
-    return slug.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    return slug.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toUpperCase();
 }
 
 function parseStores(raw) {
