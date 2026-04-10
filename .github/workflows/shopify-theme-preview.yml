@@ -258,7 +258,6 @@ jobs:
               id: helper_checkout
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
-                  workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
@@ -678,7 +677,6 @@ jobs:
               id: helper_checkout
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
-                  workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 

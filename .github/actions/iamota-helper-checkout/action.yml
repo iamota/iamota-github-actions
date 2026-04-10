@@ -22,11 +22,30 @@ inputs:
 outputs:
     ref:
         description: "Resolved git ref"
-        value: ${{ steps.resolve.outputs.ref }}
+        value: ${{ steps.stage_local.outputs.ref != '' && steps.stage_local.outputs.ref || steps.resolve.outputs.ref }}
 runs:
     using: "composite"
     steps:
+        - id: stage_local
+          run: |
+              set -euo pipefail
+              REPOSITORY_IN="${{ inputs.repository }}"
+              DEST="${{ inputs.path }}"
+              SCRIPTS_SRC="${GITHUB_ACTION_PATH}/../../scripts"
+
+              if [ -n "${GITHUB_ACTION_PATH:-}" ] && [ -d "${SCRIPTS_SRC}" ] && { [ -z "${GITHUB_ACTION_REPOSITORY:-}" ] || [ "${GITHUB_ACTION_REPOSITORY}" = "${REPOSITORY_IN}" ]; }; then
+                  rm -rf "${DEST}"
+                  mkdir -p "${DEST}/.github"
+                  cp -a "${SCRIPTS_SRC}" "${DEST}/.github/scripts"
+                  echo "ref=${GITHUB_ACTION_REF:-bundled}" >> "$GITHUB_OUTPUT"
+                  echo "used_local_bundle=true" >> "$GITHUB_OUTPUT"
+              else
+                  echo "used_local_bundle=false" >> "$GITHUB_OUTPUT"
+              fi
+          shell: bash
+
         - id: resolve
+          if: steps.stage_local.outputs.used_local_bundle != 'true'
           run: |
               set -euo pipefail
               REF_IN="${{ inputs.ref }}"
@@ -49,7 +68,7 @@ runs:
               fi
           shell: bash
 
-        - if: ${{ inputs.token != '' }}
+        - if: ${{ steps.stage_local.outputs.used_local_bundle != 'true' && inputs.token != '' }}
           uses: actions/checkout@v5
           with:
               repository: ${{ inputs.repository }}
@@ -57,7 +76,7 @@ runs:
               token: ${{ inputs.token }}
               path: ${{ inputs.path }}
 
-        - if: ${{ inputs.token == '' }}
+        - if: ${{ steps.stage_local.outputs.used_local_bundle != 'true' && inputs.token == '' }}
           uses: actions/checkout@v5
           with:
               repository: ${{ inputs.repository }}

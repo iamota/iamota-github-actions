@@ -25,7 +25,6 @@ jobs:
             - name: Checkout helper scripts
               uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
               with:
-                  workflow_ref: ${{ github.workflow_ref }}
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
 
