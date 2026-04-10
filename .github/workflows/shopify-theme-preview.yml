@@ -426,7 +426,7 @@ jobs:
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
               uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@v1
               with:
-                  name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}
+                  name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}-${{ env.TARGET_STORE_SLUG }}
                   path: ${{ env.PREVIEW_BACKUP_ZIP }}
 
             - name: Create preview theme (duplicate base) if missing
