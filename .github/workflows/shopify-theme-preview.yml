@@ -100,7 +100,7 @@ jobs:
               run: |
                   set -euo pipefail
                   SKIP_PREVIEW="$(
-                      node - <<'NODE'
+                      node -e '
                       const head = String(process.env.HEAD_REF || "").trim().toLowerCase();
                       const productionBranch = String(process.env.PRODUCTION_BRANCH || "").trim().toLowerCase();
                       const raw = String(process.env.NON_PREVIEW_BRANCHES || "").trim();
@@ -131,7 +131,7 @@ jobs:
 
                       const skip = [...blocked].some((pattern) => globToRegExp(pattern).test(head));
                       process.stdout.write(skip ? "true" : "false");
-                      NODE
+                      '
                   )"
                   echo "skip_preview=${SKIP_PREVIEW}" >> "$GITHUB_OUTPUT"
 
