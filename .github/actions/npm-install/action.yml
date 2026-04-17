@@ -52,6 +52,15 @@ runs:
                   echo "package.json found but no lockfile; falling back from 'npm ci' to 'npm install'."
                   bash -lc "npm install"
                 else
+                  if [[ "${CMD}" =~ ^[[:space:]]*npm[[:space:]]+ci([[:space:]]|$) ]]; then
+                    if [ -f "package-lock.json" ]; then
+                      echo "package-lock.json found; running 'npm ci'."
+                    elif [ -f "npm-shrinkwrap.json" ]; then
+                      echo "npm-shrinkwrap.json found; running 'npm ci'."
+                    fi
+                  else
+                    echo "Running install command: ${CMD}"
+                  fi
                   bash -lc "${CMD}"
                 fi
               )

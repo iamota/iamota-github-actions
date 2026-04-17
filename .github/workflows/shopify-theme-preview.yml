@@ -167,6 +167,36 @@ jobs:
                   fi
                   echo "theme_root_effective=${ROOT}" >> "$GITHUB_OUTPUT"
 
+            - name: Resolve npm cache dependency path
+              id: npm_cache
+              env:
+                  THEME_ROOT_EFFECTIVE: ${{ steps.inputs.outputs.theme_root_effective }}
+              run: |
+                  set -euo pipefail
+                  ROOT="${THEME_ROOT_EFFECTIVE}"
+                  if [ -f "${ROOT}/package-lock.json" ]; then
+                      {
+                          echo "enabled=true"
+                          echo "dependency_path=${ROOT}/package-lock.json"
+                      } >> "$GITHUB_OUTPUT"
+                  elif [ -f "${ROOT}/npm-shrinkwrap.json" ]; then
+                      {
+                          echo "enabled=true"
+                          echo "dependency_path=${ROOT}/npm-shrinkwrap.json"
+                      } >> "$GITHUB_OUTPUT"
+                  else
+                      echo "enabled=false" >> "$GITHUB_OUTPUT"
+                      echo "No npm lockfile found for cache restore under ${ROOT}; skipping npm cache."
+                  fi
+
+            - name: Setup Node with npm cache
+              if: steps.npm_cache.outputs.enabled == 'true'
+              uses: actions/setup-node@v5
+              with:
+                  node-version: "20"
+                  cache: npm
+                  cache-dependency-path: ${{ steps.npm_cache.outputs.dependency_path }}
+
             - name: Resolve build install command
               id: resolve_build_install
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
