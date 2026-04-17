@@ -246,9 +246,91 @@ jobs:
             echo "run_prepare=${{ steps.resolve_run_prepare.outputs.value != '' && steps.resolve_run_prepare.outputs.value || 'true' }}"
           } >> "$GITHUB_OUTPUT"
 
+  install_dependencies:
+    needs: [resolve_inputs]
+    runs-on: ubuntu-latest
+    outputs:
+      theme_root_effective: ${{ steps.inputs.outputs.theme_root_effective }}
+      theme_src_effective: ${{ steps.inputs.outputs.theme_src_effective }}
+      npm_install_ran: ${{ steps.npm.outputs.ran }}
+      install_artifact_name: ${{ steps.meta.outputs.artifact_name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: inputs
+        run: |
+          set -euo pipefail
+          ROOT="${{ needs.resolve_inputs.outputs.theme_root }}"
+          SRC="${{ needs.resolve_inputs.outputs.theme_src }}"
+
+          if [ -z "${ROOT}" ]; then
+            ROOT="."
+          fi
+
+          if [ -z "${SRC}" ]; then
+            if [ "${ROOT}" != "." ]; then
+              SRC="${ROOT}"
+            elif [ -d "./src" ]; then
+              SRC="./src"
+            else
+              SRC="."
+            fi
+          fi
+
+          if [ ! -d "${ROOT}" ]; then
+            echo "THEME_ROOT directory not found: ${ROOT}"
+            exit 1
+          fi
+
+          if [ ! -d "${SRC}" ]; then
+            echo "THEME_SRC directory not found: ${SRC}"
+            exit 1
+          fi
+
+          {
+            echo "theme_root_effective=${ROOT}"
+            echo "theme_src_effective=${SRC}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: NPM install (self-aware)
+        id: npm
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+        with:
+          working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
+          install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
+          if_package_json: "1"
+
+      - name: Pack installed dependencies
+        if: steps.npm.outputs.ran == 'true'
+        env:
+          THEME_ROOT_EFFECTIVE: ${{ steps.inputs.outputs.theme_root_effective }}
+        run: |
+          set -euo pipefail
+          ROOT="${THEME_ROOT_EFFECTIVE}"
+          mkdir -p _ci_artifacts
+
+          if [ ! -d "${ROOT}/node_modules" ]; then
+            echo "Expected node_modules after install, but none was found at ${ROOT}/node_modules"
+            exit 1
+          fi
+
+          tar -C "${ROOT}" -czf _ci_artifacts/node-modules.tgz node_modules
+
+      - id: meta
+        run: |
+          echo "artifact_name=shopify-theme-ci-node-modules" >> "$GITHUB_OUTPUT"
+
+      - name: Upload installed dependencies
+        if: steps.npm.outputs.ran == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: _ci_artifacts/node-modules.tgz
+          if-no-files-found: error
+
   prepare:
     if: needs.resolve_inputs.outputs.run_prepare == 'true'
-    needs: [resolve_inputs]
+    needs: [resolve_inputs, install_dependencies]
     runs-on: ubuntu-latest
     outputs:
       theme_root   : ${{ steps.root.outputs.theme_dist_effective }}
@@ -258,15 +340,88 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Prepare theme (install + build + resolve dist)
-        id: root
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@v1
+      - name: Download installed dependencies
+        if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+        uses: actions/download-artifact@v8
         with:
-          theme_root           : ${{ needs.resolve_inputs.outputs.theme_root }}
-          theme_src            : ${{ needs.resolve_inputs.outputs.theme_src }}
-          theme_dist           : ${{ needs.resolve_inputs.outputs.theme_dist }}
-          build_install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
-          build_command        : ${{ needs.resolve_inputs.outputs.build_command }}
+          name: ${{ needs.install_dependencies.outputs.install_artifact_name }}
+          path: _ci_artifacts
+
+      - name: Restore installed dependencies
+        if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+        env:
+          THEME_ROOT_EFFECTIVE: ${{ needs.install_dependencies.outputs.theme_root_effective }}
+        run: |
+          set -euo pipefail
+          ROOT="${THEME_ROOT_EFFECTIVE}"
+          mkdir -p "${ROOT}"
+          tar -C "${ROOT}" -xzf _ci_artifacts/node-modules.tgz
+
+      - id: root_inputs
+        run: |
+          set -euo pipefail
+          ROOT="${{ needs.install_dependencies.outputs.theme_root_effective }}"
+          SRC="${{ needs.install_dependencies.outputs.theme_src_effective }}"
+          DIST_IN="${{ needs.resolve_inputs.outputs.theme_dist }}"
+
+          if [ -z "${ROOT}" ]; then
+            ROOT="."
+          fi
+
+          if [ -z "${SRC}" ]; then
+            if [ "${ROOT}" != "." ]; then
+              SRC="${ROOT}"
+            elif [ -d "./src" ]; then
+              SRC="./src"
+            else
+              SRC="."
+            fi
+          fi
+
+          {
+            echo "theme_root_effective=${ROOT}"
+            echo "theme_src_effective=${SRC}"
+            echo "dist_input=${DIST_IN}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build theme when webpack is configured
+        id: webpack
+        uses: iamota/iamota-github-actions/.github/actions/webpack-build@v1
+        with:
+          working_directory: ${{ steps.root_inputs.outputs.theme_root_effective }}
+          build_command: ${{ needs.resolve_inputs.outputs.build_command }}
+          if_webpack_config: "1"
+
+      - name: Resolve effective theme output path
+        id: root
+        run: |
+          set -euo pipefail
+          DIST="${{ steps.root_inputs.outputs.dist_input }}"
+          ROOT="${{ steps.root_inputs.outputs.theme_root_effective }}"
+          SRC="${{ steps.root_inputs.outputs.theme_src_effective }}"
+
+          if [ -z "${DIST}" ]; then
+            if [ "${{ steps.webpack.outputs.ran }}" = "true" ]; then
+              if [ "${ROOT}" = "." ]; then
+                DIST="./dist"
+              else
+                DIST="${ROOT}/dist"
+              fi
+            else
+              DIST="${SRC}"
+            fi
+          fi
+
+          if [ ! -d "${DIST}" ]; then
+            echo "Resolved theme output path not found: ${DIST}"
+            exit 1
+          fi
+
+          {
+            echo "theme_root_effective=${ROOT}"
+            echo "theme_src_effective=${SRC}"
+            echo "theme_dist_effective=${DIST}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set artifact name
         id: meta
@@ -633,22 +788,32 @@ jobs:
 
   lint:
     if: needs.resolve_inputs.outputs.run_lint == 'true'
-    needs: [resolve_inputs]
+    needs: [resolve_inputs, install_dependencies]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: NPM install (self-aware)
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+      - name: Download installed dependencies
+        if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+        uses: actions/download-artifact@v8
         with:
-          working_directory: ${{ needs.resolve_inputs.outputs.theme_root }}
-          install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
-          if_package_json: "1"
+          name: ${{ needs.install_dependencies.outputs.install_artifact_name }}
+          path: _ci_artifacts
+
+      - name: Restore installed dependencies
+        if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+        env:
+          THEME_ROOT_EFFECTIVE: ${{ needs.install_dependencies.outputs.theme_root_effective }}
+        run: |
+          set -euo pipefail
+          ROOT="${THEME_ROOT_EFFECTIVE}"
+          mkdir -p "${ROOT}"
+          tar -C "${ROOT}" -xzf _ci_artifacts/node-modules.tgz
 
       - name: Run lint script when available
         run: |
           set -euo pipefail
-          ROOT="${{ needs.resolve_inputs.outputs.theme_root }}"
+          ROOT="${{ needs.install_dependencies.outputs.theme_root_effective }}"
           if [ -z "${ROOT}" ]; then
             ROOT="."
           fi
@@ -672,17 +837,27 @@ jobs:
 
   test:
     if: needs.resolve_inputs.outputs.run_test == 'true'
-    needs: [resolve_inputs, prepare]
+    needs: [resolve_inputs, install_dependencies, prepare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: NPM install (self-aware)
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+      - name: Download installed dependencies
+        if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+        uses: actions/download-artifact@v8
         with:
-          working_directory: ${{ needs.resolve_inputs.outputs.theme_root }}
-          install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
-          if_package_json: "1"
+          name: ${{ needs.install_dependencies.outputs.install_artifact_name }}
+          path: _ci_artifacts
+
+      - name: Restore installed dependencies
+        if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+        env:
+          THEME_ROOT_EFFECTIVE: ${{ needs.install_dependencies.outputs.theme_root_effective }}
+        run: |
+          set -euo pipefail
+          ROOT="${THEME_ROOT_EFFECTIVE}"
+          mkdir -p "${ROOT}"
+          tar -C "${ROOT}" -xzf _ci_artifacts/node-modules.tgz
 
       - name: Download prepared theme root
         uses: actions/download-artifact@v8
@@ -696,7 +871,7 @@ jobs:
           THEME_DIST: ${{ github.workspace }}/_ci_theme_root
         run: |
           set -euo pipefail
-          ROOT="${{ needs.resolve_inputs.outputs.theme_root }}"
+          ROOT="${{ needs.install_dependencies.outputs.theme_root_effective }}"
           if [ -z "${ROOT}" ]; then
             ROOT="."
           fi

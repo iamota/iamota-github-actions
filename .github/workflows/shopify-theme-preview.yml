@@ -86,6 +86,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             matrix_json: ${{ steps.stores.outputs.matrix_json }}
+            first_store: ${{ steps.stores.outputs.first_store }}
             skip_preview: ${{ steps.branch_policy.outputs.skip_preview }}
         steps:
             - id: stores
@@ -135,8 +136,82 @@ jobs:
                   )"
                   echo "skip_preview=${SKIP_PREVIEW}" >> "$GITHUB_OUTPUT"
 
-    shopify_theme_preview:
+    install_dependencies:
         needs: [resolve_targets]
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.resolve_targets.outputs.skip_preview != 'true'
+        runs-on: ubuntu-latest
+        outputs:
+            theme_root_effective: ${{ steps.inputs.outputs.theme_root_effective }}
+            npm_install_ran: ${{ steps.npm.outputs.ran }}
+            install_artifact_name: ${{ steps.meta.outputs.artifact_name }}
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Resolve theme root path
+              id: resolve_theme_root
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ needs.resolve_targets.outputs.first_store }}
+                  raw: ${{ inputs.theme_root }}
+
+            - id: inputs
+              run: |
+                  set -euo pipefail
+                  ROOT="${{ steps.resolve_theme_root.outputs.value }}"
+                  if [ -z "${ROOT}" ]; then
+                      ROOT="."
+                  fi
+                  if [ ! -d "${ROOT}" ]; then
+                      echo "THEME_ROOT directory not found: ${ROOT}"
+                      exit 1
+                  fi
+                  echo "theme_root_effective=${ROOT}" >> "$GITHUB_OUTPUT"
+
+            - name: Resolve build install command
+              id: resolve_build_install
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ needs.resolve_targets.outputs.first_store }}
+                  raw: ${{ inputs.build_install_command }}
+
+            - name: NPM install (self-aware)
+              id: npm
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              with:
+                  working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
+                  install_command: ${{ steps.resolve_build_install.outputs.value }}
+                  if_package_json: "1"
+
+            - name: Pack installed dependencies
+              if: steps.npm.outputs.ran == 'true'
+              env:
+                  THEME_ROOT_EFFECTIVE: ${{ steps.inputs.outputs.theme_root_effective }}
+              run: |
+                  set -euo pipefail
+                  ROOT="${THEME_ROOT_EFFECTIVE}"
+                  mkdir -p _ci_artifacts
+
+                  if [ ! -d "${ROOT}/node_modules" ]; then
+                      echo "Expected node_modules after install, but none was found at ${ROOT}/node_modules"
+                      exit 1
+                  fi
+
+                  tar -C "${ROOT}" -czf _ci_artifacts/node-modules.tgz node_modules
+
+            - id: meta
+              run: |
+                  echo "artifact_name=shopify-theme-preview-node-modules" >> "$GITHUB_OUTPUT"
+
+            - name: Upload installed dependencies
+              if: steps.npm.outputs.ran == 'true'
+              uses: actions/upload-artifact@v7
+              with:
+                  name: ${{ steps.meta.outputs.artifact_name }}
+                  path: _ci_artifacts/node-modules.tgz
+                  if-no-files-found: error
+
+    shopify_theme_preview:
+        needs: [resolve_targets, install_dependencies]
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
@@ -466,6 +541,23 @@ jobs:
                   else
                       echo "nodelete=1" >> "$GITHUB_OUTPUT"
                   fi
+
+            - name: Download installed dependencies
+              if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+              uses: actions/download-artifact@v8
+              with:
+                  name: ${{ needs.install_dependencies.outputs.install_artifact_name }}
+                  path: _ci_artifacts
+
+            - name: Restore installed dependencies
+              if: needs.install_dependencies.outputs.npm_install_ran == 'true'
+              env:
+                  THEME_ROOT_EFFECTIVE: ${{ env.THEME_ROOT }}
+              run: |
+                  set -euo pipefail
+                  ROOT="${THEME_ROOT_EFFECTIVE:-.}"
+                  mkdir -p "${ROOT}"
+                  tar -C "${ROOT}" -xzf _ci_artifacts/node-modules.tgz
 
             - name: Prepare theme (install + build + resolve dist)
               id: prepare
