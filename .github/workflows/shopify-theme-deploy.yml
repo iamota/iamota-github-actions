@@ -56,6 +56,10 @@ on:
 permissions:
     contents: read
 
+concurrency:
+    group: iamota-shopify-theme-deploy-${{ github.repository }}-${{ inputs.branch || github.ref || github.run_id }}
+    cancel-in-progress: true
+
 jobs:
     resolve_targets:
         runs-on: ubuntu-latest
