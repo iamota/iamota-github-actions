@@ -30,6 +30,12 @@ jobs:
 
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+            const shouldIgnoreConflictFile = (filePath) => {
+              const normalized = String(filePath || '').replace(/\\/g, '/');
+              const fileName = normalized.split('/').pop();
+              return fileName === 'package.json' || fileName === 'package-lock.json';
+            };
+
             const parseEventFromBody = (body) => {
               if (!body) {
                 return null;
@@ -93,6 +99,15 @@ jobs:
                 .sort((a, b) => new Date(a.comment.created_at) - new Date(b.comment.created_at));
 
               return eventComments.length > 0 ? eventComments[eventComments.length - 1] : null;
+            };
+
+            const listPullFiles = async (pullNumber) => {
+              return github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: pullNumber,
+                per_page: 100
+              });
             };
 
             const createEventComment = async (pull, status, previousEvent) => {
@@ -189,11 +204,24 @@ jobs:
 
             const processPull = async (pullNumber) => {
               const pull = await getPullWithMergeability(pullNumber);
+              const pullFiles = await listPullFiles(pullNumber);
+              const relevantPullFiles = pullFiles.filter((file) => !shouldIgnoreConflictFile(file.filename));
               const hasConflicts = pull?.mergeable_state === 'dirty' || pull?.mergeable === false;
 
               const latestEventComment = await getLatestEventComment(pullNumber);
               const latestStatus = latestEventComment?.event?.status || null;
               const latestEvent = latestEventComment?.event || null;
+
+              if (relevantPullFiles.length === 0) {
+                core.info(`Skipping PR #${pullNumber}: only ignored conflict-prone files changed.`);
+
+                if (latestStatus === 'conflict') {
+                  await markConflictCommentAsResolved(latestEventComment.comment, pull);
+                  await createEventComment(pull, 'resolved', latestEvent);
+                }
+
+                return { pullNumber, hasConflicts: false };
+              }
 
               if (hasConflicts) {
                 if (latestStatus !== 'conflict') {

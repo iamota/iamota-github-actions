@@ -64,6 +64,16 @@ jobs:
                 return a.filter((x) => setB.has(x));
             }
 
+            function shouldIgnoreConflictFile(filePath) {
+                const normalized = String(filePath || '').replace(/\\/g, '/');
+                const fileName = normalized.split('/').pop();
+                return fileName === 'package.json' || fileName === 'package-lock.json';
+            }
+
+            function filterIgnoredConflictFiles(files) {
+                return (files || []).filter((file) => !shouldIgnoreConflictFile(file));
+            }
+
             // -----------------------------------------------------------------------------
             // Tunables
             // -----------------------------------------------------------------------------
@@ -281,7 +291,9 @@ jobs:
                     core.warning(`Skipping ${label}: no merge base between ${defaultRef} and ${targetRef}.`);
                     return null;
                 }
-                return uniq(lines(`git diff --name-only ${defaultRef}...${targetRef}`));
+                return filterIgnoredConflictFiles(
+                    uniq(lines(`git diff --name-only ${defaultRef}...${targetRef}`))
+                );
             }
 
             const changedFilesCache = new Map();
