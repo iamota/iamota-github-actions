@@ -322,7 +322,7 @@ jobs:
         if: steps.npm_cache.outputs.enabled == 'true'
         uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: ${{ steps.npm_cache.outputs.dependency_path }}
 
