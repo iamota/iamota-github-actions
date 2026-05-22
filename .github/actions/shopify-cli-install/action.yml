@@ -3,14 +3,14 @@ description: "Setup Node and install Shopify CLI"
 inputs:
     node_version:
         description: "Node.js version used for Shopify CLI"
-        default: "20"
+        default: "24"
     cli_version:
         description: "Shopify CLI version"
         default: "latest"
 runs:
     using: "composite"
     steps:
-        - uses: actions/setup-node@v5
+        - uses: actions/setup-node@v6
           with:
               node-version: ${{ inputs.node_version }}
 
