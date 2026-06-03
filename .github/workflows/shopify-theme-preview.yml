@@ -142,8 +142,9 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             theme_root_effective: ${{ steps.inputs.outputs.theme_root_effective }}
-            npm_install_ran: ${{ steps.npm.outputs.ran }}
-            install_artifact_name: ${{ steps.meta.outputs.artifact_name }}
+            npm_install_ran: ${{ steps.nm_cache.outputs.cache-hit == 'true' || steps.npm.outputs.ran == 'true' }}
+            node_modules_cache_key: ${{ steps.nm_cache_key.outputs.key }}
+            node_modules_cache_path: ${{ steps.nm_cache_key.outputs.path }}
         steps:
             - uses: actions/checkout@v5
 
@@ -189,8 +190,28 @@ jobs:
                       echo "No npm lockfile found for cache restore under ${ROOT}; skipping npm cache."
                   fi
 
-            - name: Setup Node with npm cache
+            - name: Compute node_modules cache key
               if: steps.npm_cache.outputs.enabled == 'true'
+              id: nm_cache_key
+              env:
+                  DEP_PATH: ${{ steps.npm_cache.outputs.dependency_path }}
+                  THEME_ROOT_EFFECTIVE: ${{ steps.inputs.outputs.theme_root_effective }}
+              run: |
+                  set -euo pipefail
+                  HASH="$(sha256sum "${DEP_PATH}" | awk '{print $1}')"
+                  echo "key=node-modules-${{ runner.os }}-shopify-theme-preview-${HASH}" >> "$GITHUB_OUTPUT"
+                  echo "path=${THEME_ROOT_EFFECTIVE}/node_modules" >> "$GITHUB_OUTPUT"
+
+            - name: Restore/save node_modules cache
+              if: steps.npm_cache.outputs.enabled == 'true'
+              id: nm_cache
+              uses: actions/cache@v4
+              with:
+                  path: ${{ steps.nm_cache_key.outputs.path }}
+                  key: ${{ steps.nm_cache_key.outputs.key }}
+
+            - name: Setup Node with npm cache
+              if: steps.npm_cache.outputs.enabled == 'true' && steps.nm_cache.outputs.cache-hit != 'true'
               uses: actions/setup-node@v5
               with:
                   node-version: "24"
@@ -205,40 +226,13 @@ jobs:
                   raw: ${{ inputs.build_install_command }}
 
             - name: NPM install (self-aware)
+              if: steps.npm_cache.outputs.enabled != 'true' || steps.nm_cache.outputs.cache-hit != 'true'
               id: npm
               uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
               with:
                   working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
                   install_command: ${{ steps.resolve_build_install.outputs.value }}
                   if_package_json: "1"
-
-            - name: Pack installed dependencies
-              if: steps.npm.outputs.ran == 'true'
-              env:
-                  THEME_ROOT_EFFECTIVE: ${{ steps.inputs.outputs.theme_root_effective }}
-              run: |
-                  set -euo pipefail
-                  ROOT="${THEME_ROOT_EFFECTIVE}"
-                  mkdir -p _ci_artifacts
-
-                  if [ ! -d "${ROOT}/node_modules" ]; then
-                      echo "Expected node_modules after install, but none was found at ${ROOT}/node_modules"
-                      exit 1
-                  fi
-
-                  tar -C "${ROOT}" -czf _ci_artifacts/node-modules.tgz node_modules
-
-            - id: meta
-              run: |
-                  echo "artifact_name=shopify-theme-preview-node-modules" >> "$GITHUB_OUTPUT"
-
-            - name: Upload installed dependencies
-              if: steps.npm.outputs.ran == 'true'
-              uses: actions/upload-artifact@v7
-              with:
-                  name: ${{ steps.meta.outputs.artifact_name }}
-                  path: _ci_artifacts/node-modules.tgz
-                  if-no-files-found: error
 
     shopify_theme_preview:
         needs: [resolve_targets, install_dependencies]
@@ -572,22 +566,13 @@ jobs:
                       echo "nodelete=1" >> "$GITHUB_OUTPUT"
                   fi
 
-            - name: Download installed dependencies
+            - name: Restore node_modules cache
               if: needs.install_dependencies.outputs.npm_install_ran == 'true'
-              uses: actions/download-artifact@v8
+              uses: actions/cache/restore@v4
               with:
-                  name: ${{ needs.install_dependencies.outputs.install_artifact_name }}
-                  path: _ci_artifacts
-
-            - name: Restore installed dependencies
-              if: needs.install_dependencies.outputs.npm_install_ran == 'true'
-              env:
-                  THEME_ROOT_EFFECTIVE: ${{ env.THEME_ROOT }}
-              run: |
-                  set -euo pipefail
-                  ROOT="${THEME_ROOT_EFFECTIVE:-.}"
-                  mkdir -p "${ROOT}"
-                  tar -C "${ROOT}" -xzf _ci_artifacts/node-modules.tgz
+                  path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+                  key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+                  fail-on-cache-miss: true
 
             - name: Prepare theme (install + build + resolve dist)
               id: prepare

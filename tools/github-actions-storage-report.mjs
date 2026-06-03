@@ -207,6 +207,13 @@ function parseIsoDate(iso) {
     return d;
 }
 
+function isArtifactCurrentlyStored(artifact, nowMs) {
+    const expires = parseIsoDate(artifact.expiresAt);
+    const notExpiredByFlag = !artifact.expired;
+    const notExpiredByDate = !expires || expires.getTime() > nowMs;
+    return notExpiredByFlag && notExpiredByDate;
+}
+
 function dayIndexFromEpochMs(ms) {
     return Math.floor(ms / 86400000);
 }
@@ -430,6 +437,35 @@ function formatYAxisLabel(bytes) {
     return `${mib.toFixed(0)} MiB`;
 }
 
+function computeBillingAlignedMetrics(series, now) {
+    const nowDate = new Date(now);
+    const year = nowDate.getUTCFullYear();
+    const month = nowDate.getUTCMonth();
+    const firstDay = new Date(Date.UTC(year, month, 1));
+    const lastDay = new Date(Date.UTC(year, month + 1, 0));
+    const daysInMonth = lastDay.getUTCDate();
+
+    const startKey = firstDay.toISOString().slice(0, 10);
+    const endKey = nowDate.toISOString().slice(0, 10);
+
+    const monthPoints = (series || []).filter((p) => p.date >= startKey && p.date <= endKey);
+    const daysElapsed = monthPoints.length || 1;
+    const sumBytes = monthPoints.reduce((sum, p) => sum + Number(p.bytes || 0), 0);
+
+    const avgBytesMTD = sumBytes / daysElapsed;
+    const accruedGbMonthToDate = (sumBytes / GIB) / daysInMonth;
+    const projectedMonthAverageGiB = avgBytesMTD / GIB;
+
+    return {
+        month: `${year}-${String(month + 1).padStart(2, "0")}`,
+        daysElapsed,
+        daysInMonth,
+        avgBytesMTD,
+        accruedGbMonthToDate,
+        projectedMonthAverageGiB,
+    };
+}
+
 function escapeHtml(text) {
     return String(text)
         .replaceAll("&", "&amp;")
@@ -450,6 +486,8 @@ function buildHtmlReport(report) {
         topWorkflows,
         retentionCurrent,
         retentionWhatIf,
+        whatIfScenarios,
+        billingAligned,
     } = report;
 
     const currentValues = retentionCurrent.series.map((p) => p.bytes);
@@ -521,6 +559,18 @@ function buildHtmlReport(report) {
 
     const billingRows = Object.entries(billing || {})
         .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(JSON.stringify(v))}</td></tr>`)
+        .join("\n");
+
+    const whatIfRows = (whatIfScenarios || [])
+        .map((scenario) => {
+            const within = scenario.avgBytes <= summary.thresholdBytes;
+            return `<tr>
+<td>${scenario.days}d</td>
+<td>${formatBytes(scenario.avgBytes)}</td>
+<td>${(scenario.avgBytes / GIB).toFixed(3)} GiB</td>
+<td>${within ? "yes" : "no"}</td>
+</tr>`;
+        })
         .join("\n");
 
     return `<!doctype html>
@@ -620,7 +670,7 @@ code {
       <div class="kpi">${summary.reposScanned.toLocaleString()}</div>
     </div>
     <div class="card">
-      <h3>Artifacts Scanned</h3>
+            <h3>Artifacts Counted (Stored)</h3>
       <div class="kpi">${summary.artifactsScanned.toLocaleString()}</div>
     </div>
     <div class="card">
@@ -634,15 +684,35 @@ code {
       <p>${summary.currentAvgBytes <= summary.thresholdBytes ? "At or below threshold" : "Above threshold"}</p>
     </div>
     <div class="card">
-      <h3>What-if Policy Avg (${summary.whatIfRetentionDays}d)</h3>
-      <div class="kpi ${summary.whatIfAvgBytes <= summary.thresholdBytes ? "good" : "bad"}">${(summary.whatIfAvgBytes / GIB).toFixed(3)} GiB</div>
-      <p>${summary.whatIfAvgBytes <= summary.thresholdBytes ? "Likely within threshold" : "Likely above threshold"}</p>
+            <h3>What-if Policy Avg</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Days</th>
+                            <th>Avg</th>
+                            <th>Avg (GiB)</th>
+                            <th>Within ${summary.thresholdGb}GB</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${whatIfRows}
+                    </tbody>
+                </table>
+            </div>
+            <p>Average estimated storage over the last N days (from now backward).</p>
     </div>
     <div class="card">
       <h3>Estimated Delta</h3>
       <div class="kpi ${summary.avgDeltaBytes <= 0 ? "good" : "warn"}">${(summary.avgDeltaBytes / GIB).toFixed(3)} GiB</div>
-      <p>Current avg minus what-if avg</p>
+            <p>Current avg minus ${summary.whatIfRetentionDays}d what-if avg</p>
     </div>
+        <div class="card">
+            <h3>Billing-Aligned (MTD)</h3>
+            <div class="kpi">${billingAligned.accruedGbMonthToDate.toFixed(3)} GB-month</div>
+            <p>${billingAligned.daysElapsed}/${billingAligned.daysInMonth} days elapsed this month</p>
+            <p>Projected month avg: ${billingAligned.projectedMonthAverageGiB.toFixed(3)} GiB</p>
+        </div>
   </section>
 
   <section class="card" style="margin-bottom:12px">
@@ -659,7 +729,7 @@ code {
             <text x="${chart.left + chart.width / 2}" y="${chart.top + chart.height + 44}" text-anchor="middle" fill="#d1d5db" font-size="13">Age of data (days old)</text>
             <text x="22" y="${chart.top + chart.height / 2}" text-anchor="middle" fill="#d1d5db" font-size="13" transform="rotate(-90 22 ${chart.top + chart.height / 2})">Estimated storage size</text>
     </svg>
-    <p><span style="color:var(--accent)">Current ${summary.currentRetentionDays}d</span> | <span style="color:var(--accent2)">What-if ${summary.whatIfRetentionDays}d</span></p>
+        <p><span style="color:var(--accent)">Current ${summary.currentRetentionDays}d</span> | <span style="color:var(--accent2)">What-if baseline ${summary.whatIfRetentionDays}d</span></p>
   </section>
 
   <section class="card" style="margin-bottom:12px">
@@ -887,18 +957,35 @@ async function main() {
             continue;
         }
 
-        perRepoArtifacts.set(repo.name, artifacts);
-        allArtifacts.push(...artifacts);
+        const activeArtifacts = artifacts.filter((artifact) => isArtifactCurrentlyStored(artifact, now.getTime()));
 
-        repoSummaries.push(summarizeRepoArtifacts(repo.name, artifacts, now, args.currentRetentionDays));
+        perRepoArtifacts.set(repo.name, activeArtifacts);
+        allArtifacts.push(...activeArtifacts);
+
+        repoSummaries.push(summarizeRepoArtifacts(repo.name, activeArtifacts, now, args.currentRetentionDays));
     }
 
     const currentActiveArtifactBytes = repoSummaries.reduce((sum, r) => sum + r.currentActiveBytes, 0);
     const currentActiveArtifactGiB = currentActiveArtifactBytes / GIB;
 
-    const horizonDays = Math.max(args.currentRetentionDays, args.whatIfRetentionDays);
+    const scenarioDays = [30, 45, 60, 75, 90];
+    const horizonDays = Math.max(args.currentRetentionDays, args.whatIfRetentionDays, ...scenarioDays);
     const retentionCurrent = buildRetentionSeries(allArtifacts, horizonDays, args.currentRetentionDays, now);
-    const retentionWhatIf = buildRetentionSeries(allArtifacts, horizonDays, args.whatIfRetentionDays, now);
+    const scenarioRetention = scenarioDays.map((days) => ({
+        days,
+        retention: buildRetentionSeries(allArtifacts, horizonDays, days, now),
+    }));
+    const selectedScenario = scenarioRetention.find((item) => item.days === args.whatIfRetentionDays);
+    const retentionWhatIf = selectedScenario
+        ? selectedScenario.retention
+        : buildRetentionSeries(allArtifacts, horizonDays, args.whatIfRetentionDays, now);
+    const whatIfScenarios = scenarioRetention.map((item) => ({
+        days: item.days,
+        avgBytes: item.retention.avgBytes,
+        peakBytes: item.retention.maxBytes,
+        latestBytes: item.retention.latestBytes,
+    }));
+    const billingAligned = computeBillingAlignedMetrics(retentionCurrent.points, now);
 
     const runEntries = [];
     for (const [repo, artifacts] of perRepoArtifacts.entries()) {
@@ -928,14 +1015,19 @@ async function main() {
     const assumptions = [
         "This report directly measures artifact sizes from repository artifact endpoints.",
         "GitHub does not provide a simple per-repo log-bytes endpoint in this workflow; storage projections are artifact-based and should be treated as directional.",
-        "Current active artifact storage is computed from artifacts that are not expired and whose expiration date is in the future.",
+        "All metrics in this report are based on artifacts currently in storage (not deleted, not expired).",
         "Retention what-if estimates apply a policy cap to each artifact lifespan: min(actual expiration, created + what-if retention).",
+        "The threshold value is a user-defined planning target (default 2 GB), not an authoritative org hard limit.",
         "If your org has large log volume, actual artifact+log storage may exceed artifact-only estimates.",
     ];
 
     const report = {
         generatedAt: now.toISOString(),
         org: args.org,
+        scanScope: {
+            maxRepos: args.maxRepos,
+            mode: args.maxRepos > 0 ? "limited" : "all-repos",
+        },
         assumptions,
         summary: {
             reposScanned: repoSummaries.length,
@@ -951,6 +1043,8 @@ async function main() {
             avgDeltaBytes: retentionCurrent.avgBytes - retentionWhatIf.avgBytes,
             currentPeakBytes: retentionCurrent.maxBytes,
             whatIfPeakBytes: retentionWhatIf.maxBytes,
+            whatIfPolicyAverages: whatIfScenarios,
+            billingAligned,
         },
         retentionCurrent: {
             days: args.currentRetentionDays,
@@ -966,6 +1060,8 @@ async function main() {
             latestBytes: retentionWhatIf.latestBytes,
             series: retentionWhatIf.points,
         },
+        whatIfScenarios,
+        billingAligned,
         topRepositories,
         topWorkflows,
         billing,
@@ -979,14 +1075,22 @@ async function main() {
     const summaryText = [
         `Org: ${args.org}`,
         `Generated: ${report.generatedAt}`,
+        `Scan scope: ${args.maxRepos > 0 ? `max ${args.maxRepos} repos` : "all repos (no max)"}`,
         `Repos scanned: ${report.summary.reposScanned}`,
-        `Artifacts scanned: ${report.summary.artifactsScanned}`,
+        `Artifacts counted (currently stored): ${report.summary.artifactsScanned}`,
         `Current active artifact storage: ${formatBytes(report.summary.currentActiveArtifactBytes)} (${formatGiB(report.summary.currentActiveArtifactBytes)} GiB)`,
         `Current retention (${args.currentRetentionDays}d) avg: ${formatBytes(report.summary.currentAvgBytes)} (${formatGiB(report.summary.currentAvgBytes)} GiB)`,
-        `What-if retention (${args.whatIfRetentionDays}d) avg: ${formatBytes(report.summary.whatIfAvgBytes)} (${formatGiB(report.summary.whatIfAvgBytes)} GiB)`,
+        `What-if baseline (${args.whatIfRetentionDays}d) avg: ${formatBytes(report.summary.whatIfAvgBytes)} (${formatGiB(report.summary.whatIfAvgBytes)} GiB)`,
         `Delta avg: ${formatBytes(report.summary.avgDeltaBytes)} (${formatGiB(report.summary.avgDeltaBytes)} GiB)`,
         `Threshold: ${args.thresholdGb} GB`,
         `Within threshold (what-if avg): ${report.summary.whatIfAvgBytes <= thresholdBytes ? "yes" : "no"}`,
+        `Billing-aligned MTD accrued (GB-month): ${billingAligned.accruedGbMonthToDate.toFixed(3)}`,
+        `Billing-aligned projected month avg: ${billingAligned.projectedMonthAverageGiB.toFixed(3)} GiB`,
+        "",
+        "What-if policy averages (from now backward):",
+        ...whatIfScenarios.map(
+            (scenario) => `- ${scenario.days}d: ${formatBytes(scenario.avgBytes)} (${formatGiB(scenario.avgBytes)} GiB), within ${args.thresholdGb}GB=${scenario.avgBytes <= thresholdBytes ? "yes" : "no"}`
+        ),
         "",
         "Top repos by current active artifact storage:",
         ...topRepositories.map((r, idx) => `${idx + 1}. ${r.repo} - ${formatBytes(r.currentActiveBytes)} (${r.artifactCount} artifacts)`),
