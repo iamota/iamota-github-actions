@@ -385,13 +385,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Restore node_modules cache
-        if: needs.install_dependencies.outputs.node_modules_cache_key != ''
-        uses: actions/cache/restore@v4
+      - name: Restore node_modules
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
         with:
-          path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
-          key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
-          fail-on-cache-miss: true
+          cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+          cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+          theme_root: ${{ needs.install_dependencies.outputs.theme_root_effective }}
 
       - id: root_inputs
         run: |
@@ -830,13 +829,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Restore node_modules cache
-        if: needs.install_dependencies.outputs.node_modules_cache_key != ''
-        uses: actions/cache/restore@v4
+      - name: Restore node_modules
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
         with:
-          path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
-          key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
-          fail-on-cache-miss: true
+          cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+          cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+          theme_root: ${{ needs.install_dependencies.outputs.theme_root_effective }}
 
       - name: Run lint script when available
         run: |
@@ -870,13 +868,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Restore node_modules cache
-        if: needs.install_dependencies.outputs.node_modules_cache_key != ''
-        uses: actions/cache/restore@v4
+      - name: Restore node_modules
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
         with:
-          path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
-          key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
-          fail-on-cache-miss: true
+          cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+          cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+          theme_root: ${{ needs.install_dependencies.outputs.theme_root_effective }}
 
       - name: Download prepared theme root
         uses: actions/download-artifact@v8

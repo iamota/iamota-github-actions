@@ -1,0 +1,107 @@
+name: "Restore node_modules with fallback install"
+description: "Restores node_modules from actions/cache and falls back to setup-node + npm ci when the cache is missing or incomplete."
+inputs:
+    cache_key:
+        description: "Cache key produced by the install_dependencies job. When empty, only the fallback install runs."
+        required: false
+        default: ""
+    cache_path:
+        description: "Filesystem path the cache restored to (typically <theme_root>/node_modules)."
+        required: false
+        default: ""
+    theme_root:
+        description: "Working directory containing package.json. Defaults to '.'."
+        required: false
+        default: "."
+    node_version:
+        description: "Node.js version used by the fallback install."
+        required: false
+        default: "24"
+outputs:
+    cache_hit:
+        description: "Whether the node_modules cache restored cleanly without fallback install."
+        value: ${{ steps.verify.outputs.cache_hit }}
+    installed:
+        description: "Whether a fallback npm ci ran."
+        value: ${{ steps.verify.outputs.installed }}
+runs:
+    using: "composite"
+    steps:
+        - name: Restore node_modules cache
+          if: inputs.cache_key != ''
+          id: nm_restore
+          uses: actions/cache/restore@v4
+          with:
+              path: ${{ inputs.cache_path }}
+              key: ${{ inputs.cache_key }}
+
+        - name: Verify node_modules
+          id: verify
+          shell: bash
+          env:
+              THEME_ROOT: ${{ inputs.theme_root }}
+              CACHE_HIT: ${{ steps.nm_restore.outputs.cache-hit }}
+          run: |
+              set -euo pipefail
+              ROOT="${THEME_ROOT:-.}"
+              if [ ! -f "${ROOT}/package.json" ]; then
+                  echo "No package.json at ${ROOT}; nothing to install."
+                  echo "cache_hit=false" >> "$GITHUB_OUTPUT"
+                  echo "needs_install=false" >> "$GITHUB_OUTPUT"
+                  echo "installed=false" >> "$GITHUB_OUTPUT"
+                  exit 0
+              fi
+              if [ "${CACHE_HIT}" = "true" ] \
+                  && [ -d "${ROOT}/node_modules" ] \
+                  && [ -f "${ROOT}/node_modules/.package-lock.json" ] \
+                  && [ -d "${ROOT}/node_modules/.bin" ]; then
+                  echo "node_modules cache restored cleanly."
+                  echo "cache_hit=true" >> "$GITHUB_OUTPUT"
+                  echo "needs_install=false" >> "$GITHUB_OUTPUT"
+                  echo "installed=false" >> "$GITHUB_OUTPUT"
+              else
+                  echo "node_modules cache missed or incomplete; will run fallback npm ci."
+                  echo "cache_hit=false" >> "$GITHUB_OUTPUT"
+                  echo "needs_install=true" >> "$GITHUB_OUTPUT"
+                  echo "installed=true" >> "$GITHUB_OUTPUT"
+              fi
+
+        - name: Resolve npm cache dependency path
+          if: steps.verify.outputs.needs_install == 'true'
+          id: npm_dep_path
+          shell: bash
+          env:
+              THEME_ROOT: ${{ inputs.theme_root }}
+          run: |
+              set -euo pipefail
+              ROOT="${THEME_ROOT:-.}"
+              if [ -f "${ROOT}/package-lock.json" ]; then
+                  echo "path=${ROOT}/package-lock.json" >> "$GITHUB_OUTPUT"
+              elif [ -f "${ROOT}/npm-shrinkwrap.json" ]; then
+                  echo "path=${ROOT}/npm-shrinkwrap.json" >> "$GITHUB_OUTPUT"
+              else
+                  echo "path=" >> "$GITHUB_OUTPUT"
+              fi
+
+        - name: Setup Node for fallback install
+          if: steps.verify.outputs.needs_install == 'true'
+          uses: actions/setup-node@v5
+          with:
+              node-version: ${{ inputs.node_version }}
+              cache: ${{ steps.npm_dep_path.outputs.path != '' && 'npm' || '' }}
+              cache-dependency-path: ${{ steps.npm_dep_path.outputs.path }}
+
+        - name: Fallback npm ci
+          if: steps.verify.outputs.needs_install == 'true'
+          shell: bash
+          env:
+              THEME_ROOT: ${{ inputs.theme_root }}
+          run: |
+              set -euo pipefail
+              ROOT="${THEME_ROOT:-.}"
+              cd "${ROOT}"
+              if [ -f "package-lock.json" ] || [ -f "npm-shrinkwrap.json" ]; then
+                  npm ci
+              else
+                  npm install
+              fi

@@ -296,13 +296,12 @@ jobs:
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
 
-            - name: Restore node_modules cache
-              if: needs.install_dependencies.outputs.node_modules_cache_key != ''
-              uses: actions/cache/restore@v4
+            - name: Restore node_modules
+              uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
               with:
-                  path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
-                  key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
-                  fail-on-cache-miss: true
+                  cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+                  cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+                  theme_root: ${{ steps.resolve_theme_root.outputs.value != '' && steps.resolve_theme_root.outputs.value || '.' }}
 
             - name: Build theme when webpack is configured
               id: webpack
