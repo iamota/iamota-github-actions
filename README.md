@@ -9,6 +9,7 @@ Centralized reusable GitHub Actions workflows, composite actions, and helper scr
 - [Workflows Reference](./docs/github-actions/workflows.md)
 - [Composite Actions Reference](./docs/github-actions/actions.md)
 - [Scripts Reference](./docs/github-actions/scripts.md)
+- [Tools](./tools/README.md)
 
 ## Copyright and Restricted Use
 

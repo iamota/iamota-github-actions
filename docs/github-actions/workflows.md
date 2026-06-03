@@ -99,6 +99,7 @@ Purpose:
 Inputs:
 
 - Build roots: `theme_root`, `theme_src`, `theme_dist`, `build_install_command`, `build_command`
+- Artifact retention: `ci_artifact_retention_days` (optional, default `1`; applies to transient CI handoff artifacts)
 - Store metadata: `shopify_store`, `shopify_theme_id`
 - Lighthouse mode: `lighthouse_align_with_production_json`
 - Feature toggles: `run_theme_check`, `run_lint`, `run_test`, `run_lighthouse`
@@ -114,6 +115,7 @@ Notes:
 
 - Prepare stage builds once; `theme_check`, `test`, and lighthouse consume the prepared output.
 - Store-agnostic jobs run once; lighthouse runs per store when enabled.
+- `ci_artifact_retention_days` controls retention for intermediate artifacts (`shopify-theme-ci-node-modules`, `shopify-theme-ci-root`) used to pass files between CI jobs.
 
 ### `.github/workflows/shopify-json-sync-production.yml`
 

@@ -62,12 +62,17 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 - `.github/scripts/github/github-pr-guard-shopify-locale.mjs`
 - `.github/scripts/github/github-pr-guard-shopify-theme-settings.mjs`
 
+### Tools
+
+- `tools/github-actions-storage-report.mjs`
+
 ## Start Here
 
 - [Consumer Setup Guide](./consumer-setup.md)
 - [Workflows Reference](./workflows.md)
 - [Composite Actions Reference](./actions.md)
 - [Scripts Reference](./scripts.md)
+- [Tools README](../../tools/README.md)
 
 ## Architecture Contract
 

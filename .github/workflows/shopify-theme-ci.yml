@@ -71,6 +71,10 @@ on:
         type: string
         required: false
         default: "true"
+      ci_artifact_retention_days:
+        type: number
+        required: false
+        default: 1
     secrets:
       SHOPIFY_THEME_ACCESS_TOKEN:
         required: false
@@ -107,6 +111,7 @@ jobs:
       run_test                             : ${{ steps.out.outputs.run_test }}
       run_lighthouse                       : ${{ steps.out.outputs.run_lighthouse }}
       run_prepare                          : ${{ steps.out.outputs.run_prepare }}
+      ci_artifact_retention_days           : ${{ steps.out.outputs.ci_artifact_retention_days }}
     steps:
       - id: stores
         uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
@@ -210,6 +215,12 @@ jobs:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_prepare }}
 
+      - id: resolve_ci_artifact_retention_days
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        with:
+          store: ${{ steps.stores.outputs.first_store }}
+          raw: ${{ inputs.ci_artifact_retention_days }}
+
       - id: out
         run: |
           RAW_THEME_CHECK_FAIL_LEVEL="${{ steps.resolve_theme_check_fail_level.outputs.value }}"
@@ -248,6 +259,7 @@ jobs:
             echo "run_test=${{ steps.resolve_run_test.outputs.value != '' && steps.resolve_run_test.outputs.value || 'true' }}"
             echo "run_lighthouse=${{ steps.resolve_run_lighthouse.outputs.value != '' && steps.resolve_run_lighthouse.outputs.value || 'true' }}"
             echo "run_prepare=${{ steps.resolve_run_prepare.outputs.value != '' && steps.resolve_run_prepare.outputs.value || 'true' }}"
+            echo "ci_artifact_retention_days=${{ steps.resolve_ci_artifact_retention_days.outputs.value != '' && steps.resolve_ci_artifact_retention_days.outputs.value || '1' }}"
           } >> "$GITHUB_OUTPUT"
 
   install_dependencies:
@@ -361,6 +373,7 @@ jobs:
           name: ${{ steps.meta.outputs.artifact_name }}
           path: _ci_artifacts/node-modules.tgz
           if-no-files-found: error
+          retention-days: ${{ needs.resolve_inputs.outputs.ci_artifact_retention_days }}
 
   prepare:
     if: needs.resolve_inputs.outputs.run_prepare == 'true'
@@ -468,6 +481,7 @@ jobs:
           name: ${{ steps.meta.outputs.artifact_name }}
           path: ${{ steps.root.outputs.theme_dist_effective }}
           if-no-files-found: error
+          retention-days: ${{ needs.resolve_inputs.outputs.ci_artifact_retention_days }}
 
   theme_check:
     if: needs.resolve_inputs.outputs.run_theme_check != 'false'

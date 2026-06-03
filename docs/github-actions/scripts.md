@@ -116,3 +116,26 @@ Theme settings guard runner built on guard core.
 Default acknowledgement label:
 
 - `I will manually deploy theme settings`
+
+## Tools
+
+### `tools/github-actions-storage-report.mjs`
+
+Purpose:
+
+- Builds an org-wide artifact usage report for GitHub Actions.
+- Helps estimate storage impact of retention changes (for example 90 days to 75 days).
+
+Behavior:
+
+- Uses `gh api` to scan org repositories and list Actions artifacts.
+- Aggregates usage by repo and (best-effort) workflow.
+- Generates report artifacts:
+	- `report.json`
+	- `summary.txt`
+	- `dashboard.html`
+
+Notes:
+
+- Storage simulation is artifact-based and directional.
+- The script also captures available org billing endpoint snapshots for context.
