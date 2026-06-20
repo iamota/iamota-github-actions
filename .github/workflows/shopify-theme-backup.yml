@@ -13,6 +13,17 @@ on:
             SHOPIFY_THEME_ID:
                 type: string
                 required: true
+            SHOPIFY_BACKUP:
+                description: >-
+                    Controls which stores are backed up. Scalar "true"/"false"
+                    toggles all stores, or a store-keyed JSON object enables
+                    backups per store, e.g.
+                    {"dev-acme":false,"production-acme":true}. Stores omitted
+                    from the object default to enabled. Disabled stores are
+                    filtered out of the matrix entirely (zero billed jobs).
+                type: string
+                required: false
+                default: "true"
             aws_region:
                 type: string
                 required: false
@@ -36,15 +47,60 @@ jobs:
     resolve_targets:
         runs-on: ubuntu-latest
         outputs:
-            matrix_json: ${{ steps.stores.outputs.matrix_json }}
+            matrix_json: ${{ steps.filter.outputs.matrix_json }}
+            has_targets: ${{ steps.filter.outputs.has_targets }}
         steps:
             - id: stores
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
 
+            # Drop stores whose SHOPIFY_BACKUP flag is "false" so disabled
+            # environments produce zero matrix jobs (no 1-minute billing floor).
+            - id: filter
+              env:
+                  MATRIX_JSON: ${{ steps.stores.outputs.matrix_json }}
+                  SHOPIFY_BACKUP: ${{ inputs.SHOPIFY_BACKUP }}
+              run: |
+                  set -euo pipefail
+                  node - <<'NODE' >> "$GITHUB_OUTPUT"
+                  const matrix = JSON.parse(process.env.MATRIX_JSON || '{"include":[]}');
+                  const raw = String(process.env.SHOPIFY_BACKUP ?? "").trim();
+                  const include = Array.isArray(matrix.include) ? matrix.include : [];
+
+                  // Resolve the backup flag for one store, mirroring the
+                  // key-variant matching used by shopify-multistore-resolve-value.
+                  let map = null;
+                  if (raw.startsWith("{") && raw.endsWith("}")) {
+                      try { map = JSON.parse(raw); } catch { map = null; }
+                  }
+                  const enabledFor = (store, slug) => {
+                      let value = raw;
+                      if (map && typeof map === "object" && !Array.isArray(map)) {
+                          const variants = [store, slug, String(store || "").toLowerCase(), String(slug || "").toLowerCase()];
+                          value = ""; // default when a store is omitted from the map
+                          for (const k of variants) {
+                              if (k && Object.prototype.hasOwnProperty.call(map, k)) { value = map[k]; break; }
+                          }
+                      }
+                      // Default (empty/unknown) is enabled; only an explicit false disables.
+                      return String(value).trim().toLowerCase() !== "false";
+                  };
+
+                  const kept = include.filter((entry) => {
+                      const slug = entry.store_slug || String(entry.store || "").replace(/\.myshopify\.com$/i, "");
+                      const keep = enabledFor(entry.store, slug);
+                      if (!keep) console.error(`Backup disabled for ${entry.store}; skipping.`);
+                      return keep;
+                  });
+
+                  console.log(`matrix_json=${JSON.stringify({ include: kept })}`);
+                  console.log(`has_targets=${kept.length > 0 ? "true" : "false"}`);
+                  NODE
+
     backup:
         needs: [resolve_targets]
+        if: needs.resolve_targets.outputs.has_targets == 'true'
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
