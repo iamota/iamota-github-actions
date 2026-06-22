@@ -1,0 +1,93 @@
+name: Shopify App Deploy (Canonical)
+
+# Publishes a new Shopify app version (extensions + shopify.app.toml config) via
+# `shopify app deploy`. Branch-per-environment: the caller passes `branch`, which
+# pins the GitHub Environment (for secrets) and, for multi-environment apps, the
+# `--config <name>` selector. See iamota-ai instructions/dev/ci-cd.md.
+
+on:
+    workflow_call:
+        inputs:
+            branch:
+                type: string
+                required: true
+            config:
+                description: >-
+                    Shopify config name passed to `--config` (selects
+                    shopify.app.<config>.toml). Leave empty for a single-environment
+                    app to use the committed shopify.app.toml. For a multi-environment
+                    app pass the branch name (github.ref_name).
+                type: string
+                required: false
+                default: ""
+            working_directory:
+                type: string
+                required: false
+                default: "."
+            install_command:
+                description: "npm install (not npm ci) — see fly-io.md lockfile note."
+                type: string
+                required: false
+                default: "npm install"
+            node_version:
+                type: string
+                required: false
+                default: "20"
+            cli_version:
+                type: string
+                required: false
+                default: "latest"
+        secrets:
+            SHOPIFY_CLI_PARTNERS_TOKEN:
+                required: true
+            SHOPIFY_API_KEY:
+                required: false
+
+permissions:
+    contents: read
+
+concurrency:
+    group: iamota-shopify-app-deploy-${{ github.repository }}-${{ inputs.branch || github.ref || github.run_id }}
+    cancel-in-progress: true
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.branch }}
+        env:
+            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+            SHOPIFY_API_KEY           : ${{ secrets.SHOPIFY_API_KEY }}
+            COMMIT_URL                : ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Setup Node + Install Shopify CLI
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              with:
+                  node_version: ${{ inputs.node_version }}
+                  cli_version: ${{ inputs.cli_version }}
+
+            - name: Install npm dependencies
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              with:
+                  working_directory: ${{ inputs.working_directory }}
+                  install_command: ${{ inputs.install_command }}
+                  if_package_json: "1"
+
+            - name: Capture commit message
+              run: |
+                  set -euo pipefail
+                  MSG="$(git log -1 --pretty=%B | tr '\n' ' ' | sed 's/[^a-zA-Z0-9-_ ]//g')"
+                  echo "COMMIT_MESSAGE=${MSG}" >> "$GITHUB_ENV"
+
+            - name: Deploy to Shopify
+              working-directory: ${{ inputs.working_directory }}
+              env:
+                  CONFIG_NAME: ${{ inputs.config }}
+              run: |
+                  set -euo pipefail
+                  ARGS=(app deploy -f --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
+                  if [ -n "${CONFIG_NAME}" ]; then
+                      ARGS=(app deploy -f --config "${CONFIG_NAME}" --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
+                  fi
+                  shopify "${ARGS[@]}"
