@@ -1,0 +1,119 @@
+name: Fly.io Deploy (Canonical)
+
+# Deploys a Fly.io-hosted app via `flyctl deploy --remote-only`. Branch-per-
+# environment: the caller passes `branch` (pins the GitHub Environment for
+# secrets) and, for multi-environment apps, `config` (selects fly.<config>.toml).
+#
+# Runtime secrets: this workflow stages only the two universal Shopify app
+# secrets (SHOPIFY_API_KEY, SHOPIFY_API_SECRET) needed for OAuth. App-specific
+# secrets (Stripe, Google, etc.) persist on the Fly app once set, so set them
+# once at provisioning time with `fly secrets set` — they do not need to be
+# re-staged on every deploy. See iamota-ai instructions/dev/ci-cd.md + fly-io.md.
+
+on:
+    workflow_call:
+        inputs:
+            branch:
+                type: string
+                required: true
+            config:
+                description: >-
+                    Environment token used to select fly.<config>.toml via
+                    `--config`. Leave empty for a single-environment app to use the
+                    committed fly.toml. For a multi-environment app pass the branch
+                    name (github.ref_name).
+                type: string
+                required: false
+                default: ""
+            remote_only:
+                description: "Build on Fly's remote builder (no local Docker daemon)."
+                type: string
+                required: false
+                default: "true"
+            dockerhub_login:
+                description: >-
+                    Set to 'true' only if remote builds start hitting Docker Hub's
+                    anonymous pull rate limit. Requires dockerhub_username input +
+                    DOCKERHUB_TOKEN secret.
+                type: string
+                required: false
+                default: "false"
+            dockerhub_username:
+                type: string
+                required: false
+                default: ""
+        secrets:
+            FLY_API_TOKEN:
+                required: true
+            SHOPIFY_API_KEY:
+                required: false
+            SHOPIFY_API_SECRET:
+                required: false
+            DOCKERHUB_TOKEN:
+                required: false
+
+permissions:
+    contents: read
+
+concurrency:
+    group: iamota-fly-deploy-${{ github.repository }}-${{ inputs.branch || github.ref || github.run_id }}
+    cancel-in-progress: true
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.branch }}
+        env:
+            FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Login to Docker Hub
+              if: ${{ inputs.dockerhub_login == 'true' }}
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ inputs.dockerhub_username }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - uses: superfly/flyctl-actions/setup-flyctl@master
+
+            - name: Stage Fly runtime secrets
+              env:
+                  CONFIG_NAME       : ${{ inputs.config }}
+                  SHOPIFY_API_KEY   : ${{ secrets.SHOPIFY_API_KEY }}
+                  SHOPIFY_API_SECRET: ${{ secrets.SHOPIFY_API_SECRET }}
+              run: |
+                  set -euo pipefail
+                  CONFIG_ARGS=()
+                  if [ -n "${CONFIG_NAME}" ]; then
+                      CONFIG_ARGS=(--config "fly.${CONFIG_NAME}.toml")
+                  fi
+
+                  SECRET_ARGS=()
+                  if [ -n "${SHOPIFY_API_KEY:-}" ]; then
+                      SECRET_ARGS+=("SHOPIFY_API_KEY=${SHOPIFY_API_KEY}")
+                  fi
+                  if [ -n "${SHOPIFY_API_SECRET:-}" ]; then
+                      SECRET_ARGS+=("SHOPIFY_API_SECRET=${SHOPIFY_API_SECRET}")
+                  fi
+
+                  if [ "${#SECRET_ARGS[@]}" -gt 0 ]; then
+                      flyctl secrets set "${SECRET_ARGS[@]}" --stage "${CONFIG_ARGS[@]}"
+                  else
+                      echo "No universal Shopify secrets provided; skipping secret staging."
+                  fi
+
+            - name: Deploy to Fly
+              env:
+                  CONFIG_NAME: ${{ inputs.config }}
+                  REMOTE_ONLY: ${{ inputs.remote_only }}
+              run: |
+                  set -euo pipefail
+                  ARGS=(deploy)
+                  if [ "${REMOTE_ONLY}" = "true" ]; then
+                      ARGS+=(--remote-only)
+                  fi
+                  if [ -n "${CONFIG_NAME}" ]; then
+                      ARGS+=(--config "fly.${CONFIG_NAME}.toml")
+                  fi
+                  flyctl "${ARGS[@]}"

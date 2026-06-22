@@ -1,0 +1,249 @@
+name: Shopify Theme Backup (Canonical)
+
+on:
+    workflow_call:
+        inputs:
+            branch:
+                type: string
+                required: true
+            SHOPIFY_STORE:
+                type: string
+                required: false
+                default: ""
+            SHOPIFY_THEME_ID:
+                type: string
+                required: true
+            SHOPIFY_BACKUP:
+                description: >-
+                    Controls which stores are backed up. Scalar "true"/"false"
+                    toggles all stores, or a store-keyed JSON object enables
+                    backups per store, e.g.
+                    {"dev-acme":false,"production-acme":true}. Stores omitted
+                    from the object default to enabled. Disabled stores are
+                    filtered out of the matrix entirely (zero billed jobs).
+                type: string
+                required: false
+                default: "true"
+            aws_region:
+                type: string
+                required: false
+                default: "us-west-2"
+            aws_s3_bucket:
+                type: string
+                required: false
+                default: ""
+        secrets:
+            SHOPIFY_THEME_ACCESS_TOKEN:
+                required: false
+            AWS_ACCESS_KEY_ID:
+                required: false
+            AWS_SECRET_ACCESS_KEY:
+                required: false
+
+permissions:
+    contents: read
+
+jobs:
+    resolve_targets:
+        runs-on: ubuntu-latest
+        outputs:
+            matrix_json: ${{ steps.filter.outputs.matrix_json }}
+            has_targets: ${{ steps.filter.outputs.has_targets }}
+        steps:
+            - id: stores
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
+              with:
+                  stores: ${{ inputs.SHOPIFY_STORE }}
+
+            # Drop stores whose SHOPIFY_BACKUP flag is "false" so disabled
+            # environments produce zero matrix jobs (no 1-minute billing floor).
+            - id: filter
+              env:
+                  MATRIX_JSON: ${{ steps.stores.outputs.matrix_json }}
+                  SHOPIFY_BACKUP: ${{ inputs.SHOPIFY_BACKUP }}
+              run: |
+                  set -euo pipefail
+                  node - <<'NODE' >> "$GITHUB_OUTPUT"
+                  const matrix = JSON.parse(process.env.MATRIX_JSON || '{"include":[]}');
+                  const raw = String(process.env.SHOPIFY_BACKUP ?? "").trim();
+                  const include = Array.isArray(matrix.include) ? matrix.include : [];
+
+                  // Resolve the backup flag for one store, mirroring the
+                  // key-variant matching used by shopify-multistore-resolve-value.
+                  let map = null;
+                  if (raw.startsWith("{") && raw.endsWith("}")) {
+                      try { map = JSON.parse(raw); } catch { map = null; }
+                  }
+                  const enabledFor = (store, slug) => {
+                      let value = raw;
+                      if (map && typeof map === "object" && !Array.isArray(map)) {
+                          const variants = [store, slug, String(store || "").toLowerCase(), String(slug || "").toLowerCase()];
+                          value = ""; // default when a store is omitted from the map
+                          for (const k of variants) {
+                              if (k && Object.prototype.hasOwnProperty.call(map, k)) { value = map[k]; break; }
+                          }
+                      }
+                      // Default (empty/unknown) is enabled; only an explicit false disables.
+                      return String(value).trim().toLowerCase() !== "false";
+                  };
+
+                  const kept = include.filter((entry) => {
+                      const slug = entry.store_slug || String(entry.store || "").replace(/\.myshopify\.com$/i, "");
+                      const keep = enabledFor(entry.store, slug);
+                      if (!keep) console.error(`Backup disabled for ${entry.store}; skipping.`);
+                      return keep;
+                  });
+
+                  console.log(`matrix_json=${JSON.stringify({ include: kept })}`);
+                  console.log(`has_targets=${kept.length > 0 ? "true" : "false"}`);
+                  NODE
+
+    backup:
+        needs: [resolve_targets]
+        if: needs.resolve_targets.outputs.has_targets == 'true'
+        strategy:
+            fail-fast: false
+            matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.branch }}
+        env:
+            GITHUB_REPOSITORY         : ${{ github.repository }}
+            GITHUB_BRANCH             : ${{ inputs.branch }}
+            GITHUB_SHA                : ${{ github.sha }}
+            TARGET_STORE              : ${{ matrix.store }}
+            TARGET_STORE_SLUG         : ${{ matrix.store_slug }}
+            TARGET_STORE_INDEX        : ${{ matrix.store_index }}
+            TARGET_STORE_SECRET_KEY   : ${{ matrix.store_secret_key }}
+            RAW_SHOPIFY_THEME_ID      : ${{ inputs.SHOPIFY_THEME_ID }}
+            RAW_SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
+            RAW_AWS_REGION            : ${{ inputs.aws_region }}
+            RAW_AWS_S3_BUCKET         : ${{ inputs.aws_s3_bucket }}
+            RAW_AWS_ACCESS_KEY_ID     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+            RAW_AWS_SECRET_ACCESS_KEY : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Resolve theme id
+              id: resolve_theme_id
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
+
+            - name: Resolve effective Shopify token
+              id: resolve_theme_token
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
+                  raw_named: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('SHOPIFY_THEME_ACCESS_TOKEN_{0}', matrix.store_index)] }}
+
+            - name: Resolve AWS region
+              id: resolve_aws_region
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_AWS_REGION }}
+
+            - name: Resolve AWS bucket
+              id: resolve_aws_bucket
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw  : ${{ env.RAW_AWS_S3_BUCKET }}
+
+            - name: Resolve effective AWS access key id
+              id: resolve_aws_key
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_AWS_ACCESS_KEY_ID }}
+                  raw_named: ${{ secrets[format('AWS_ACCESS_KEY_ID__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('AWS_ACCESS_KEY_ID_{0}', matrix.store_index)] }}
+
+            - name: Resolve effective AWS secret access key
+              id: resolve_aws_secret
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              with:
+                  store: ${{ env.TARGET_STORE }}
+                  raw: ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
+                  raw_named: ${{ secrets[format('AWS_SECRET_ACCESS_KEY__{0}', matrix.store_secret_key)] }}
+                  raw_indexed: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_{0}', matrix.store_index)] }}
+
+
+            - name: Export resolved env values
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "SHOPIFY_STORE=${TARGET_STORE}"
+                      echo "SHOPIFY_THEME_ID=${{ steps.resolve_theme_id.outputs.value }}"
+                      echo "SHOPIFY_THEME_ACCESS_TOKEN=${{ steps.resolve_theme_token.outputs.value }}"
+                      echo "AWS_REGION=${{ steps.resolve_aws_region.outputs.value }}"
+                      echo "AWS_S3_BUCKET=${{ steps.resolve_aws_bucket.outputs.value }}"
+                      echo "AWS_ACCESS_KEY_ID=${{ steps.resolve_aws_key.outputs.value }}"
+                      echo "AWS_SECRET_ACCESS_KEY=${{ steps.resolve_aws_secret.outputs.value }}"
+                  } >> "$GITHUB_ENV"
+
+            - name: Setup Node + Install Shopify CLI
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+
+            - name: Validate required Shopify values
+              run: |
+                  set -euo pipefail
+                  MISSING=()
+                  [ -n "${SHOPIFY_STORE:-}" ] || MISSING+=("SHOPIFY_STORE input/var")
+                  [ -n "${SHOPIFY_THEME_ID:-}" ] || MISSING+=("SHOPIFY_THEME_ID")
+                  [ -n "${SHOPIFY_THEME_ACCESS_TOKEN:-}" ] || MISSING+=("SHOPIFY_THEME_ACCESS_TOKEN")
+                  if [ "${#MISSING[@]}" -gt 0 ]; then
+                      echo "Missing required Shopify values: ${MISSING[*]}"
+                      exit 1
+                  fi
+
+            - name: Set backup file metadata
+              run: |
+                  set -euo pipefail
+                  REPO_NAME="$(basename "${GITHUB_REPOSITORY}")"
+                  YEAR="$(date +%Y)"
+                  DATETIME="$(date +%Y-%m-%d_%H%M%S)"
+                  SANITIZED_BRANCH="$(echo "${GITHUB_BRANCH}" | tr '/' '_')"
+
+                  FILE_NAME="${REPO_NAME}__${DATETIME}__${SANITIZED_BRANCH}__${TARGET_STORE_SLUG}__${SHOPIFY_THEME_ID}__${GITHUB_SHA}"
+                  ZIP_NAME="${FILE_NAME}.zip"
+                  DEST_PATH="${YEAR}/${REPO_NAME}/${ZIP_NAME}"
+
+                  echo "FILE_NAME=${FILE_NAME}" >> "$GITHUB_ENV"
+                  echo "ZIP_NAME=${ZIP_NAME}"   >> "$GITHUB_ENV"
+                  echo "DEST_PATH=${DEST_PATH}" >> "$GITHUB_ENV"
+
+            - name: Backup and zip theme files
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@v1
+              with:
+                  store     : ${{ env.SHOPIFY_STORE }}
+                  theme_id  : ${{ env.SHOPIFY_THEME_ID }}
+                  token     : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  output_dir: ./backup
+                  zip_output: ${{ env.ZIP_NAME }}
+
+            - name: Configure AWS credentials (optional)
+              if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
+              uses: aws-actions/configure-aws-credentials@v6
+              with:
+                  aws-access-key-id    : ${{ env.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+                  aws-region           : ${{ env.AWS_REGION }}
+
+            - name: Upload backup zip to S3 (optional)
+              if: ${{ env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' }}
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@v1
+              with:
+                  file     : ${{ env.ZIP_NAME }}
+                  bucket   : ${{ env.AWS_S3_BUCKET }}
+                  dest_path: ${{ env.DEST_PATH }}
+
+            - name: Upload backup to GitHub Actions Artifacts
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@v1
+              with:
+                  name: ${{ env.FILE_NAME }}
+                  path: ./backup

@@ -1,0 +1,141 @@
+# Scripts Reference
+
+## Shopify Scripts
+
+### `.github/scripts/shopify/shopify-theme-id-resolve.mjs`
+
+Purpose:
+
+- Resolves theme id inputs.
+- Supports literal IDs and the alias `live`.
+
+Behavior:
+
+- When input is `live`, runs `shopify theme list --role main` and resolves the single main theme ID.
+- Fails if zero or multiple main theme IDs are returned.
+
+### `.github/scripts/shopify/sync-shopify-json.mjs`
+
+Purpose:
+
+- Synchronizes remote pulled Shopify JSON files into repository layout.
+- Supports dry-run, duplicate basename handling, optional report output.
+
+Primary environment variables:
+
+- `THEME_PULL_DIR`
+- `THEME_SRC`
+- `ENABLE_DELETIONS`
+- `DRY_RUN`
+- `ON_DUPLICATE_BASENAME`
+- `REQUIRE_REPO_BASE_EXISTS`
+- `WRITE_REPORT`
+- `REPORT_PATH`
+
+Output:
+
+- Prints compact totals JSON.
+- Optionally writes detailed report JSON when `WRITE_REPORT=true`.
+
+## GitHub Scripts
+
+### `.github/scripts/github/github-api-lib.mjs`
+
+Shared GitHub API utilities:
+
+- authenticated request helper
+- pagination helper for REST list endpoints
+
+### `.github/scripts/github/github-release-ref-guard.mjs`
+
+Release branch guard for internal semver pins.
+
+Behavior:
+
+- Parses current branch as `release/v<major>[.<minor>]` or `v<major>[.<minor>]`.
+- Scans internal `uses: iamota/iamota-github-actions/...@vN` references under `.github/workflows` and `.github/actions`.
+- Fails when any `@vN` major conflicts with branch major.
+- Creates or updates a reminder issue with mismatch file/line details.
+
+### `.github/scripts/github/github-pr-comment-add.mjs`
+
+Creates a new PR comment.
+
+Arguments:
+
+- `--repo`
+- `--pr`
+- `--body`
+
+### `.github/scripts/github/github-pr-comment-lib.mjs`
+
+Shared PR comment helpers:
+
+- list PR comments
+- exact marker matching
+- regex value extraction
+- marker comment sync logic (create/update/refresh)
+
+### `.github/scripts/github/github-pr-comment-marker-get.mjs`
+
+Reads latest matching marker comment and emits metadata JSON.
+
+Supports:
+
+- optional value extraction via regex (`--extract-regex`)
+- staleness detection via comment threshold (`--refresh-after-comments`)
+
+### `.github/scripts/github/github-pr-comment-marker-set.mjs`
+
+Create/update/refresh marker comment.
+
+Supports:
+
+- `--refresh-after-comments N` to force a new marker comment when old marker has at least `N` newer comments.
+
+### `.github/scripts/github/github-pr-guard-core.mjs`
+
+Shared core for guard workflows:
+
+- changed-file detection and formatting
+- acknowledgement-label handling
+- marker comment lifecycle
+
+### `.github/scripts/github/github-pr-guard-shopify-locale.mjs`
+
+Locale guard runner built on guard core.
+
+Default acknowledgement label:
+
+- `I will manually deploy locales`
+
+### `.github/scripts/github/github-pr-guard-shopify-theme-settings.mjs`
+
+Theme settings guard runner built on guard core.
+
+Default acknowledgement label:
+
+- `I will manually deploy theme settings`
+
+## Tools
+
+### `tools/github-actions-storage-report.mjs`
+
+Purpose:
+
+- Builds an org-wide artifact usage report for GitHub Actions.
+- Helps estimate storage impact of retention changes (for example 90 days to 75 days).
+
+Behavior:
+
+- Uses `gh api` to scan org repositories and list Actions artifacts.
+- Aggregates usage by repo and (best-effort) workflow.
+- Generates report artifacts:
+	- `report.json`
+	- `summary.txt`
+	- `dashboard.html`
+
+Notes:
+
+- Storage simulation is artifact-based and directional.
+- The script also captures available org billing endpoint snapshots for context.

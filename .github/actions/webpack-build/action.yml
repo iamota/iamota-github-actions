@@ -1,0 +1,53 @@
+name: "Webpack Build"
+description: "Run webpack build command when webpack.config.js exists"
+inputs:
+    working_directory:
+        description: "Directory to inspect/run from"
+        default: "."
+    build_command:
+        description: "Webpack build command to run when webpack.config.js exists"
+        default: "npx webpack --env target=${GITHUB_BRANCH}"
+    if_webpack_config:
+        description: "Only run when webpack.config.js exists (1/0)"
+        default: "1"
+outputs:
+    ran:
+        description: "Whether build command ran (true/false)"
+        value: ${{ steps.build.outputs.ran }}
+    has_webpack_config:
+        description: "Whether webpack.config.js exists (true/false)"
+        value: ${{ steps.build.outputs.has_webpack_config }}
+runs:
+    using: "composite"
+    steps:
+        - id: build
+          run: |
+              set -euo pipefail
+              WD="${{ inputs.working_directory }}"
+              CMD="${{ inputs.build_command }}"
+              IF_WEBPACK="${{ inputs.if_webpack_config }}"
+
+              if [ ! -d "${WD}" ]; then
+                echo "working_directory not found: ${WD}"
+                exit 1
+              fi
+
+              HAS_WEBPACK="false"
+              if [ -f "${WD}/webpack.config.js" ]; then
+                HAS_WEBPACK="true"
+              fi
+
+              if [ "${IF_WEBPACK}" = "1" ] && [ "${HAS_WEBPACK}" != "true" ]; then
+                echo "has_webpack_config=false" >> "$GITHUB_OUTPUT"
+                echo "ran=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              (
+                cd "${WD}"
+                bash -lc "${CMD}"
+              )
+
+              echo "has_webpack_config=${HAS_WEBPACK}" >> "$GITHUB_OUTPUT"
+              echo "ran=true" >> "$GITHUB_OUTPUT"
+          shell: bash
