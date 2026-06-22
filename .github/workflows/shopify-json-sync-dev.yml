@@ -122,7 +122,7 @@ jobs:
 
                   if [ "${#PR_ROWS[@]}" -gt 1 ]; then
                       for row in "${PR_ROWS[@]:1}"; do
-                          IFS=$'\t' read -r EXTRA_PR EXTRA_URL <<< "${row}"
+                          IFS=$'\t' read -r EXTRA_PR _ <<< "${row}"
                           echo "Closing duplicate sync PR #${EXTRA_PR} (superseded by #${PRIMARY_PR})"
                           gh pr comment "${EXTRA_PR}" --body "Superseded by newer Shopify JSON sync PR: ${PRIMARY_URL}" >/dev/null 2>&1 || true
                           gh pr close "${EXTRA_PR}" >/dev/null || true

@@ -359,7 +359,8 @@ jobs:
                   set -euo pipefail
 
                   normalize_flag() {
-                      local raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | xargs)"
+                      local raw
+                      raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | xargs)"
                       case "$raw" in
                           "") echo "" ;;
                           1|true|yes|y|on) echo "1" ;;
