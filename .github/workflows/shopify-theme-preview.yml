@@ -487,10 +487,12 @@ jobs:
 
             - name: Prepare preview backup filename
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
+              env:
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
               run: |
                   set -euo pipefail
                   PR_NUMBER="${{ github.event.pull_request.number }}"
-                  BRANCH="${{ github.event.pull_request.head.ref }}"
+                  BRANCH="${HEAD_REF}"
                   THEME_ID="${{ steps.marker.outputs.extracted_value }}"
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d_%H%M%S_%Z')"
                   REPO_NAME="$(basename "${{ github.repository }}")"
@@ -673,10 +675,12 @@ jobs:
                   fi
 
             - name: Rename preview theme to canonical name
+              env:
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
               run: |
                   set -euo pipefail
                   PR_NUMBER="${{ github.event.pull_request.number }}"
-                  BRANCH="${{ github.event.pull_request.head.ref }}"
+                  BRANCH="${HEAD_REF}"
                   NAME="iamota (${BRANCH}) PR#${PR_NUMBER}"
                   THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
                   shopify theme rename \
@@ -688,11 +692,14 @@ jobs:
 
             - name: Build preview comment metadata
               id: comment_meta
+              env:
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
               run: |
                   set -euo pipefail
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
                   echo "sync_at=${TS}" >> "$GITHUB_OUTPUT"
-                  echo "preview_theme_name=iamota (${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+                  echo "preview_theme_name=iamota (${HEAD_REF}) PR#${PR_NUMBER}" >> "$GITHUB_OUTPUT"
 
             - name: Build preview comment body
               id: preview_comment
