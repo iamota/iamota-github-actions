@@ -220,6 +220,66 @@ Secrets:
 
 - `IAMOTA_ACTIONS_READ_TOKEN` (optional)
 
+## App Deploy Workflows
+
+These deploy Shopify **apps** (not themes). Unlike the theme workflows, per-environment
+structural config (app `client_id`, `application_url`, scopes, Fly app/region) lives in
+committed `shopify.app.<env>.toml` / `fly.<env>.toml` files selected by `--config`, not in
+GitHub Variables. GitHub Environments supply only the secrets. Branch-per-environment: the
+caller passes `branch`, which pins the GitHub Environment of the same name. See iamota-ai
+`instructions/dev/ci-cd.md`.
+
+### `.github/workflows/shopify-app-deploy.yml`
+
+Purpose:
+
+- Publish a new Shopify app version (extensions + `shopify.app.toml` config) via `shopify app deploy`.
+
+Inputs:
+
+- `branch` (required) — pins the GitHub Environment and concurrency group.
+- `config` (optional, default empty) — Shopify config name passed to `--config` (selects `shopify.app.<config>.toml`). Empty = single-environment app (uses committed `shopify.app.toml`). Multi-environment apps pass the branch name.
+- `working_directory` (optional, default `.`)
+- `install_command` (optional, default `npm install`) — `npm install`, not `npm ci` (Windows-generated lockfile + platform-specific optional deps).
+- `node_version` (optional, default `20`)
+- `cli_version` (optional, default `latest`)
+
+Secrets:
+
+- `SHOPIFY_CLI_PARTNERS_TOKEN` (required) — Partner org CLI token; authorizes non-interactive deploy.
+- `SHOPIFY_API_KEY` (optional) — the app's `client_id`.
+
+Notes:
+
+- Stamps each app version with `--source-control-url` (commit) and a sanitized `--message` (commit message), so Partner Dashboard version history links back to the exact commit.
+- `-f` skips the interactive confirmation (required for CI).
+
+### `.github/workflows/fly-deploy.yml`
+
+Purpose:
+
+- Deploy a Fly.io-hosted app via `flyctl deploy --remote-only`.
+
+Inputs:
+
+- `branch` (required)
+- `config` (optional, default empty) — environment token selecting `fly.<config>.toml` via `--config`. Empty = single-environment app (uses committed `fly.toml`). Multi-environment apps pass the branch name.
+- `remote_only` (optional, default `true`) — build on Fly's remote builder (no local Docker daemon).
+- `dockerhub_login` (optional, default `false`) — add a Docker Hub login step; set only when remote builds hit Docker Hub's anonymous pull rate limit.
+- `dockerhub_username` (optional) — pair with the `DOCKERHUB_TOKEN` secret.
+
+Secrets:
+
+- `FLY_API_TOKEN` (required) — Fly deploy token scoped to the app.
+- `SHOPIFY_API_KEY` (optional) — staged as a Fly secret for OAuth.
+- `SHOPIFY_API_SECRET` (optional) — staged as a Fly secret for OAuth.
+- `DOCKERHUB_TOKEN` (optional) — only when `dockerhub_login` is enabled.
+
+Notes:
+
+- Stages **only** the two universal Shopify secrets (`SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`) with `--stage`, so the app restarts once on the following `deploy`. App-specific runtime secrets (Stripe, Google, etc.) persist on the Fly app once set — set them once at provisioning with `fly secrets set`; they do not need re-staging on every deploy.
+- A failed `deploy_shopify` does not roll back `deploy_fly` — the two jobs are independent by default. Add `needs: [deploy_shopify]` in the wrapper to gate Fly on a successful Shopify deploy.
+
 ## Internal Validation
 
 ### `.github/workflows/github-actions-lint.yml`

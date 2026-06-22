@@ -67,6 +67,16 @@ on:
         type: string
         required: false
         default: "true"
+      ci_per_store:
+        description: >-
+          When "true", Lighthouse runs once per store (full matrix fan-out).
+          When "false" (default), it runs a single time against the first
+          store. Most themes share one codebase across stores, so the default
+          avoids paying the per-job minute floor N times for identical work.
+          Set "true" on projects whose store builds genuinely differ.
+        type: string
+        required: false
+        default: "false"
       run_prepare:
         type: string
         required: false
@@ -94,6 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix_json                          : ${{ steps.stores.outputs.matrix_json }}
+      lighthouse_matrix_json               : ${{ steps.lh_matrix.outputs.lighthouse_matrix_json }}
       first_store                          : ${{ steps.stores.outputs.first_store }}
       theme_root                           : ${{ steps.out.outputs.theme_root }}
       theme_src                            : ${{ steps.out.outputs.theme_src }}
@@ -118,6 +129,22 @@ jobs:
         with:
           stores: ${{ inputs.shopify_store }}
           allow_empty: "true"
+
+      # Lighthouse matrix: full fan-out when ci_per_store is true, otherwise
+      # just the first store (one run for a shared codebase).
+      - id: lh_matrix
+        env:
+          MATRIX_JSON: ${{ steps.stores.outputs.matrix_json }}
+          CI_PER_STORE: ${{ inputs.ci_per_store }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const m = JSON.parse(process.env.MATRIX_JSON || '{"include":[]}');
+          const perStore = String(process.env.CI_PER_STORE || "").trim().toLowerCase() === "true";
+          const include = Array.isArray(m.include) ? m.include : [];
+          const out = perStore ? include : include.slice(0, 1);
+          console.log(`lighthouse_matrix_json=${JSON.stringify({ include: out })}`);
+          NODE
 
       - id: resolve_theme_root
         uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
@@ -358,7 +385,7 @@ jobs:
 
       - name: Setup Node with npm cache
         if: steps.npm_cache.outputs.enabled == 'true' && steps.nm_cache.outputs.cache-hit != 'true'
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: npm
@@ -908,7 +935,7 @@ jobs:
     needs: [resolve_inputs, prepare]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.resolve_inputs.outputs.matrix_json) }}
+      matrix: ${{ fromJson(needs.resolve_inputs.outputs.lighthouse_matrix_json) }}
     runs-on: ubuntu-latest
     env:
       TARGET_STORE                  : ${{ matrix.store }}

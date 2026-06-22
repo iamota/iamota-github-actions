@@ -85,7 +85,7 @@ runs:
 
         - name: Setup Node for fallback install
           if: steps.verify.outputs.needs_install == 'true'
-          uses: actions/setup-node@v5
+          uses: actions/setup-node@v6
           with:
               node-version: ${{ inputs.node_version }}
               cache: ${{ steps.npm_dep_path.outputs.path != '' && 'npm' || '' }}

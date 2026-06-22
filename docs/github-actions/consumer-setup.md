@@ -134,6 +134,53 @@ jobs:
       SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
 ```
 
+### Example: App Deploy (Shopify + Fly)
+
+For Shopify **app** repos (not themes). Per-environment app IDs/URLs/scopes live in the
+committed `shopify.app[.<env>].toml` / `fly[.<env>].toml`; GitHub Environments supply only
+the secrets below. Single-environment shown (no `config`); for a multi-environment app add
+the branch to `on.push` and pass `config: ${{ github.ref_name }}` to both jobs. Omit the
+`deploy_fly` job for apps that are not Fly-hosted.
+
+```yaml
+name: Deploy App
+
+on:
+  push:
+    branches: ["dev"]   # add "production" for a multi-env app
+
+permissions:
+  contents: read
+
+jobs:
+  deploy_shopify:
+    uses: iamota/iamota-github-actions/.github/workflows/shopify-app-deploy.yml@v1
+    with:
+      branch: ${{ github.ref_name }}
+      # config: ${{ github.ref_name }}   # multi-env only
+    secrets: inherit
+
+  deploy_fly:
+    uses: iamota/iamota-github-actions/.github/workflows/fly-deploy.yml@v1
+    with:
+      branch: ${{ github.ref_name }}
+      # config: ${{ github.ref_name }}   # multi-env only
+      # dockerhub_login: 'true'          # only if hitting Docker Hub pull limits
+      # dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets: inherit
+```
+
+Per **GitHub Environment** (one named for each deploy branch), provide the secrets:
+
+- `SHOPIFY_CLI_PARTNERS_TOKEN` — Partner org CLI token (authorizes `shopify app deploy`).
+- `SHOPIFY_API_KEY` — the app's `client_id`.
+- `SHOPIFY_API_SECRET` — staged as a Fly secret for OAuth (Fly-hosted apps).
+- `FLY_API_TOKEN` — Fly deploy token scoped to the app (Fly-hosted apps).
+- `DOCKERHUB_TOKEN` *(optional)* — only if `dockerhub_login` is enabled; pair with a `DOCKERHUB_USERNAME` variable.
+
+App-specific Fly runtime secrets (Stripe, Google, etc.) persist on the Fly app — set them
+once with `fly secrets set`; they are not re-staged on every deploy.
+
 ### Example: JSON Sync Production
 
 ```yaml
