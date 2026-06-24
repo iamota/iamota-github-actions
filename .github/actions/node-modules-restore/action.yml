@@ -14,6 +14,7 @@ inputs:
         required: false
         default: "."
     node_version:
+        # Node baseline — keep in sync with docs/github-actions/node-version.md.
         description: "Node.js version used by the fallback install."
         required: false
         default: "24"

@@ -2,6 +2,7 @@ name: "Shopify CLI Install"
 description: "Setup Node and install Shopify CLI"
 inputs:
     node_version:
+        # Node baseline — keep in sync with docs/github-actions/node-version.md.
         description: "Node.js version used for Shopify CLI"
         default: "24"
     cli_version:

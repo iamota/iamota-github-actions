@@ -241,7 +241,7 @@ Inputs:
 - `config` (optional, default empty) — Shopify config name passed to `--config` (selects `shopify.app.<config>.toml`). Empty = single-environment app (uses committed `shopify.app.toml`). Multi-environment apps pass the branch name.
 - `working_directory` (optional, default `.`)
 - `install_command` (optional, default `npm install`) — `npm install`, not `npm ci` (Windows-generated lockfile + platform-specific optional deps).
-- `node_version` (optional, default `20`)
+- `node_version` (optional, default `24` — see [node-version.md](node-version.md))
 - `cli_version` (optional, default `latest`)
 
 Secrets:

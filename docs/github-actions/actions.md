@@ -54,7 +54,7 @@ Sets up Node and installs Shopify CLI.
 
 Inputs:
 
-- `node_version` (optional, default `20`)
+- `node_version` (optional, default `24` — see [node-version.md](node-version.md))
 - `cli_version` (optional, default `latest`)
 
 ### `.github/actions/shopify-theme-pull/action.yml`

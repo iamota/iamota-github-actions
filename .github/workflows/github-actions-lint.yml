@@ -285,6 +285,7 @@ jobs:
             - uses: actions/checkout@v5
             - uses: actions/setup-node@v6
               with:
+                  # Node baseline — keep in sync with docs/github-actions/node-version.md.
                   node-version: "24"
             - name: Validate node scripts
               run: |

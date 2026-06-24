@@ -14,7 +14,9 @@ on:
       node_version:
         type: string
         required: false
-        default: "20"
+        # Node baseline — keep in sync with docs/github-actions/node-version.md.
+        # Shopify CLI requires Node >= 22.1 (uses module.enableCompileCache).
+        default: "24"
       run_build:
         type: string
         required: false
