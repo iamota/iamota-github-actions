@@ -77,7 +77,7 @@ jobs:
             - name: Capture commit message
               run: |
                   set -euo pipefail
-                  MSG="$(git log -1 --pretty=%B | tr '\n' ' ' | sed 's/[^a-zA-Z0-9-_ ]//g')"
+                  MSG="$(git log -1 --pretty=%B | tr '\n' ' ' | sed 's/[^a-zA-Z0-9_ -]//g')"
                   echo "COMMIT_MESSAGE=${MSG}" >> "$GITHUB_ENV"
 
             - name: Deploy to Shopify
