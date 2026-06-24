@@ -1,0 +1,249 @@
+name: Shopify App CI
+
+on:
+  workflow_call:
+    inputs:
+      working_directory:
+        type: string
+        required: false
+        default: "."
+      install_command:
+        type: string
+        required: false
+        default: "npm ci"
+      node_version:
+        type: string
+        required: false
+        default: "20"
+      run_build:
+        type: string
+        required: false
+        default: "true"
+      run_lint:
+        type: string
+        required: false
+        default: "true"
+      run_test:
+        type: string
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: iamota-shopify-app-ci-${{ github.repository }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  install_dependencies:
+    runs-on: ubuntu-latest
+    outputs:
+      working_directory_effective: ${{ steps.out.outputs.working_directory_effective }}
+      node_modules_cache_key: ${{ steps.nm_cache_key.outputs.key }}
+      node_modules_cache_path: ${{ steps.nm_cache_key.outputs.path }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: out
+        run: |
+          set -euo pipefail
+          WD="${{ inputs.working_directory }}"
+          if [ -z "${WD}" ]; then
+            WD="."
+          fi
+          if [ ! -d "${WD}" ]; then
+            echo "working_directory not found: ${WD}"
+            exit 1
+          fi
+          echo "working_directory_effective=${WD}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve npm cache dependency path
+        id: npm_cache
+        env:
+          WD: ${{ steps.out.outputs.working_directory_effective }}
+        run: |
+          set -euo pipefail
+          if [ -f "${WD}/package-lock.json" ]; then
+            {
+              echo "enabled=true"
+              echo "dependency_path=${WD}/package-lock.json"
+            } >> "$GITHUB_OUTPUT"
+          elif [ -f "${WD}/npm-shrinkwrap.json" ]; then
+            {
+              echo "enabled=true"
+              echo "dependency_path=${WD}/npm-shrinkwrap.json"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No npm lockfile found under ${WD}; skipping npm cache."
+          fi
+
+      - name: Compute node_modules cache key
+        id: nm_cache_key
+        env:
+          DEP_PATH: ${{ steps.npm_cache.outputs.dependency_path }}
+          DEP_ENABLED: ${{ steps.npm_cache.outputs.enabled }}
+          WD: ${{ steps.out.outputs.working_directory_effective }}
+        run: |
+          set -euo pipefail
+          if [ "${DEP_ENABLED}" != "true" ] || [ -z "${DEP_PATH}" ]; then
+            echo "key=" >> "$GITHUB_OUTPUT"
+            echo "path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          HASH="$(sha256sum "${DEP_PATH}" | awk '{print $1}')"
+          echo "key=node-modules-${{ runner.os }}-shopify-app-ci-${HASH}" >> "$GITHUB_OUTPUT"
+          echo "path=${WD}/node_modules" >> "$GITHUB_OUTPUT"
+
+      - name: Restore/save node_modules cache
+        if: steps.npm_cache.outputs.enabled == 'true'
+        id: nm_cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.nm_cache_key.outputs.path }}
+          key: ${{ steps.nm_cache_key.outputs.key }}
+
+      - name: Setup Node with npm cache
+        if: steps.npm_cache.outputs.enabled == 'true' && steps.nm_cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ steps.npm_cache.outputs.dependency_path }}
+
+      - name: NPM install (self-aware)
+        if: steps.npm_cache.outputs.enabled != 'true' || steps.nm_cache.outputs.cache-hit != 'true'
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+        with:
+          working_directory: ${{ steps.out.outputs.working_directory_effective }}
+          install_command: ${{ inputs.install_command }}
+          if_package_json: "1"
+
+  build:
+    if: inputs.run_build != 'false'
+    needs: [install_dependencies]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Restore node_modules
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+        with:
+          cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+          cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+          theme_root: ${{ needs.install_dependencies.outputs.working_directory_effective }}
+          node_version: ${{ inputs.node_version }}
+
+      - name: Run build script when available
+        run: |
+          set -euo pipefail
+          WD="${{ needs.install_dependencies.outputs.working_directory_effective }}"
+          if [ -z "${WD}" ]; then
+            WD="."
+          fi
+          if [ ! -f "${WD}/package.json" ]; then
+            echo "No package.json; skipping build."
+            exit 0
+          fi
+          cd "${WD}"
+          HAS_BUILD="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.build)?'1':'0')")"
+          if [ "${HAS_BUILD}" != "1" ]; then
+            echo "No build script; skipping."
+            exit 0
+          fi
+          npm run build
+
+  lint:
+    if: inputs.run_lint == 'true'
+    needs: [install_dependencies]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Restore node_modules
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+        with:
+          cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+          cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+          theme_root: ${{ needs.install_dependencies.outputs.working_directory_effective }}
+          node_version: ${{ inputs.node_version }}
+
+      - name: Run lint script when available
+        run: |
+          set -euo pipefail
+          WD="${{ needs.install_dependencies.outputs.working_directory_effective }}"
+          if [ -z "${WD}" ]; then
+            WD="."
+          fi
+          if [ ! -f "${WD}/package.json" ]; then
+            echo "No package.json; skipping lint."
+            exit 0
+          fi
+          cd "${WD}"
+          HAS_LINT="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.lint)?'1':'0')")"
+          if [ "${HAS_LINT}" != "1" ]; then
+            echo "No lint script; skipping."
+            exit 0
+          fi
+          LINT_CMD="$(node -e "const p=require('./package.json');process.stdout.write(String((p.scripts&&p.scripts.lint)||''))")"
+          if echo "${LINT_CMD}" | grep -qi "eslint"; then
+            echo "Running ESLint lint script with warnings allowed (errors still fail)."
+            npm run lint -- --max-warnings=-1
+          else
+            npm run lint
+          fi
+
+  test:
+    if: inputs.run_test == 'true'
+    needs: [install_dependencies]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Restore node_modules
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+        with:
+          cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
+          cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
+          theme_root: ${{ needs.install_dependencies.outputs.working_directory_effective }}
+          node_version: ${{ inputs.node_version }}
+
+      - name: Run test script when available
+        run: |
+          set -euo pipefail
+          WD="${{ needs.install_dependencies.outputs.working_directory_effective }}"
+          if [ -z "${WD}" ]; then
+            WD="."
+          fi
+          if [ ! -f "${WD}/package.json" ]; then
+            echo "No package.json; skipping tests."
+            exit 0
+          fi
+          cd "${WD}"
+          HAS_TEST="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.test)?'1':'0')")"
+          if [ "${HAS_TEST}" != "1" ]; then
+            echo "No test script; skipping."
+            exit 0
+          fi
+          npm test --if-present
+
+  ci:
+    name: CI Aggregate
+    runs-on: ubuntu-latest
+    needs:
+      - install_dependencies
+      - build
+      - lint
+      - test
+    if: always()
+    steps:
+      - name: Fail if any required job failed
+        run: |
+          set -euo pipefail
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more CI jobs failed or were cancelled."
+            exit 1
+          fi
+          echo "CI aggregate passed."
