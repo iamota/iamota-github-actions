@@ -88,8 +88,8 @@ jobs:
                   CONFIG_NAME: ${{ inputs.config }}
               run: |
                   set -euo pipefail
-                  ARGS=(app deploy -f --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
+                  ARGS=(app deploy --force --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
                   if [ -n "${CONFIG_NAME}" ]; then
-                      ARGS=(app deploy -f --config "${CONFIG_NAME}" --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
+                      ARGS=(app deploy --force --config "${CONFIG_NAME}" --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
                   fi
                   shopify "${ARGS[@]}"
