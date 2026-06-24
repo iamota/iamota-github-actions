@@ -40,8 +40,13 @@ on:
                 required: false
                 default: "latest"
         secrets:
+            # App-scoped automation token (preferred — least privilege, per-app).
+            # Falls back to the Partner org CLI token when absent. Provide at
+            # least one; the deploy job errors if both are empty.
+            SHOPIFY_APP_AUTOMATION_TOKEN:
+                required: false
             SHOPIFY_CLI_PARTNERS_TOKEN:
-                required: true
+                required: false
             SHOPIFY_API_KEY:
                 required: false
 
@@ -57,9 +62,13 @@ jobs:
         runs-on: ubuntu-latest
         environment: ${{ inputs.branch }}
         env:
-            SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
-            SHOPIFY_API_KEY           : ${{ secrets.SHOPIFY_API_KEY }}
-            COMMIT_URL                : ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+            # Prefer the app-scoped automation token; fall back to the Partner org
+            # CLI token. The deploy step unsets the partners token when the
+            # automation token is present so exactly one auth path is active.
+            SHOPIFY_APP_AUTOMATION_TOKEN: ${{ secrets.SHOPIFY_APP_AUTOMATION_TOKEN }}
+            SHOPIFY_CLI_PARTNERS_TOKEN  : ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+            SHOPIFY_API_KEY             : ${{ secrets.SHOPIFY_API_KEY }}
+            COMMIT_URL                  : ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
         steps:
             - uses: actions/checkout@v5
 
@@ -88,6 +97,16 @@ jobs:
                   CONFIG_NAME: ${{ inputs.config }}
               run: |
                   set -euo pipefail
+                  if [ -z "${SHOPIFY_APP_AUTOMATION_TOKEN:-}" ] && [ -z "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ]; then
+                      echo "::error::Provide SHOPIFY_APP_AUTOMATION_TOKEN (preferred) or SHOPIFY_CLI_PARTNERS_TOKEN."
+                      exit 1
+                  fi
+                  if [ -n "${SHOPIFY_APP_AUTOMATION_TOKEN:-}" ]; then
+                      echo "Authenticating with app automation token."
+                      unset SHOPIFY_CLI_PARTNERS_TOKEN
+                  else
+                      echo "Authenticating with Partners CLI token (fallback)."
+                  fi
                   ARGS=(app deploy --force --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
                   if [ -n "${CONFIG_NAME}" ]; then
                       ARGS=(app deploy --force --config "${CONFIG_NAME}" --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
