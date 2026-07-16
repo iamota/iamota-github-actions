@@ -39,6 +39,24 @@ on:
                 type: string
                 required: false
                 default: "latest"
+            allow_updates:
+                description: >-
+                    Pass `--allow-updates` so the deploy doesn't stall on a
+                    confirmation prompt in CI. Set false to require manual
+                    approval (deploy will fail non-interactively instead).
+                type: boolean
+                required: false
+                default: true
+            allow_deletes:
+                description: >-
+                    Pass `--allow-deletes` so the deploy doesn't stall on a
+                    confirmation prompt in CI. Set false for an app where
+                    accidental extension deletion is a real risk — the deploy
+                    will then fail non-interactively if it would delete
+                    anything, rather than doing so unattended.
+                type: boolean
+                required: false
+                default: true
         secrets:
             # App-scoped automation token (preferred — least privilege, per-app).
             # Falls back to the Partner org CLI token when absent. Provide at
@@ -95,6 +113,8 @@ jobs:
               working-directory: ${{ inputs.working_directory }}
               env:
                   CONFIG_NAME: ${{ inputs.config }}
+                  ALLOW_UPDATES: ${{ inputs.allow_updates }}
+                  ALLOW_DELETES: ${{ inputs.allow_deletes }}
               run: |
                   set -euo pipefail
                   if [ -z "${SHOPIFY_APP_AUTOMATION_TOKEN:-}" ] && [ -z "${SHOPIFY_CLI_PARTNERS_TOKEN:-}" ]; then
@@ -107,8 +127,14 @@ jobs:
                   else
                       echo "Authenticating with Partners CLI token (fallback)."
                   fi
-                  ARGS=(app deploy --allow-updates --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
+                  ARGS=(app deploy --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
                   if [ -n "${CONFIG_NAME}" ]; then
-                      ARGS=(app deploy --allow-updates --config "${CONFIG_NAME}" --source-control-url "${COMMIT_URL}" --message "${COMMIT_MESSAGE}")
+                      ARGS+=(--config "${CONFIG_NAME}")
+                  fi
+                  if [ "${ALLOW_UPDATES}" = "true" ]; then
+                      ARGS+=(--allow-updates)
+                  fi
+                  if [ "${ALLOW_DELETES}" = "true" ]; then
+                      ARGS+=(--allow-deletes)
                   fi
                   shopify "${ARGS[@]}"

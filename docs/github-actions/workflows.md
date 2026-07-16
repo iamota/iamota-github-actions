@@ -243,16 +243,19 @@ Inputs:
 - `install_command` (optional, default `npm install`) — `npm install`, not `npm ci` (Windows-generated lockfile + platform-specific optional deps).
 - `node_version` (optional, default `24` — see [node-version.md](node-version.md))
 - `cli_version` (optional, default `latest`)
+- `allow_updates` (optional, default `true`) — passes `--allow-updates` so the deploy doesn't stall on a CI confirmation prompt. Set `false` to require manual approval — the deploy then fails non-interactively instead of applying updates unattended.
+- `allow_deletes` (optional, default `true`) — passes `--allow-deletes` so the deploy doesn't stall on a CI confirmation prompt. Set `false` for an app where accidental extension deletion is a real risk — the deploy then fails non-interactively instead of deleting anything unattended.
 
 Secrets:
 
-- `SHOPIFY_CLI_PARTNERS_TOKEN` (required) — Partner org CLI token; authorizes non-interactive deploy.
+- `SHOPIFY_APP_AUTOMATION_TOKEN` (optional) — **preferred.** App-scoped automation token; authorizes non-interactive deploy with least privilege. At least one of this or `SHOPIFY_CLI_PARTNERS_TOKEN` is required — the job errors if both are empty.
+- `SHOPIFY_CLI_PARTNERS_TOKEN` (optional) — legacy fallback, used only when `SHOPIFY_APP_AUTOMATION_TOKEN` is absent. Partner-org-wide CLI token.
 - `SHOPIFY_API_KEY` (optional) — the app's `client_id`.
 
 Notes:
 
 - Stamps each app version with `--source-control-url` (commit) and a sanitized `--message` (commit message), so Partner Dashboard version history links back to the exact commit.
-- `-f` skips the interactive confirmation (required for CI).
+- `--allow-updates` and `--allow-deletes` skip the interactive confirmation (required for CI) — toggle either off via the matching input for an app that needs manual sign-off on that class of change.
 
 ### `.github/workflows/fly-deploy.yml`
 

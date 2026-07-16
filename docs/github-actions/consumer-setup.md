@@ -172,7 +172,8 @@ jobs:
 
 Per **GitHub Environment** (one named for each deploy branch), provide the secrets:
 
-- `SHOPIFY_CLI_PARTNERS_TOKEN` — Partner org CLI token (authorizes `shopify app deploy`).
+- `SHOPIFY_APP_AUTOMATION_TOKEN` — **preferred.** App-scoped automation token (Partner Dashboard → the app → CLI credentials); authorizes `shopify app deploy` non-interactively with least privilege.
+- `SHOPIFY_CLI_PARTNERS_TOKEN` — legacy fallback only, used when `SHOPIFY_APP_AUTOMATION_TOKEN` isn't set. Partner-org-wide CLI token — don't add it to a new app.
 - `SHOPIFY_API_KEY` — the app's `client_id`.
 - `SHOPIFY_API_SECRET` — staged as a Fly secret for OAuth (Fly-hosted apps).
 - `FLY_API_TOKEN` — Fly deploy token scoped to the app (Fly-hosted apps).
