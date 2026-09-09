@@ -273,6 +273,51 @@ jobs:
       IAMOTA_ACTIONS_READ_TOKEN: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
 ```
 
+### Example: Publish An NPM Package To GitHub Packages
+
+For library repos that ship an `@iamota/...` package privately to the org. The package must
+be scoped (`"name": "@iamota/<pkg>"`) and should carry
+`"publishConfig": { "registry": "https://npm.pkg.github.com" }` so a stray local `npm publish`
+cannot reach the public registry. No PAT is needed — `permissions: packages: write` on the
+wrapper job is what authorizes the publish.
+
+```yaml
+name: Publish Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    uses: iamota/iamota-github-actions/.github/workflows/github-npm-publish.yml@v1
+    permissions:
+      contents: read
+      packages: write
+    with:
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+```
+
+Consuming the published package from another repo or a developer machine needs an `.npmrc`
+pointing the scope at GitHub Packages, with a token carrying `read:packages`:
+
+```ini
+@iamota:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+```
+
+In CI, `secrets.GITHUB_TOKEN` covers same-repo reads; cross-repo reads need
+`IAMOTA_ACTIONS_READ_TOKEN` (or another fine-grained PAT with `Packages: Read`).
+
 ## 6) Common Wrapper Set To Enable
 
 Most Shopify repos should wire these wrappers:
@@ -296,6 +341,7 @@ Examples:
 
 - Sync workflows need `contents: write`
 - PR-commenting workflows need `pull-requests: write`
+- `github-npm-publish.yml` needs `packages: write`
 
 ## 8) Version Pinning Strategy
 

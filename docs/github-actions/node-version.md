@@ -33,6 +33,7 @@ These set the default that flows into everything else:
 - `.github/actions/node-modules-restore/action.yml` — `node_version` default
 - `.github/workflows/shopify-app-ci.yml` — `node_version` input default
 - `.github/workflows/shopify-app-deploy.yml` — `node_version` input default
+- `.github/workflows/github-npm-publish.yml` — `node_version` input default
 
 ### Hardcoded `setup-node` sites (theme + housekeeping workflows)
 

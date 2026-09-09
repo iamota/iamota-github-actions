@@ -6,8 +6,12 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 
 ### Reusable Workflows
 
+- `.github/workflows/fly-deploy.yml`
+- `.github/workflows/github-npm-publish.yml`
 - `.github/workflows/github-warn-merge-conflicts.yml`
 - `.github/workflows/github-warn-possible-conflicts.yml`
+- `.github/workflows/shopify-app-ci.yml`
+- `.github/workflows/shopify-app-deploy.yml`
 - `.github/workflows/shopify-json-sync-dev.yml`
 - `.github/workflows/shopify-json-sync-production.yml`
 - `.github/workflows/shopify-theme-backup.yml`

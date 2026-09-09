@@ -1,0 +1,241 @@
+name: GitHub Packages NPM Publish (Canonical)
+
+# Publishes a scoped npm package to GitHub Packages (npm.pkg.github.com) as a
+# private, org-scoped package. Package visibility follows the source repository:
+# a private repo yields a package only `iamota` org members can install, so no
+# `--access` flag is involved.
+#
+# Auth is the run's own GITHUB_TOKEN — the caller must grant
+# `permissions: packages: write` on the calling job. That replaces the classic
+# PAT with `write:packages` that the old per-repo publish workflows used.
+#
+# Typical trigger is a published GitHub Release; the version guard below keeps
+# the release tag and package.json version from drifting apart.
+
+on:
+    workflow_call:
+        inputs:
+            scope:
+                description: >-
+                    npm scope the package must be published under. The job fails
+                    when package.json `name` is not `<scope>/...`, so a misnamed
+                    package can never resolve to the wrong registry.
+                type: string
+                required: false
+                default: "@iamota"
+            registry_url:
+                description: "npm registry to publish to."
+                type: string
+                required: false
+                default: "https://npm.pkg.github.com"
+            working_directory:
+                description: "Directory containing package.json."
+                type: string
+                required: false
+                default: "."
+            install_command:
+                type: string
+                required: false
+                default: "npm ci"
+            node_version:
+                type: string
+                required: false
+                # Node baseline — keep in sync with docs/github-actions/node-version.md.
+                default: "24"
+            run_test:
+                description: "Run `npm test` before publishing (skipped when the package has no test script)."
+                type: boolean
+                required: false
+                default: true
+            run_build:
+                description: "Run `npm run build` before publishing (skipped when the package has no build script)."
+                type: boolean
+                required: false
+                default: false
+            verify_version_matches_tag:
+                description: >-
+                    When the run is triggered by a release or tag, require
+                    package.json `version` to equal the tag (leading `v`
+                    optional). Non-tag triggers skip the check.
+                type: boolean
+                required: false
+                default: true
+            skip_if_published:
+                description: >-
+                    Exit successfully (instead of failing on the registry's 409)
+                    when this name@version is already published.
+                type: boolean
+                required: false
+                default: true
+            dry_run:
+                description: "Run `npm publish --dry-run` — packs and validates, publishes nothing."
+                type: boolean
+                required: false
+                default: false
+        secrets:
+            NPM_PUBLISH_TOKEN:
+                description: >-
+                    Optional override token. Leave unset to publish with the
+                    run's GITHUB_TOKEN (the normal case). Set only to publish to
+                    a registry the run token cannot reach.
+                required: false
+
+permissions:
+    contents: read
+    packages: write
+
+concurrency:
+    group: iamota-github-npm-publish-${{ github.repository }}-${{ github.ref || github.run_id }}
+    cancel-in-progress: false
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        env:
+            NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Setup Node for GitHub Packages
+              uses: actions/setup-node@v6
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  registry-url: ${{ inputs.registry_url }}
+                  scope: ${{ inputs.scope }}
+
+            - name: Install npm dependencies
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              with:
+                  working_directory: ${{ inputs.working_directory }}
+                  install_command: ${{ inputs.install_command }}
+                  if_package_json: "1"
+
+            - name: Resolve package identity
+              id: pkg
+              working-directory: ${{ inputs.working_directory }}
+              env:
+                  EXPECTED_SCOPE: ${{ inputs.scope }}
+                  REGISTRY_URL: ${{ inputs.registry_url }}
+                  WORKING_DIRECTORY: ${{ inputs.working_directory }}
+              run: |
+                  set -euo pipefail
+                  if [ ! -f package.json ]; then
+                      echo "::error::No package.json in ${WORKING_DIRECTORY}; nothing to publish."
+                      exit 1
+                  fi
+                  NAME="$(node -p "require('./package.json').name || ''")"
+                  VERSION="$(node -p "require('./package.json').version || ''")"
+                  if [ -z "${NAME}" ] || [ -z "${VERSION}" ]; then
+                      echo "::error::package.json must declare both name and version."
+                      exit 1
+                  fi
+                  case "${NAME}" in
+                      "${EXPECTED_SCOPE}/"*) ;;
+                      *)
+                          echo "::error::Package name '${NAME}' is not under the expected scope '${EXPECTED_SCOPE}'; it would not resolve to ${REGISTRY_URL}."
+                          exit 1
+                          ;;
+                  esac
+                  {
+                      echo "name=${NAME}"
+                      echo "version=${VERSION}"
+                  } >> "$GITHUB_OUTPUT"
+                  echo "Publishing ${NAME}@${VERSION} to ${REGISTRY_URL}"
+
+            - name: Verify version matches release tag
+              if: inputs.verify_version_matches_tag && (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/'))
+              env:
+                  TAG: ${{ github.event.release.tag_name || github.ref_name }}
+                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
+              run: |
+                  set -euo pipefail
+                  TAG_VERSION="${TAG#v}"
+                  if [ "${TAG_VERSION}" != "${PKG_VERSION}" ]; then
+                      echo "::error::Release tag '${TAG}' does not match package.json version '${PKG_VERSION}'. Bump package.json (and its lockfile) before tagging."
+                      exit 1
+                  fi
+                  echo "Tag '${TAG}' matches package version '${PKG_VERSION}'."
+
+            - name: Check whether this version is already published
+              id: published
+              if: inputs.skip_if_published
+              working-directory: ${{ inputs.working_directory }}
+              env:
+                  PKG_NAME: ${{ steps.pkg.outputs.name }}
+                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
+                  REGISTRY_URL: ${{ inputs.registry_url }}
+              run: |
+                  set -euo pipefail
+                  # `npm view` exits non-zero for an unpublished name/version, which
+                  # is the normal case on a first publish — not an error here.
+                  if npm view "${PKG_NAME}@${PKG_VERSION}" version --registry "${REGISTRY_URL}" >/dev/null 2>&1; then
+                      echo "exists=true" >> "$GITHUB_OUTPUT"
+                      echo "::notice::${PKG_NAME}@${PKG_VERSION} is already published; publish will be skipped."
+                  else
+                      echo "exists=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Run build script when available
+              if: inputs.run_build && steps.published.outputs.exists != 'true'
+              working-directory: ${{ inputs.working_directory }}
+              run: |
+                  set -euo pipefail
+                  HAS_BUILD="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.build)?'1':'0')")"
+                  if [ "${HAS_BUILD}" != "1" ]; then
+                      echo "No build script; skipping."
+                      exit 0
+                  fi
+                  npm run build
+
+            - name: Run tests when available
+              if: inputs.run_test && steps.published.outputs.exists != 'true'
+              working-directory: ${{ inputs.working_directory }}
+              run: |
+                  set -euo pipefail
+                  HAS_TEST="$(node -e "const p=require('./package.json');process.stdout.write((p.scripts&&p.scripts.test)?'1':'0')")"
+                  if [ "${HAS_TEST}" != "1" ]; then
+                      echo "No test script; skipping."
+                      exit 0
+                  fi
+                  npm test
+
+            - name: Publish
+              if: steps.published.outputs.exists != 'true'
+              working-directory: ${{ inputs.working_directory }}
+              env:
+                  PKG_NAME: ${{ steps.pkg.outputs.name }}
+                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
+                  REGISTRY_URL: ${{ inputs.registry_url }}
+                  DRY_RUN: ${{ inputs.dry_run }}
+              run: |
+                  set -euo pipefail
+                  ARGS=(publish --registry "${REGISTRY_URL}")
+                  if [ "${DRY_RUN}" = "true" ]; then
+                      ARGS+=(--dry-run)
+                      echo "Dry run — packing ${PKG_NAME}@${PKG_VERSION} without publishing."
+                  fi
+                  npm "${ARGS[@]}"
+
+            - name: Publish summary
+              if: always()
+              env:
+                  PKG_NAME: ${{ steps.pkg.outputs.name }}
+                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
+                  ALREADY_PUBLISHED: ${{ steps.published.outputs.exists }}
+                  REGISTRY_URL: ${{ inputs.registry_url }}
+                  DRY_RUN: ${{ inputs.dry_run }}
+              run: |
+                  set -euo pipefail
+                  {
+                      echo "## GitHub Packages Publish"
+                      echo ""
+                      echo "- Package: \`${PKG_NAME:-unresolved}@${PKG_VERSION:-unresolved}\`"
+                      echo "- Registry: \`${REGISTRY_URL}\`"
+                      if [ "${ALREADY_PUBLISHED}" = "true" ]; then
+                          echo "- Result: skipped (version already published)"
+                      elif [ "${DRY_RUN}" = "true" ]; then
+                          echo "- Result: dry run (nothing published)"
+                      else
+                          echo "- Result: published"
+                      fi
+                  } >> "$GITHUB_STEP_SUMMARY"

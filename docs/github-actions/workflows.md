@@ -283,6 +283,42 @@ Notes:
 - Stages **only** the two universal Shopify secrets (`SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`) with `--stage`, so the app restarts once on the following `deploy`. App-specific runtime secrets (Stripe, Google, etc.) persist on the Fly app once set — set them once at provisioning with `fly secrets set`; they do not need re-staging on every deploy.
 - A failed `deploy_shopify` does not roll back `deploy_fly` — the two jobs are independent by default. Add `needs: [deploy_shopify]` in the wrapper to gate Fly on a successful Shopify deploy.
 
+## Package Publishing
+
+### `.github/workflows/github-npm-publish.yml`
+
+Purpose:
+
+- Publish a scoped npm package to GitHub Packages (`npm.pkg.github.com`) as a private, org-scoped package.
+
+Package visibility follows the source repository — a private `iamota` repo produces a
+package only org members can install. There is no `--access` flag involved, and nothing is
+published to the public npm registry. Consumers install it with an `@iamota:registry`
+entry in their `.npmrc` plus a token carrying `read:packages`.
+
+Inputs:
+
+- `scope` (optional, default `@iamota`) — package.json `name` must be `<scope>/...` or the job fails before publishing.
+- `registry_url` (optional, default `https://npm.pkg.github.com`)
+- `working_directory` (optional, default `.`)
+- `install_command` (optional, default `npm ci`)
+- `node_version` (optional, default `24` — see [node-version.md](node-version.md))
+- `run_test` (optional, default `true`) — runs `npm test`; skipped when the package has no test script.
+- `run_build` (optional, default `false`) — runs `npm run build`; skipped when the package has no build script.
+- `verify_version_matches_tag` (optional, default `true`) — on a release/tag trigger, requires package.json `version` to equal the tag (leading `v` optional). Non-tag triggers skip the check.
+- `skip_if_published` (optional, default `true`) — exits green instead of failing on the registry's 409 when the version already exists.
+- `dry_run` (optional, default `false`) — `npm publish --dry-run`; packs and validates, publishes nothing.
+
+Secrets:
+
+- `NPM_PUBLISH_TOKEN` (optional) — override token. Leave unset for the normal case; the run's `GITHUB_TOKEN` authenticates the publish. Set it only to reach a registry the run token cannot.
+
+Notes:
+
+- The caller **must** grant `permissions: packages: write` (plus `contents: read`) on the calling job — that is what replaces the classic PAT with `write:packages` used by older per-repo publish workflows.
+- The scope guard runs before any publish attempt, so a package renamed out of `@iamota` fails loudly rather than resolving to a different registry.
+- Re-running a release is safe: the already-published check short-circuits before build, test, and publish.
+
 ## Internal Validation
 
 ### `.github/workflows/github-actions-lint.yml`
