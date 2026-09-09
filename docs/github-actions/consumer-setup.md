@@ -281,12 +281,18 @@ be scoped (`"name": "@iamota/<pkg>"`) and should carry
 cannot reach the public registry. No PAT is needed — `permissions: packages: write` on the
 wrapper job is what authorizes the publish.
 
+The recommended shape pairs it with `release-semver-tags.yml` so the release-line
+branch model works the same way it does in this repo: every push to
+`release/v<major>.<minor>` bumps the patch version, tags it, and publishes. Ship a
+minor by cutting a new line branch (`release/v2.1`) — no hand-edited versions.
+
 ```yaml
-name: Publish Package
+name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - "release/v*.*"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -295,17 +301,46 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
+  tag:
+    if: github.event_name == 'push'
+    uses: iamota/iamota-github-actions/.github/workflows/release-semver-tags.yml@v1
+    permissions:
+      contents: write
+      issues: write
+    with:
+      bump_package_version: "true"
+
   publish:
+    needs: [tag]
+    if: github.event_name == 'push' && needs.tag.outputs.tagged == 'true'
     uses: iamota/iamota-github-actions/.github/workflows/github-npm-publish.yml@v1
     permissions:
       contents: read
       packages: write
     with:
-      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+      # Publish the bump commit the tag job created, not the pushed commit.
+      ref: ${{ needs.tag.outputs.tag }}
+      expected_version: ${{ needs.tag.outputs.version }}
+
+  publish_dry_run:
+    if: github.event_name == 'workflow_dispatch'
+    uses: iamota/iamota-github-actions/.github/workflows/github-npm-publish.yml@v1
+    permissions:
+      contents: read
+      packages: write
+    with:
+      dry_run: ${{ inputs.dry_run }}
 ```
+
+`ref` matters: without it the publish job would check out the pushed commit and
+publish the pre-bump version. `expected_version` then fails the run loudly if the
+wrong ref ever lands in the checkout.
+
+For a repo that would rather cut releases by hand, drop the `tag` job and trigger
+`github-npm-publish.yml` on `release: [published]` instead — its
+`verify_version_matches_tag` guard keeps the release tag and `package.json` in step.
 
 Consuming the published package from another repo or a developer machine needs an `.npmrc`
 pointing the scope at GitHub Packages, with a token carrying `read:packages`:

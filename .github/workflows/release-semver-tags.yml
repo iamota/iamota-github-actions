@@ -1,34 +1,110 @@
 name: Release Semver Tags
 
+# Auto-tags pushes on a release line branch (`v<major>.<minor>` or
+# `release/v<major>.<minor>`): creates the next immutable patch tag and moves the
+# floating line (`v1.0`) and major (`v1`) tags.
+#
+# Runs two ways:
+#   - directly, on pushes to this repo's own release branches (`on: push` below);
+#   - as a reusable workflow (`workflow_call`), for consumer repos that want the
+#     same release-line model — optionally bumping package.json to the computed
+#     version so a published npm package and its tag never drift.
+#
+# Inputs are typed `string`, not `boolean`, because the `inputs` context is empty
+# on a `push` trigger; `inputs.x || 'default'` then resolves correctly for both
+# entry points.
+
 on:
     push:
         branches:
             - "v*.*"
             - "release/v*.*"
     workflow_dispatch: {}
+    workflow_call:
+        inputs:
+            bump_package_version:
+                description: >-
+                    When "true", rewrite package.json (and its lockfile) to the
+                    computed version, commit it to the release branch, and tag
+                    that commit. Leave "false" for repos with no package.json.
+                type: string
+                required: false
+                default: "false"
+            working_directory:
+                description: "Directory containing package.json (used only when bumping)."
+                type: string
+                required: false
+                default: "."
+            run_ref_guard:
+                description: >-
+                    Run the internal `@vN` ref guard. Only meaningful in
+                    iamota-github-actions itself; skipped automatically when the
+                    guard script is absent.
+                type: string
+                required: false
+                default: "true"
+            node_version:
+                type: string
+                required: false
+                # Node baseline — keep in sync with docs/github-actions/node-version.md.
+                default: "24"
+        outputs:
+            tagged:
+                description: "\"true\" when a release tag was created or refreshed."
+                value: ${{ jobs.tag.outputs.tagged }}
+            version:
+                description: "Computed version with no leading v (e.g. 2.0.1)."
+                value: ${{ jobs.tag.outputs.version }}
+            tag:
+                description: "Immutable patch tag (e.g. v2.0.1)."
+                value: ${{ jobs.tag.outputs.tag }}
+            line_tag:
+                description: "Floating line tag (e.g. v2.0)."
+                value: ${{ jobs.tag.outputs.line_tag }}
+            major_tag:
+                description: "Floating major tag (e.g. v2)."
+                value: ${{ jobs.tag.outputs.major_tag }}
+            sha:
+                description: "Commit the immutable tag points at (the bump commit when bumping)."
+                value: ${{ jobs.tag.outputs.sha }}
 
 permissions:
     contents: write
     issues: write
 
 concurrency:
-    group: release-semver-tags
+    group: iamota-release-semver-tags-${{ github.repository }}
     cancel-in-progress: false
 
 jobs:
     tag:
         runs-on: ubuntu-latest
+        outputs:
+            tagged: ${{ steps.tags.outputs.tagged }}
+            version: ${{ steps.tags.outputs.version }}
+            tag: ${{ steps.tags.outputs.tag }}
+            line_tag: ${{ steps.tags.outputs.line_tag }}
+            major_tag: ${{ steps.tags.outputs.major_tag }}
+            sha: ${{ steps.tags.outputs.sha }}
         steps:
             - uses: actions/checkout@v5
               with:
                   fetch-depth: 0
 
             - name: Guard internal release refs
+              if: (inputs.run_ref_guard || 'true') != 'false'
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
-                  node .github/scripts/github/github-release-ref-guard.mjs
+                  GUARD=".github/scripts/github/github-release-ref-guard.mjs"
+                  # The guard script lives only in iamota-github-actions; consumer
+                  # repos calling this workflow have nothing to check.
+                  if [ ! -f "${GUARD}" ]; then
+                      echo "No ${GUARD} in this repo; skipping internal ref guard."
+                      exit 0
+                  fi
+                  node "${GUARD}"
 
             - name: Validate release branch format
               id: meta
@@ -47,12 +123,21 @@ jobs:
                   echo "minor=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
                   echo "branch=${CANONICAL_BRANCH}" >> "$GITHUB_OUTPUT"
 
+            - name: Setup Node
+              if: steps.meta.outputs.valid == 'true' && (inputs.bump_package_version || 'false') == 'true'
+              uses: actions/setup-node@v6
+              with:
+                  node-version: ${{ inputs.node_version || '24' }}
+
             - name: Compute and update tags
+              id: tags
               if: steps.meta.outputs.valid == 'true'
               env:
                   MAJOR: ${{ steps.meta.outputs.major }}
                   MINOR: ${{ steps.meta.outputs.minor }}
                   BRANCH: ${{ steps.meta.outputs.branch }}
+                  BUMP: ${{ inputs.bump_package_version || 'false' }}
+                  WORKING_DIRECTORY: ${{ inputs.working_directory || '.' }}
               run: |
                   set -euo pipefail
 
@@ -72,14 +157,43 @@ jobs:
                       NEXT_PATCH="0"
                   fi
 
-                  NEW_TAG="v${MAJOR}.${MINOR}.${NEXT_PATCH}"
+                  VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+                  NEW_TAG="v${VERSION}"
                   LINE_FLOATER="v${MAJOR}.${MINOR}"
                   MAJOR_FLOATER="v${MAJOR}"
+                  TARGET_SHA="${GITHUB_SHA}"
+
+                  # Bump package.json to the computed version and tag the bump
+                  # commit, so the tag and the published package agree. Pushed
+                  # with GITHUB_TOKEN, which does not retrigger workflows;
+                  # [skip ci] is belt-and-braces for any mirrored trigger.
+                  if [ "${BUMP}" = "true" ]; then
+                      if [ ! -f "${WORKING_DIRECTORY}/package.json" ]; then
+                          echo "::error::bump_package_version is true but ${WORKING_DIRECTORY}/package.json does not exist."
+                          exit 1
+                      fi
+                      CURRENT_VERSION="$(node -p "require('./${WORKING_DIRECTORY}/package.json').version || ''")"
+                      if [ "${CURRENT_VERSION}" = "${VERSION}" ]; then
+                          echo "package.json is already at ${VERSION}; no bump commit needed."
+                      else
+                          (
+                              cd "${WORKING_DIRECTORY}"
+                              npm version "${VERSION}" --no-git-tag-version --allow-same-version
+                              git add package.json
+                              if [ -f package-lock.json ]; then git add package-lock.json; fi
+                              if [ -f npm-shrinkwrap.json ]; then git add npm-shrinkwrap.json; fi
+                          )
+                          git commit -m "chore(release): ${NEW_TAG} [skip ci]"
+                          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+                          TARGET_SHA="$(git rev-parse HEAD)"
+                          echo "Bumped package.json ${CURRENT_VERSION} -> ${VERSION} in ${TARGET_SHA}."
+                      fi
+                  fi
 
                   if git rev-parse -q --verify "refs/tags/${NEW_TAG}" >/dev/null; then
                       echo "Immutable tag ${NEW_TAG} already exists; skipping creation."
                   else
-                      git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG} from ${BRANCH}" "${GITHUB_SHA}"
+                      git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG} from ${BRANCH}" "${TARGET_SHA}"
                       git push origin "refs/tags/${NEW_TAG}"
                   fi
 
@@ -96,7 +210,16 @@ jobs:
                   git tag -fa "${MAJOR_FLOATER}" -m "Floating tag ${MAJOR_FLOATER} -> ${MAJOR_TARGET}" "${MAJOR_TARGET}"
                   git push origin "refs/tags/${MAJOR_FLOATER}" --force
 
+                  {
+                      echo "tagged=true"
+                      echo "version=${VERSION}"
+                      echo "tag=${NEW_TAG}"
+                      echo "line_tag=${LINE_FLOATER}"
+                      echo "major_tag=${MAJOR_FLOATER}"
+                      echo "sha=${TARGET_SHA}"
+                  } >> "$GITHUB_OUTPUT"
+
                   echo "Created/updated tags:"
-                  echo "- Immutable: ${NEW_TAG}"
+                  echo "- Immutable: ${NEW_TAG} -> ${TARGET_SHA}"
                   echo "- Line floater: ${LINE_FLOATER} -> ${NEW_TAG}"
                   echo "- Major floater: ${MAJOR_FLOATER} -> ${MAJOR_TARGET}"

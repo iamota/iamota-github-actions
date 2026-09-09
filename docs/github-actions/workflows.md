@@ -301,6 +301,8 @@ Inputs:
 - `scope` (optional, default `@iamota`) — package.json `name` must be `<scope>/...` or the job fails before publishing.
 - `registry_url` (optional, default `https://npm.pkg.github.com`)
 - `working_directory` (optional, default `.`)
+- `ref` (optional, default empty) — git ref to check out and publish. Empty uses the triggering ref. Set it when an upstream job created the commit to publish (e.g. the tag from `release-semver-tags`).
+- `expected_version` (optional, default empty) — when set, package.json `version` must equal it (leading `v` optional). Asserts the version an upstream job computed actually landed in the checkout.
 - `install_command` (optional, default `npm ci`)
 - `node_version` (optional, default `24` — see [node-version.md](node-version.md))
 - `run_test` (optional, default `true`) — runs `npm test`; skipped when the package has no test script.
@@ -327,7 +329,7 @@ Purpose:
 
 - Runs `actionlint` and `node --check` on `.github/scripts/**/*.mjs` for this repo.
 
-## Internal Release
+## Release Tagging
 
 ### `.github/workflows/release-semver-tags.yml`
 
@@ -337,15 +339,39 @@ Purpose:
 - Create immutable patch tags (`v1.0.0`, `v1.0.1`, ...).
 - Move floating line tag (`v1.0`) to latest patch in that line.
 - Move floating major tag (`v1`) to highest semantic version across all `v1.*.*` tags.
+- Optionally bump `package.json` to the computed version and tag that commit, so an npm package and its tag cannot drift.
 
-Inputs: none
+Runs two ways: directly on pushes to **this** repo's release branches, and as a
+reusable workflow (`workflow_call`) for consumer repos adopting the same
+release-line model.
+
+Inputs (reusable calls only — `on: push` runs use the defaults):
+
+- `bump_package_version` (optional, default `"false"`) — rewrite `package.json` + lockfile to the computed version, commit to the release branch, and tag that commit.
+- `working_directory` (optional, default `.`) — where `package.json` lives; used only when bumping.
+- `run_ref_guard` (optional, default `"true"`) — run the internal `@vN` ref guard. Skipped automatically when the guard script is absent, so consumer repos can leave it alone.
+- `node_version` (optional, default `24` — see [node-version.md](node-version.md)) — used only when bumping.
+
+Inputs are typed `string` rather than `boolean`: the `inputs` context is empty on
+a `push` trigger, so the workflow reads them as `inputs.x || 'default'`, which
+only works for a string.
+
+Outputs:
+
+- `tagged` — `"true"` when a tag was created or refreshed (empty when the branch name did not validate).
+- `version` — computed version, no leading `v` (e.g. `2.0.1`).
+- `tag` — immutable patch tag (e.g. `v2.0.1`).
+- `line_tag` / `major_tag` — the floating tags that were moved (e.g. `v2.0`, `v2`).
+- `sha` — commit the immutable tag points at; the bump commit when bumping.
+
 Secrets: none
 
 Notes:
 
-- Runs on pushes to branches matching `v*.*`.
-- Supports release branch names `v<major>.<minor>` and `release/v<major>.<minor>`.
-- Validation enforces canonical version format: `v<major>.<minor>`.
-- Runs release ref guard script before tagging and fails when internal `@vN` refs conflict with branch major.
-- On mismatch, creates/updates a repository issue with file/line details.
-- Uses `contents: write` to create immutable tags and force-update floating tags.
+- Runs on pushes to branches matching `v*.*` and `release/v*.*`; validation enforces canonical `v<major>.<minor>`. A non-matching branch is skipped, not failed, and leaves `tagged` empty.
+- Patch numbers come from existing **tags** on the line, not from `package.json` — a line with no tags yet starts at `.0`.
+- Ship a minor or major by cutting a new line branch (`release/v2.1`), not by editing a version by hand.
+- The bump commit is pushed with `GITHUB_TOKEN`, which does not retrigger workflows; its message also carries `[skip ci]`.
+- Re-running on an unchanged commit is safe: an existing immutable tag is left alone and the floating tags are simply re-pointed.
+- Runs the release ref guard before tagging and fails when internal `@vN` refs conflict with the branch major, creating/updating a repository issue with file/line details.
+- Needs `contents: write` to create immutable tags, force-update floating tags, and push the bump commit — a calling job must grant it.

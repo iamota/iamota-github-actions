@@ -33,6 +33,24 @@ on:
                 type: string
                 required: false
                 default: "."
+            ref:
+                description: >-
+                    Git ref to check out and publish. Empty = the ref that
+                    triggered the run. Set this when an upstream job created the
+                    commit to publish (e.g. the release tag from
+                    release-semver-tags), since the default checkout would
+                    otherwise miss it.
+                type: string
+                required: false
+                default: ""
+            expected_version:
+                description: >-
+                    When set, require package.json `version` to equal this
+                    (leading `v` optional). Use it to assert the version an
+                    upstream job computed actually landed in the checkout.
+                type: string
+                required: false
+                default: ""
             install_command:
                 type: string
                 required: false
@@ -95,6 +113,9 @@ jobs:
             NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
         steps:
             - uses: actions/checkout@v5
+              with:
+                  # Empty resolves to the triggering ref (checkout's own default).
+                  ref: ${{ inputs.ref }}
 
             - name: Setup Node for GitHub Packages
               uses: actions/setup-node@v6
@@ -141,6 +162,20 @@ jobs:
                       echo "version=${VERSION}"
                   } >> "$GITHUB_OUTPUT"
                   echo "Publishing ${NAME}@${VERSION} to ${REGISTRY_URL}"
+
+            - name: Verify version matches expected_version
+              if: inputs.expected_version != ''
+              env:
+                  EXPECTED: ${{ inputs.expected_version }}
+                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
+              run: |
+                  set -euo pipefail
+                  EXPECTED_VERSION="${EXPECTED#v}"
+                  if [ "${EXPECTED_VERSION}" != "${PKG_VERSION}" ]; then
+                      echo "::error::Expected version '${EXPECTED_VERSION}' but the checkout's package.json says '${PKG_VERSION}'. The wrong ref was published."
+                      exit 1
+                  fi
+                  echo "Checkout is at expected version '${PKG_VERSION}'."
 
             - name: Verify version matches release tag
               if: inputs.verify_version_matches_tag && (github.event_name == 'release' || startsWith(github.ref, 'refs/tags/'))

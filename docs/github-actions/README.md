@@ -25,7 +25,9 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 
 - `.github/workflows/github-actions-lint.yml`
 
-### Internal Release Workflow
+### Release Tagging Workflow
+
+Runs internally on this repo's release branches, and is callable by consumer repos.
 
 - `.github/workflows/release-semver-tags.yml`
 
