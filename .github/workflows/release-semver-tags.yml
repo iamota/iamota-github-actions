@@ -180,8 +180,14 @@ jobs:
                               cd "${WORKING_DIRECTORY}"
                               npm version "${VERSION}" --no-git-tag-version --allow-same-version
                               git add package.json
-                              if [ -f package-lock.json ]; then git add package-lock.json; fi
-                              if [ -f npm-shrinkwrap.json ]; then git add npm-shrinkwrap.json; fi
+                              # A lockfile can exist on disk yet be gitignored (common
+                              # for libraries). `git add` on an ignored path is a hard
+                              # error, which would break the release under `set -e`.
+                              for LOCKFILE in package-lock.json npm-shrinkwrap.json; do
+                                  if [ -f "${LOCKFILE}" ] && ! git check-ignore -q "${LOCKFILE}"; then
+                                      git add "${LOCKFILE}"
+                                  fi
+                              done
                           )
                           git commit -m "chore(release): ${NEW_TAG} [skip ci]"
                           git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
