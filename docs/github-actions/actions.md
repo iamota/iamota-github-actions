@@ -300,3 +300,24 @@ Inputs:
 Outputs:
 
 - `ref` (resolved ref)
+
+## Claude Helpers
+
+### `.github/actions/claude-plugins-validate/action.yml`
+
+Validates a Claude plugin marketplace repo for claude.ai organization sync. `validate.mjs` (zero dependencies, runnable locally with `node validate.mjs <repo> [--base <ref>]`) checks:
+
+- `marketplace.json` names, `./` sources that exist, and entry names matching each `plugin.json`
+- no top-level `bin/` in any plugin (claude.ai rejects those)
+- `SKILL.md` frontmatter limited to the keys claude.ai accepts (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`), `name` matching its folder, description of 1024 characters or fewer
+- agents with `name` + `description`, no empty `tools` list, `model` as an alias or `inherit` (warning)
+- with `base_ref`: plugins whose files changed must bump their version
+
+Then runs `claude plugin validate --strict` on the marketplace and each plugin.
+
+Inputs:
+
+- `path` (optional, default `.`)
+- `base_ref` (optional) — enables the version-bump check; needs full history
+- `claude_code_version` (optional, default `latest`)
+- `run_claude_validate` (optional `true`/`false`, default `true`)
