@@ -1,207 +1,168 @@
 #!/usr/bin/env node
 /**
  * Validate a Claude plugin marketplace repository (the layout claude.ai
- * organization sync reads) beyond what `claude plugin validate` checks:
+ * organization sync reads) beyond what `claude plugin validate` checks.
  *
- *   - marketplace.json: plugin names, `./` relative sources that exist, and the
- *     entry name matching each plugin's own plugin.json
+ * File rules come from @iamota/claude-plugin-schema (published from
+ * iamota-ai-plugins), the same package kb-web's editors and checks use, so CI
+ * and the editor never disagree: SKILL.md / agent frontmatter, plugin.json,
+ * marketplace.json, hooks.json and .mcp.json, each issue with a line.
+ *
+ * This script adds the checks that span files, which the package doesn't do:
+ *
+ *   - marketplace.json: `./` sources that exist, and each entry's name matching
+ *     its plugin's own plugin.json
  *   - no top-level bin/ in any plugin (claude.ai rejects those plugins)
- *   - SKILL.md frontmatter: only the keys claude.ai accepts, a kebab-case
- *     `name` that matches its folder, and a description within the limit
- *   - agents: name + description present, no empty `tools` list (zero-tool
- *     subagents fail to launch), `model` as an alias or `inherit`
+ *   - every skills/<name>/ folder has a SKILL.md
  *   - optional: a plugin whose files changed must bump its plugin.json version
- *     (Claude Code installs stay pinned to a version until it changes)
+ *     (Claude Code installs stay pinned to a version until it changes);
+ *     compiled Python (__pycache__/, *.pyc) doesn't count as a change
  *
  * Usage: node validate.mjs [repoRoot] [--base <git-ref>]
- * Zero dependencies. Exit 1 on any error; warnings never fail.
+ *
+ * The package is loaded from CLAUDE_PLUGIN_SCHEMA_DIR (the action installs it
+ * there) or, failing that, from the repo root's node_modules (in
+ * iamota-ai-plugins: `npm ci && npm run build -w @iamota/claude-plugin-schema`).
+ * Exit 1 on any error; warnings never fail.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const args = process.argv.slice(2);
 const baseIdx = args.indexOf("--base");
 const baseRef = baseIdx >= 0 ? args[baseIdx + 1] : "";
-const root = path.resolve(args.find((a, i) => !a.startsWith("--") && i !== baseIdx + 1) ?? ".");
+const root = path.resolve(args.find((a, i) => !a.startsWith("--") && (baseIdx < 0 || i !== baseIdx + 1)) ?? ".");
+
+async function loadSchema() {
+  const bases = [process.env.CLAUDE_PLUGIN_SCHEMA_DIR, root].filter(Boolean);
+  for (const base of bases) {
+    try {
+      const resolved = createRequire(path.join(path.resolve(base), "package.json")).resolve("@iamota/claude-plugin-schema");
+      return await import(pathToFileURL(resolved).href);
+    } catch {
+      // try the next location
+    }
+  }
+  console.log(
+    `::error::@iamota/claude-plugin-schema not found (looked in ${bases.join(", ")}). ` +
+      "In CI the action installs it (needs `packages: read`); locally set CLAUDE_PLUGIN_SCHEMA_DIR or build it in iamota-ai-plugins.",
+  );
+  process.exit(1);
+}
+
+const { validatePluginFile, isCompiledPython } = await loadSchema();
 
 const errors = [];
 const warnings = [];
-const err = (file, msg) => errors.push(`${file}: ${msg}`);
-const warn = (file, msg) => warnings.push(`${file}: ${msg}`);
+const report = (file, line, msg, severity = "error") => (severity === "error" ? errors : warnings).push({ file, line, msg });
 const rel = (p) => path.relative(root, p).split(path.sep).join("/");
 
-const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const RESERVED_PREFIX = /^(claude|anthropic|anthropics|cc-plugin)-/;
-// claude.ai rejects any other top-level SKILL.md key when syncing or uploading.
-const SKILL_KEYS = new Set(["name", "description", "license", "compatibility", "metadata", "allowed-tools"]);
-const SKILL_DESCRIPTION_MAX = 1024;
-const AGENT_MODELS = new Set(["inherit", "sonnet", "opus", "haiku", "fable"]);
-
-/**
- * Minimal frontmatter reader: top-level keys with plain, quoted, flow-list or
- * block-scalar values. Enough to check keys and string lengths; the YAML itself
- * is checked by `claude plugin validate`.
- */
-function readFrontmatter(file) {
-  const raw = readFileSync(file, "utf8");
-  if (!/^---\r?\n/.test(raw)) return null;
-  const end = raw.slice(4).search(/\r?\n---\s*(\r?\n|$)/);
-  if (end < 0) return null;
-  const data = {};
-  let key = null;
-  let block = false;
-  for (const line of raw.slice(4, 4 + end).split(/\r?\n/)) {
-    const kv = line.match(/^([A-Za-z0-9_-]+):(?:\s+(.*))?$/);
-    if (kv) {
-      key = kv[1];
-      const v = (kv[2] ?? "").trim();
-      block = v === "" || /^[>|][-+]?$/.test(v);
-      data[key] = block ? "" : v.replace(/^(["'])(.*)\1$/, "$2");
-    } else if (key && block && /^\s+\S/.test(line)) {
-      data[key] += (data[key] ? " " : "") + line.trim();
-    }
-  }
-  return data;
-}
-
-function readJson(file) {
-  try {
-    return JSON.parse(readFileSync(file, "utf8"));
-  } catch (e) {
-    err(rel(file), `invalid JSON (${e.message})`);
-    return null;
-  }
+function git(...a) {
+  return execFileSync("git", a, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
 }
 
 function listDir(dir) {
   return existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : [];
 }
 
-function checkSkills(pluginDir) {
-  for (const entry of listDir(path.join(pluginDir, "skills"))) {
-    if (!entry.isDirectory()) continue;
-    const file = path.join(pluginDir, "skills", entry.name, "SKILL.md");
-    if (!existsSync(file)) {
-      err(rel(path.dirname(file)), "skill folder has no SKILL.md");
-      continue;
-    }
-    const fm = readFrontmatter(file);
-    if (!fm) {
-      err(rel(file), "missing frontmatter (the first line must be ---)");
-      continue;
-    }
-    for (const k of Object.keys(fm)) {
-      if (!SKILL_KEYS.has(k)) err(rel(file), `frontmatter key "${k}" is not accepted by claude.ai; move it under metadata`);
-    }
-    if (!fm.name) err(rel(file), "name is required");
-    else {
-      if (fm.name !== entry.name) err(rel(file), `name "${fm.name}" must match its folder "${entry.name}"`);
-      if (!KEBAB.test(fm.name) || fm.name.length > 64) err(rel(file), `name "${fm.name}" must be kebab-case, 64 characters or fewer`);
-    }
-    if (!fm.description) err(rel(file), "description is required");
-    else if (fm.description.length > SKILL_DESCRIPTION_MAX) {
-      err(rel(file), `description is ${fm.description.length} characters (max ${SKILL_DESCRIPTION_MAX})`);
-    }
+/** Every file in the repo: tracked plus untracked-but-not-ignored. */
+function repoFiles() {
+  try {
+    return git("ls-files", "--cached", "--others", "--exclude-standard", "-z").split("\0").filter(Boolean);
+  } catch {
+    console.log(`::error::${root} is not a git checkout; the validator reads the file list from git`);
+    process.exit(1);
   }
 }
 
-function checkAgents(pluginDir) {
-  const dir = path.join(pluginDir, "agents");
-  for (const entry of listDir(dir)) {
-    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-    const file = path.join(dir, entry.name);
-    const fm = readFrontmatter(file);
-    if (!fm) {
-      err(rel(file), "missing frontmatter (the first line must be ---)");
+// 1. Every file, through the shared schema.
+for (const file of repoFiles()) {
+  const abs = path.join(root, file);
+  if (!existsSync(abs) || !statSync(abs).isFile()) continue; // deleted in the worktree
+  // Compiled Python is binary: the schema only needs the path to flag it.
+  const content = isCompiledPython(file) ? "" : readFileSync(abs, "utf8");
+  for (const issue of validatePluginFile(file, content)) report(file, issue.line, issue.message, issue.severity);
+}
+
+// 2. Checks that span files.
+const marketplaceFile = path.join(root, ".claude-plugin", "marketplace.json");
+const plugins = [];
+if (!existsSync(marketplaceFile)) {
+  report(".claude-plugin/marketplace.json", undefined, "not found; organization sync reads the marketplace from this path");
+} else {
+  let market = null;
+  try {
+    market = JSON.parse(readFileSync(marketplaceFile, "utf8"));
+  } catch {
+    // the schema pass already reported the invalid JSON
+  }
+  for (const p of Array.isArray(market?.plugins) ? market.plugins : []) {
+    const where = `${rel(marketplaceFile)} → ${p?.name ?? "(unnamed)"}`;
+    if (typeof p?.source !== "string" || !p.source.startsWith("./")) continue; // the schema covers the shape
+    const dir = path.join(root, p.source);
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+      report(where, undefined, `source ${p.source} does not exist`);
       continue;
     }
-    if (!fm.name) err(rel(file), "name is required");
-    else if (fm.name.includes(":")) err(rel(file), `name "${fm.name}" must not contain ":"`);
-    if (!fm.description) err(rel(file), "description is required");
-    if ("tools" in fm && /^\[\s*\]$|^$/.test(fm.tools)) {
-      err(rel(file), "tools is empty, so the subagent would launch with zero tools; omit it to inherit");
+    if (existsSync(path.join(dir, "bin"))) report(where, undefined, "top-level bin/ directory; claude.ai rejects the plugin (use scripts/)");
+    const manifestFile = path.join(dir, ".claude-plugin", "plugin.json");
+    if (existsSync(manifestFile)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+        if (manifest.name !== p.name) report(rel(manifestFile), undefined, `name "${manifest.name}" differs from marketplace entry "${p.name}"`);
+      } catch {
+        // reported by the schema pass
+      }
     }
-    if (fm.model && !AGENT_MODELS.has(fm.model)) {
-      warn(rel(file), `model "${fm.model}" is a pinned ID; prefer an alias (sonnet/opus/haiku) or inherit`);
+    for (const entry of listDir(path.join(dir, "skills"))) {
+      if (entry.isDirectory() && !existsSync(path.join(dir, "skills", entry.name, "SKILL.md"))) {
+        report(rel(path.join(dir, "skills", entry.name)), undefined, "skill folder has no SKILL.md");
+      }
     }
+    plugins.push({ name: p.name, prefix: `${rel(dir)}/` });
   }
 }
 
-function git(...a) {
-  return execFileSync("git", a, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-}
-
-function checkVersionBump(plugins) {
+// 3. A changed plugin must bump its version.
+function checkVersionBump() {
   let changed;
   try {
-    changed = git("diff", "--name-only", `${baseRef}...HEAD`).split("\n").filter(Boolean);
+    changed = git("diff", "--name-only", `${baseRef}...HEAD`).split("\n").filter((f) => f && !isCompiledPython(f));
   } catch {
-    warn("version-bump", `could not diff against "${baseRef}" (is fetch-depth 0?); skipped`);
+    report("version-bump", undefined, `could not diff against "${baseRef}" (is fetch-depth 0?); skipped`, "warning");
     return;
   }
-  for (const { name, dir } of plugins) {
-    const prefix = rel(dir) + "/";
+  for (const { name, prefix } of plugins) {
     if (!changed.some((f) => f.startsWith(prefix))) continue;
     const manifest = `${prefix}.claude-plugin/plugin.json`;
-    let before = null;
+    let before;
+    let after;
     try {
       before = JSON.parse(git("show", `${baseRef}:${manifest}`)).version ?? null;
     } catch {
       continue; // new plugin
     }
-    const after = JSON.parse(readFileSync(path.join(root, manifest), "utf8")).version ?? null;
+    try {
+      after = JSON.parse(readFileSync(path.join(root, manifest), "utf8")).version ?? null;
+    } catch {
+      continue; // reported by the schema pass
+    }
     if (before === after) {
-      err(manifest, `files in ${name} changed but version is still ${after ?? "unset"}; bump it so Claude Code installs pick up the change`);
+      report(manifest, undefined, `files in ${name} changed but version is still ${after ?? "unset"}; bump it so Claude Code installs pick up the change`);
     }
   }
 }
+if (baseRef) checkVersionBump();
 
-const marketplaceFile = path.join(root, ".claude-plugin", "marketplace.json");
-if (!existsSync(marketplaceFile)) {
-  err(".claude-plugin/marketplace.json", "not found; organization sync reads the marketplace from this path");
-} else {
-  const market = readJson(marketplaceFile);
-  const plugins = [];
-  if (market) {
-    if (!market.name) err(rel(marketplaceFile), "name is required");
-    if (!market.owner?.name) err(rel(marketplaceFile), "owner.name is required");
-    if (!Array.isArray(market.plugins) || market.plugins.length === 0) err(rel(marketplaceFile), "plugins must be a non-empty array");
-    const seen = new Set();
-    for (const p of market.plugins ?? []) {
-      const where = `${rel(marketplaceFile)} → ${p.name ?? "(unnamed)"}`;
-      if (!p.name || !KEBAB.test(p.name)) err(where, "plugin name must be kebab-case");
-      else if (RESERVED_PREFIX.test(p.name)) err(where, "plugin name uses a reserved prefix");
-      if (seen.has(p.name)) err(where, "duplicate plugin name");
-      seen.add(p.name);
-      if (typeof p.source !== "string") {
-        warn(where, "non-path source; organization sync only packages github, url, git-subdir or ./ sources");
-        continue;
-      }
-      if (!p.source.startsWith("./")) {
-        err(where, `source "${p.source}" must be a relative path starting with ./`);
-        continue;
-      }
-      const dir = path.join(root, p.source);
-      if (!existsSync(dir) || !statSync(dir).isDirectory()) {
-        err(where, `source ${p.source} does not exist`);
-        continue;
-      }
-      if (existsSync(path.join(dir, "bin"))) err(where, "top-level bin/ directory; claude.ai rejects the plugin (use scripts/)");
-      const manifestFile = path.join(dir, ".claude-plugin", "plugin.json");
-      if (existsSync(manifestFile)) {
-        const manifest = readJson(manifestFile);
-        if (manifest && manifest.name !== p.name) err(rel(manifestFile), `name "${manifest.name}" differs from marketplace entry "${p.name}"`);
-      }
-      plugins.push({ name: p.name, dir });
-      checkSkills(dir);
-      checkAgents(dir);
-    }
-  }
-  if (baseRef) checkVersionBump(plugins);
+function annotate(kind, { file, line, msg }) {
+  const onFile = !file.includes(" → ") && file !== "version-bump";
+  const props = onFile ? ` file=${file}${line ? `,line=${line}` : ""}` : "";
+  console.log(`::${kind}${props}::${file}${line ? `:${line}` : ""}: ${msg}`);
 }
-
-for (const w of warnings) console.log(`::warning::${w}`);
-for (const e of errors) console.log(`::error::${e}`);
+for (const w of warnings) annotate("warning", w);
+for (const e of errors) annotate("error", e);
 console.log(`${errors.length} error(s), ${warnings.length} warning(s)`);
 process.exit(errors.length ? 1 : 0);
