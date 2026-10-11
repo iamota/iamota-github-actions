@@ -1,5 +1,7 @@
 name: "Claude Plugins Validate"
-description: "Validate a Claude plugin marketplace repo (claude.ai org sync layout) with iamota checks and claude plugin validate"
+description: "Validate a Claude plugin marketplace repo (claude.ai org sync layout) with @iamota/claude-plugin-schema and claude plugin validate"
+# Installs @iamota/claude-plugin-schema from GitHub Packages, so the calling job needs
+# `permissions: packages: read` (and, outside iamota-ai-plugins, Actions access to the package).
 inputs:
     path:
         description: "Marketplace repository root (contains .claude-plugin/marketplace.json)"
@@ -10,16 +12,41 @@ inputs:
     claude_code_version:
         description: "@anthropic-ai/claude-code version used for claude plugin validate"
         default: "latest"
+    schema_version:
+        description: "@iamota/claude-plugin-schema version (published from iamota-ai-plugins to GitHub Packages)"
+        default: "0.1.0"
+    token:
+        description: "Token that can read @iamota packages from GitHub Packages (passed to npm as NODE_AUTH_TOKEN); needs packages: read"
+        default: ${{ github.token }}
     run_claude_validate:
         description: "Also run claude plugin validate --strict on the marketplace and every plugin (true/false)"
         default: "true"
 runs:
     using: "composite"
     steps:
+        - name: Install @iamota/claude-plugin-schema
+          env:
+              NODE_AUTH_TOKEN: ${{ inputs.token }}
+              SCHEMA_DIR: ${{ runner.temp }}/claude-plugin-schema
+              SCHEMA_VERSION: ${{ inputs.schema_version }}
+          run: |
+              set -euo pipefail
+              mkdir -p "${SCHEMA_DIR}"
+              cd "${SCHEMA_DIR}"
+              # npm expands ${NODE_AUTH_TOKEN} itself; the token never lands on disk.
+              {
+                  echo '@iamota:registry=https://npm.pkg.github.com'
+                  echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+              } > .npmrc
+              echo '{"private":true}' > package.json
+              npm install --no-fund --no-audit --no-package-lock "@iamota/claude-plugin-schema@${SCHEMA_VERSION}"
+          shell: bash
+
         - name: iamota plugin checks
           env:
               ROOT: ${{ inputs.path }}
               BASE_REF: ${{ inputs.base_ref }}
+              CLAUDE_PLUGIN_SCHEMA_DIR: ${{ runner.temp }}/claude-plugin-schema
           run: |
               set -euo pipefail
               ARGS=("${ROOT}")
