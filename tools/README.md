@@ -2,6 +2,10 @@
 
 This folder contains local/operational utilities for the `iamota-github-actions` repository.
 
+## Shopify CLI Compatibility Checks
+
+Run `node --test tools/tests/shopify-cli-compatibility.test.mjs` from the repo root (Node and Bash required; Git Bash is supported on Windows). The tests exercise the action JSON parsers, live-theme resolution with a mocked CLI, installer version precedence with mocked commands, and variable wiring for every installation site. Workflow Sanity also runs these checks in CI.
+
 ## GitHub Actions Artifact and Log Usage Report
 
 Script: `tools/github-actions-storage-report.mjs`

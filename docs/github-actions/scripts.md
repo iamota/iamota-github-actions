@@ -11,8 +11,9 @@ Purpose:
 
 Behavior:
 
-- When input is `live`, runs `shopify theme list --role main` and resolves the single main theme ID.
+- When input is `live`, runs `shopify theme list --role live` and resolves the single main theme ID.
 - Fails if zero or multiple main theme IDs are returned.
+- Accepts CLI 4's theme array and CLI 5's `{ "themes": [...] }` envelope, numeric or string IDs, and published roles `live` or `main`.
 
 ### `.github/scripts/shopify/sync-shopify-json.mjs`
 

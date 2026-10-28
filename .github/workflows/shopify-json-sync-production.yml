@@ -179,6 +179,8 @@ jobs:
 
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              with:
+                  cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}
 
             - name: Reset pulled theme directory
               run: |

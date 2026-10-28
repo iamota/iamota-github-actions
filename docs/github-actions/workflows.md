@@ -242,7 +242,7 @@ Inputs:
 - `working_directory` (optional, default `.`)
 - `install_command` (optional, default `npm install`) — `npm install`, not `npm ci` (Windows-generated lockfile + platform-specific optional deps).
 - `node_version` (optional, default `24` — see [node-version.md](node-version.md))
-- `cli_version` (optional, default `latest`)
+- `cli_version` (optional; overrides `vars.SHOPIFY_CLI_VERSION`, otherwise defaults to `latest`)
 - `allow_updates` (optional, default `true`) — passes `--allow-updates` so the deploy doesn't stall on a CI confirmation prompt. Set `false` to require manual approval — the deploy then fails non-interactively instead of applying updates unattended.
 - `allow_deletes` (optional, default `true`) — passes `--allow-deletes` so the deploy doesn't stall on a CI confirmation prompt. Set `false` for an app where accidental extension deletion is a real risk — the deploy then fails non-interactively instead of deleting anything unattended.
 

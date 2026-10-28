@@ -23,7 +23,7 @@ outputs:
         description: "Raw JSON output from Shopify CLI (when json=1)"
         value: ${{ steps.push.outputs.raw_json }}
     preview_url:
-        description: "Theme preview URL parsed from JSON output (when available)"
+        description: "Theme preview URL parsed from JSON output (when available; CLI 5+ `theme.previewUrl`, CLI 4 `theme.preview_url`)"
         value: ${{ steps.push.outputs.preview_url }}
 runs:
     using: "composite"
@@ -59,7 +59,7 @@ runs:
               if [ "${{ inputs.json }}" = "1" ]; then
                 ARGS+=(--json)
                 OUT="$(shopify "${ARGS[@]}")"
-                PREVIEW_URL="$(echo "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);process.stdout.write(String(j?.theme?.preview_url||''));}catch{process.stdout.write('');}});")"
+                PREVIEW_URL="$(echo "${OUT}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);process.stdout.write(String(j?.theme?.previewUrl||j?.theme?.preview_url||''));}catch{process.stdout.write('');}});")"
                 {
                   echo "raw_json<<EOF"
                   printf '%s\n' "${OUT}"

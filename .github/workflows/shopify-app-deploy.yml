@@ -36,9 +36,10 @@ on:
                 # Shopify CLI requires Node >= 22.1 (uses module.enableCompileCache).
                 default: "24"
             cli_version:
+                description: "Shopify CLI version; defaults to vars.SHOPIFY_CLI_VERSION, then latest"
                 type: string
                 required: false
-                default: "latest"
+                default: ""
             allow_updates:
                 description: >-
                     Pass `--allow-updates` so the deploy doesn't stall on a
@@ -94,7 +95,7 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
               with:
                   node_version: ${{ inputs.node_version }}
-                  cli_version: ${{ inputs.cli_version }}
+                  cli_version: ${{ inputs.cli_version || vars.SHOPIFY_CLI_VERSION }}
 
             - name: Install npm dependencies
               uses: iamota/iamota-github-actions/.github/actions/npm-install@v1

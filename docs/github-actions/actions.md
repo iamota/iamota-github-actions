@@ -55,7 +55,9 @@ Sets up Node and installs Shopify CLI.
 Inputs:
 
 - `node_version` (optional, default `24` — see [node-version.md](node-version.md))
-- `cli_version` (optional, default `latest`)
+- `cli_version` (optional; falls back to the `SHOPIFY_CLI_VERSION` environment variable, then `latest`)
+
+Reusable workflows pass the caller's `vars.SHOPIFY_CLI_VERSION` (organization/repository/environment variable) to this input. When using the composite action directly, pass `cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}` or set the environment variable. An explicit input takes precedence. Installation logs show the requested and installed versions.
 
 ### `.github/actions/shopify-theme-pull/action.yml`
 

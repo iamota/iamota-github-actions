@@ -6,8 +6,8 @@ inputs:
         description: "Node.js version used for Shopify CLI"
         default: "24"
     cli_version:
-        description: "Shopify CLI version"
-        default: "latest"
+        description: "Shopify CLI version (falls back to SHOPIFY_CLI_VERSION, then latest)"
+        default: ""
 runs:
     using: "composite"
     steps:
@@ -17,6 +17,11 @@ runs:
 
         - run: |
               set -euo pipefail
-              npm install -g "@shopify/cli@${{ inputs.cli_version }}"
+              CLI_VERSION="${CLI_VERSION_INPUT:-${SHOPIFY_CLI_VERSION:-latest}}"
+              echo "Installing Shopify CLI: ${CLI_VERSION}"
+              npm install -g "@shopify/cli@${CLI_VERSION}"
               command -v shopify >/dev/null
+              shopify version
           shell: bash
+          env:
+              CLI_VERSION_INPUT: ${{ inputs.cli_version }}

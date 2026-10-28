@@ -32,6 +32,7 @@ Repository/org secrets:
 
 ### Common additional variables
 
+- `SHOPIFY_CLI_VERSION` — npm version or range used by all shared Shopify CLI installs; defaults to `latest` when unset. The app deploy workflow's explicit `cli_version` input takes precedence. Organization variables must grant access to the consuming repository.
 - `THEME_ROOT`
 - `SHOPIFY_THEME_ID`
 - `SHOPIFY_PRODUCTION_THEME_ID`

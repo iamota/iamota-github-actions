@@ -512,6 +512,8 @@ jobs:
 
       - name: Setup Node + Install Shopify CLI
         uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+        with:
+            cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}
 
       - name: Run Theme Check JSON
         id: theme_check_run
@@ -665,10 +667,19 @@ jobs:
               throw new Error(`Theme Check JSON output was empty (exit code ${exitCode}).`);
             }
             const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-              throw new Error("Theme Check JSON output was not an array.");
+            if (Array.isArray(parsed)) return parsed;
+            // CLI 5 returns flat issues with camelCase fields and one-based positions.
+            if (typeof parsed?.valid === "boolean" && Array.isArray(parsed.issues)) {
+              return parsed.issues.map((issue) => ({
+                path: issue.filePath,
+                offenses: [{
+                  ...issue,
+                  start_row: issue.startRow,
+                  start_column: issue.startColumn,
+                }],
+              }));
             }
-            return parsed;
+            throw new Error("Theme Check JSON output was neither a legacy array nor a valid issues report.");
           }
 
           const report = readJsonReport();

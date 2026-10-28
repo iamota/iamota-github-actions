@@ -34,6 +34,16 @@ env:
     ACTIONLINT_VERSION: "1.7.12"
 
 jobs:
+    shopify-cli-compatibility:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: "24"
+            - name: Test Shopify CLI JSON compatibility and version selection
+              run: node --test tools/tests/shopify-cli-compatibility.test.mjs
+
     actionlint:
         # Resolve effective config: workflow_dispatch input > repo variable >
         # default. Defaults gate only on errors and log everything else.

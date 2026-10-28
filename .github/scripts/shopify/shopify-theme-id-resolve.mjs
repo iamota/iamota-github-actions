@@ -39,7 +39,7 @@ function collectThemeLikeObjects(node, out = []) {
 function resolveLiveThemeId({ store, token }) {
     const cmd = spawnSync(
         "shopify",
-        ["theme", "list", "--store", store, "--password", token, "--role", "main", "--json", "--no-color"],
+        ["theme", "list", "--store", store, "--password", token, "--role", "live", "--json", "--no-color"],
         {
             encoding: "utf8",
             maxBuffer: 10 * 1024 * 1024,
@@ -48,7 +48,7 @@ function resolveLiveThemeId({ store, token }) {
 
     if (cmd.status !== 0) {
         const err = String(cmd.stderr || cmd.stdout || "").trim();
-        throw new Error(`Failed to resolve live theme id via shopify theme list --role main. ${err}`);
+        throw new Error(`Failed to resolve live theme id via shopify theme list --role live. ${err}`);
     }
 
     const raw = String(cmd.stdout || "").trim();
@@ -67,7 +67,8 @@ function resolveLiveThemeId({ store, token }) {
     const ids = [];
     for (const item of items) {
         const role = String(item?.role ?? "").trim().toLowerCase();
-        if (role && role !== "main") continue;
+        // The CLI reports the published theme's role as "live"; the Admin API calls it "main".
+        if (role && role !== "live" && role !== "main") continue;
         const id = toThemeId(item?.id);
         if (id) ids.push(id);
     }
