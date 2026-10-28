@@ -538,6 +538,31 @@ jobs:
                   name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}-${{ env.TARGET_STORE_SLUG }}
                   path: ${{ env.PREVIEW_BACKUP_ZIP }}
 
+            # Shopify rejects theme names over 50 characters, so long branch names
+            # drop a leading type prefix (feature/, fix/, ...) and then keep their
+            # tail, which is usually the distinctive part.
+            - name: Build preview theme name
+              id: theme_name
+              env:
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+              run: |
+                  set -euo pipefail
+                  node - <<'NODE'
+                  const fs = require("fs");
+                  const MAX = 50;
+                  const prefix = "iamota (";
+                  const suffix = `) PR#${process.env.PR_NUMBER || ""}`;
+                  let branch = String(process.env.HEAD_REF || "")
+                    .replace(/^(feature|feat|fix|bugfix|hotfix|chore|release|refactor|task|issue|docs|test|ci|build|perf|style)\//i, "");
+                  const budget = MAX - prefix.length - suffix.length;
+                  const chars = Array.from(branch);
+                  if (chars.length > budget) branch = `...${chars.slice(-(budget - 3)).join("")}`;
+                  const name = `${prefix}${branch}${suffix}`;
+                  console.log(`Preview theme name: ${name} (${Array.from(name).length} chars)`);
+                  fs.appendFileSync(process.env.GITHUB_OUTPUT, `name<<EOF\n${name}\nEOF\n`);
+                  NODE
+
             - name: Create preview theme (duplicate base) if missing
               if: steps.marker.outputs.extracted_value == ''
               id: createtheme
@@ -546,7 +571,7 @@ jobs:
                   store: ${{ env.SHOPIFY_STORE }}
                   base_theme_id: ${{ env.SHOPIFY_PREVIEW_BASE_ID }}
                   token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
-                  name: iamota (${{ github.event.pull_request.head.ref }}) PR#${{ github.event.pull_request.number }}
+                  name: ${{ steps.theme_name.outputs.name }}
 
             - name: Determine preview theme id
               id: finaltheme
@@ -679,12 +704,9 @@ jobs:
 
             - name: Rename preview theme to canonical name
               env:
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+                  NAME: ${{ steps.theme_name.outputs.name }}
               run: |
                   set -euo pipefail
-                  PR_NUMBER="${{ github.event.pull_request.number }}"
-                  BRANCH="${HEAD_REF}"
-                  NAME="iamota (${BRANCH}) PR#${PR_NUMBER}"
                   THEME_ID="${{ steps.finaltheme.outputs.theme_id }}"
                   shopify theme rename \
                       --store "${SHOPIFY_STORE}" \
@@ -696,13 +718,12 @@ jobs:
             - name: Build preview comment metadata
               id: comment_meta
               env:
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
-                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  PREVIEW_THEME_NAME: ${{ steps.theme_name.outputs.name }}
               run: |
                   set -euo pipefail
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
                   echo "sync_at=${TS}" >> "$GITHUB_OUTPUT"
-                  echo "preview_theme_name=iamota (${HEAD_REF}) PR#${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+                  echo "preview_theme_name=${PREVIEW_THEME_NAME}" >> "$GITHUB_OUTPUT"
 
             - name: Build preview comment body
               id: preview_comment

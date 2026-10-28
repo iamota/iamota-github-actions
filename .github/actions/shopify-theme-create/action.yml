@@ -17,6 +17,8 @@ runs:
     using: "composite"
     steps:
         - id: create
+          env:
+              THEME_NAME: ${{ inputs.name }}
           run: |
               set -euo pipefail
 
@@ -31,7 +33,7 @@ runs:
                   shopify theme duplicate \
                       --store "${{ inputs.store }}" \
                       --theme "${BASE_THEME_ID}" \
-                      --name "${{ inputs.name }}" \
+                      --name "${THEME_NAME}" \
                       --password "${{ inputs.token }}" \
                       --force \
                       --json \
