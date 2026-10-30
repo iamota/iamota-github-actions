@@ -42,6 +42,15 @@ on:
                 type: string
                 required: false
                 default: ""
+            flyctl_version:
+                description: >-
+                    flyctl CLI version to install (pinned; never "latest"). Bump
+                    deliberately, to a release at least 14 days old.
+                type: string
+                required: false
+                default: "0.4.118"
+        # Callers must pass these explicitly (`secrets: FLY_API_TOKEN: ...`), never
+        # `secrets: inherit`. Each is exposed only to the one step that uses it.
         secrets:
             FLY_API_TOKEN:
                 required: true
@@ -52,8 +61,7 @@ on:
             DOCKERHUB_TOKEN:
                 required: false
 
-permissions:
-    contents: read
+permissions: {}
 
 concurrency:
     group: iamota-fly-deploy-${{ github.repository }}-${{ inputs.branch || github.ref || github.run_id }}
@@ -63,23 +71,31 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         environment: ${{ inputs.branch }}
-        env:
-            FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        permissions:
+            contents: read
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
 
             - name: Login to Docker Hub
               if: ${{ inputs.dockerhub_login == 'true' }}
-              uses: docker/login-action@v3
+              uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
               with:
                   username: ${{ inputs.dockerhub_username }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - uses: superfly/flyctl-actions/setup-flyctl@master
+            - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+              with:
+                  version: ${{ inputs.flyctl_version }}
 
-            - name: Stage Fly runtime secrets
+            # Staging and deploying share one step so FLY_API_TOKEN lives in exactly
+            # one step's environment.
+            - name: Stage Fly runtime secrets and deploy
               env:
+                  FLY_API_TOKEN     : ${{ secrets.FLY_API_TOKEN }}
                   CONFIG_NAME       : ${{ inputs.config }}
+                  REMOTE_ONLY       : ${{ inputs.remote_only }}
                   SHOPIFY_API_KEY   : ${{ secrets.SHOPIFY_API_KEY }}
                   SHOPIFY_API_SECRET: ${{ secrets.SHOPIFY_API_SECRET }}
               run: |
@@ -102,13 +118,9 @@ jobs:
                   else
                       echo "No universal Shopify secrets provided; skipping secret staging."
                   fi
+                  # Only the deploy needs the Shopify values; drop them first.
+                  unset SHOPIFY_API_KEY SHOPIFY_API_SECRET
 
-            - name: Deploy to Fly
-              env:
-                  CONFIG_NAME: ${{ inputs.config }}
-                  REMOTE_ONLY: ${{ inputs.remote_only }}
-              run: |
-                  set -euo pipefail
                   ARGS=(deploy)
                   if [ "${REMOTE_ONLY}" = "true" ]; then
                       ARGS+=(--remote-only)

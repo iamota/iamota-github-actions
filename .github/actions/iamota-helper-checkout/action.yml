@@ -69,16 +69,20 @@ runs:
           shell: bash
 
         - if: ${{ steps.stage_local.outputs.used_local_bundle != 'true' && inputs.token != '' }}
-          uses: actions/checkout@v5
+          uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
           with:
               repository: ${{ inputs.repository }}
               ref: ${{ steps.resolve.outputs.ref }}
               token: ${{ inputs.token }}
               path: ${{ inputs.path }}
+              # Only scripts are read from the helper checkout; don't leave the
+              # read token in its .git/config.
+              persist-credentials: false
 
         - if: ${{ steps.stage_local.outputs.used_local_bundle != 'true' && inputs.token == '' }}
-          uses: actions/checkout@v5
+          uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
           with:
               repository: ${{ inputs.repository }}
               ref: ${{ steps.resolve.outputs.ref }}
               path: ${{ inputs.path }}
+              persist-credentials: false

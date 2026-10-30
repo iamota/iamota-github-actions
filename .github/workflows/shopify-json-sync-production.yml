@@ -48,8 +48,7 @@ on:
             IAMOTA_ACTIONS_READ_TOKEN:
                 required: false
 
-permissions:
-    contents: write
+permissions: {}
 
 concurrency:
     group: iamota-shopify-json-sync-production
@@ -58,6 +57,7 @@ concurrency:
 jobs:
     resolve_master_store:
         runs-on: ubuntu-latest
+        permissions: {}
         outputs:
             first_store: ${{ steps.stores.outputs.first_store }}
             first_store_index: ${{ steps.stores.outputs.first_store_index }}
@@ -71,6 +71,8 @@ jobs:
     sync_production:
         needs: [resolve_master_store]
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # the last step pushes the sync commit
 
         env:
             PRODUCTION_BRANCH         : ${{ inputs.production_branch }}
@@ -175,10 +177,14 @@ jobs:
                   } >> "$GITHUB_ENV"
 
             - name: Checkout production branch
-              uses: actions/checkout@v5
+              uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
               with:
                   ref: ${{ env.PRODUCTION_BRANCH }}
                   fetch-depth: 0
+                  # The Shopify CLI install, theme pull and sync script run in this
+                  # job, so the write token is not left in .git/config; only the
+                  # push step below gets it.
+                  persist-credentials: false
 
             - name: Validate required Shopify values
               run: |
@@ -234,6 +240,8 @@ jobs:
                   rm -rf .iamota-actions "${THEME_PULL_DIR}"
 
             - name: Commit and push to production branch (if changed)
+              env:
+                  PUSH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
 
@@ -256,4 +264,7 @@ jobs:
                   [ -n "${SRC_STORE}" ] || SRC_STORE="unknown-store"
                   SRC_THEME="${SHOPIFY_THEME_ID:-unknown-theme}"
                   git commit -m "Shopify JSON Sync from ${SRC_STORE}#${SRC_THEME} @ ${TS}"
-                  git push origin "${PRODUCTION_BRANCH}"
+                  # Same auth header actions/checkout would have persisted, scoped to this command.
+                  BASIC="$(printf 'x-access-token:%s' "${PUSH_TOKEN}" | base64 -w0)"
+                  echo "::add-mask::${BASIC}"
+                  git -c "http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic ${BASIC}" push origin "${PRODUCTION_BRANCH}"

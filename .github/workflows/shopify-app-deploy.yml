@@ -69,8 +69,10 @@ on:
             SHOPIFY_API_KEY:
                 required: false
 
-permissions:
-    contents: read
+# Secrets: callers must pass them explicitly (`secrets: SHOPIFY_APP_AUTOMATION_TOKEN: ...`),
+# never `secrets: inherit`. They are exposed only to the deploy step, never to
+# checkout or `npm install` (whose package scripts could read job-level env).
+permissions: {}
 
 concurrency:
     group: iamota-shopify-app-deploy-${{ github.repository }}-${{ inputs.branch || github.ref || github.run_id }}
@@ -80,16 +82,14 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         environment: ${{ inputs.branch }}
+        permissions:
+            contents: read
         env:
-            # Prefer the app-scoped automation token; fall back to the Partner org
-            # CLI token. The deploy step unsets the partners token when the
-            # automation token is present so exactly one auth path is active.
-            SHOPIFY_APP_AUTOMATION_TOKEN: ${{ secrets.SHOPIFY_APP_AUTOMATION_TOKEN }}
-            SHOPIFY_CLI_PARTNERS_TOKEN  : ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
-            SHOPIFY_API_KEY             : ${{ secrets.SHOPIFY_API_KEY }}
             COMMIT_URL                  : ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
 
             - name: Setup Node + Install Shopify CLI
               uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
@@ -113,6 +113,12 @@ jobs:
             - name: Deploy to Shopify
               working-directory: ${{ inputs.working_directory }}
               env:
+                  # Prefer the app-scoped automation token; fall back to the Partner org
+                  # CLI token. The step unsets the partners token when the automation
+                  # token is present so exactly one auth path is active.
+                  SHOPIFY_APP_AUTOMATION_TOKEN: ${{ secrets.SHOPIFY_APP_AUTOMATION_TOKEN }}
+                  SHOPIFY_CLI_PARTNERS_TOKEN  : ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+                  SHOPIFY_API_KEY             : ${{ secrets.SHOPIFY_API_KEY }}
                   CONFIG_NAME: ${{ inputs.config }}
                   ALLOW_UPDATES: ${{ inputs.allow_updates }}
                   ALLOW_DELETES: ${{ inputs.allow_deletes }}

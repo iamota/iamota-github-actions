@@ -68,9 +68,7 @@ on:
                 description: "Commit the immutable tag points at (the bump commit when bumping)."
                 value: ${{ jobs.tag.outputs.sha }}
 
-permissions:
-    contents: write
-    issues: write
+permissions: {}
 
 concurrency:
     group: iamota-release-semver-tags-${{ github.repository }}
@@ -79,6 +77,9 @@ concurrency:
 jobs:
     tag:
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # push the bump commit and the tags
+            issues: write   # the internal ref guard opens an issue on mismatch
         outputs:
             tagged: ${{ steps.tags.outputs.tagged }}
             version: ${{ steps.tags.outputs.version }}
@@ -87,9 +88,13 @@ jobs:
             major_tag: ${{ steps.tags.outputs.major_tag }}
             sha: ${{ steps.tags.outputs.sha }}
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
               with:
                   fetch-depth: 0
+                  # Kept (the default): the tag step pushes the bump commit and tags
+                  # with these credentials. Nothing in this job installs or runs
+                  # package code (`npm version` below runs with --ignore-scripts).
+                  persist-credentials: true
 
             - name: Guard internal release refs
               if: (inputs.run_ref_guard || 'true') != 'false'
@@ -125,7 +130,7 @@ jobs:
 
             - name: Setup Node
               if: steps.meta.outputs.valid == 'true' && (inputs.bump_package_version || 'false') == 'true'
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
               with:
                   node-version: ${{ inputs.node_version || '24' }}
 
@@ -178,7 +183,7 @@ jobs:
                       else
                           (
                               cd "${WORKING_DIRECTORY}"
-                              npm version "${VERSION}" --no-git-tag-version --allow-same-version
+                              npm version "${VERSION}" --no-git-tag-version --allow-same-version --ignore-scripts
                               git add package.json
                               # A lockfile can exist on disk yet be gitignored (common
                               # for libraries). `git add` on an ignored path is a hard

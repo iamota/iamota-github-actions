@@ -30,9 +30,7 @@ on:
         required: false
         default: "true"
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: iamota-shopify-app-ci-${{ github.repository }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
@@ -41,12 +39,16 @@ concurrency:
 jobs:
   install_dependencies:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       working_directory_effective: ${{ steps.out.outputs.working_directory_effective }}
       node_modules_cache_key: ${{ steps.nm_cache_key.outputs.key }}
       node_modules_cache_path: ${{ steps.nm_cache_key.outputs.path }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - id: out
         run: |
@@ -102,14 +104,14 @@ jobs:
       - name: Restore/save node_modules cache
         if: steps.npm_cache.outputs.enabled == 'true'
         id: nm_cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ steps.nm_cache_key.outputs.path }}
           key: ${{ steps.nm_cache_key.outputs.key }}
 
       - name: Setup Node with npm cache
         if: steps.npm_cache.outputs.enabled == 'true' && steps.nm_cache.outputs.cache-hit != 'true'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: ${{ inputs.node_version }}
           cache: npm
@@ -127,8 +129,12 @@ jobs:
     if: inputs.run_build != 'false'
     needs: [install_dependencies]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Restore node_modules
         uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
@@ -161,8 +167,12 @@ jobs:
     if: inputs.run_lint == 'true'
     needs: [install_dependencies]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Restore node_modules
         uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
@@ -201,8 +211,12 @@ jobs:
     if: inputs.run_test == 'true'
     needs: [install_dependencies]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Restore node_modules
         uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
@@ -234,6 +248,7 @@ jobs:
   ci:
     name: CI Aggregate
     runs-on: ubuntu-latest
+    permissions: {}
     needs:
       - install_dependencies
       - build

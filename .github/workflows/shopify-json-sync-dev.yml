@@ -36,9 +36,7 @@ on:
                 required: false
                 default: ""
 
-permissions:
-    contents: write
-    pull-requests: write
+permissions: {}
 
 concurrency:
     group: iamota-shopify-json-sync-dev
@@ -47,6 +45,7 @@ concurrency:
 jobs:
     resolve_master_store:
         runs-on: ubuntu-latest
+        permissions: {}
         outputs:
             first_store: ${{ steps.stores.outputs.first_store }}
         steps:
@@ -59,6 +58,12 @@ jobs:
     sync_dev:
         needs: [resolve_master_store]
         runs-on: ubuntu-latest
+        # `gh` (with github.token) creates/edits the sync PR and enables auto-merge.
+        # Creating the PR also needs the repo setting "Allow GitHub Actions to create
+        # and approve pull requests" (see SECURITY.md).
+        permissions:
+            contents: write
+            pull-requests: write
 
         env:
             PRODUCTION_BRANCH : ${{ inputs.production_branch }}
@@ -102,9 +107,10 @@ jobs:
                   } >> "$GITHUB_ENV"
 
             - name: Checkout repository
-              uses: actions/checkout@v5
+              uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
               with:
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: Show GitHub CLI version
               run: gh --version

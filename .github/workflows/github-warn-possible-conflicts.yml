@@ -12,9 +12,7 @@ on:
         required: false
         default: false
 
-permissions:
-  contents: read
-  issues: write
+permissions: {}
 
 concurrency:
   group: github-warn-possible-conflicts-${{ github.repository }}-${{ inputs.full_sweep && 'full-sweep' || inputs.branch || github.ref_name }}
@@ -24,12 +22,19 @@ jobs:
   github-warn-possible-conflicts:
     name: Possible Conflicts Warning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
 
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+          # Kept (the default): the next step runs `git fetch --all` with these
+          # credentials. The token is read-only for contents, and this job
+          # installs and runs no repository code.
+          persist-credentials: true
 
       - name: Fetch all branches
         run: |
@@ -37,7 +42,7 @@ jobs:
           git fetch --all --prune
 
       - name: Detect overlaps and open/update issues
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           INPUT_BRANCH: ${{ inputs.branch }}
           INPUT_FULL_SWEEP: ${{ inputs.full_sweep }}
