@@ -133,7 +133,7 @@ jobs:
       ci_artifact_retention_days           : ${{ steps.out.outputs.ci_artifact_retention_days }}
     steps:
       - id: stores
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@test/multistore-named-vars
         with:
           stores: ${{ inputs.shopify_store }}
           allow_empty: "true"
@@ -155,103 +155,103 @@ jobs:
           NODE
 
       - id: resolve_theme_root
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_root }}
 
       - id: resolve_theme_src
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_src }}
 
       - id: resolve_theme_dist
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_dist }}
 
       - id: resolve_build_install
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.build_install_command }}
 
       - id: resolve_build_command
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.build_command }}
 
       - id: resolve_shopify_theme_id
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.shopify_theme_id }}
 
       - id: resolve_lighthouse_align
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.lighthouse_align_with_production_json }}
 
       - id: resolve_run_theme_check
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_theme_check }}
 
       - id: resolve_theme_check_fail_level
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_fail_level }}
 
       - id: resolve_theme_check_config_path
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_config_path }}
 
       - id: resolve_theme_check_verbose
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_verbose }}
 
       - id: resolve_theme_check_auto_correct
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.theme_check_auto_correct }}
 
       - id: resolve_run_lint
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_lint }}
 
       - id: resolve_run_test
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_test }}
 
       - id: resolve_run_lighthouse
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_lighthouse }}
 
       - id: resolve_run_prepare
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.run_prepare }}
 
       - id: resolve_ci_artifact_retention_days
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ steps.stores.outputs.first_store }}
           raw: ${{ inputs.ci_artifact_retention_days }}
@@ -403,7 +403,7 @@ jobs:
       - name: NPM install (self-aware)
         if: steps.npm_cache.outputs.enabled != 'true' || steps.nm_cache.outputs.cache-hit != 'true'
         id: npm
-        uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+        uses: iamota/iamota-github-actions/.github/actions/npm-install@test/multistore-named-vars
         with:
           working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
           install_command: ${{ needs.resolve_inputs.outputs.build_install_command }}
@@ -422,7 +422,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Restore node_modules
-        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@test/multistore-named-vars
         with:
           cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
           cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
@@ -457,7 +457,7 @@ jobs:
 
       - name: Build theme when webpack is configured
         id: webpack
-        uses: iamota/iamota-github-actions/.github/actions/webpack-build@v1
+        uses: iamota/iamota-github-actions/.github/actions/webpack-build@test/multistore-named-vars
         with:
           working_directory: ${{ steps.root_inputs.outputs.theme_root_effective }}
           build_command: ${{ needs.resolve_inputs.outputs.build_command }}
@@ -519,7 +519,7 @@ jobs:
           path: _ci_theme_root
 
       - name: Setup Node + Install Shopify CLI
-        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@test/multistore-named-vars
         with:
             cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}
 
@@ -877,7 +877,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Restore node_modules
-        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@test/multistore-named-vars
         with:
           cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
           cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
@@ -916,7 +916,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Restore node_modules
-        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+        uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@test/multistore-named-vars
         with:
           cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
           cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
@@ -970,14 +970,14 @@ jobs:
       # Stages variables so the resolve steps below can apply per-store
       # NAME__STORE_KEY / NAME_N overrides.
       - name: Load per-store variable overrides
-        uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+        uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@test/multistore-named-vars
         with:
           vars_json: ${{ toJSON(vars) }}
           env_vars_json: ${{ inputs.env_vars }}
 
       - name: Resolve store-scoped run_lighthouse flag
         id: resolve_store_run_lighthouse
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_RUN_LIGHTHOUSE }}
@@ -986,7 +986,7 @@ jobs:
 
       - name: Resolve store-scoped lighthouse theme id
         id: resolve_store_theme_id
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
@@ -995,7 +995,7 @@ jobs:
 
       - name: Resolve store-scoped lighthouse JSON alignment flag
         id: resolve_store_lh_align
-        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LIGHTHOUSE_ALIGN }}
@@ -1004,7 +1004,7 @@ jobs:
 
       - name: Resolve effective Shopify token
         id: resolve_store_shopify_token
-        uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+        uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/multistore-named-vars
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
@@ -1013,7 +1013,7 @@ jobs:
 
       - name: Resolve effective LHCI token
         id: resolve_store_lhci_token
-        uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+        uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/multistore-named-vars
         with:
           store: ${{ env.TARGET_STORE }}
           raw: ${{ env.RAW_LHCI_GITHUB_APP_TOKEN }}
@@ -1058,7 +1058,7 @@ jobs:
 
       - name: Lighthouse
         if: steps.prereq.outputs.ready == 'true'
-        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@v1
+        uses: iamota/iamota-github-actions/.github/actions/shopify-theme-lighthouse@test/multistore-named-vars
         with:
           access_token: ${{ steps.resolve_store_shopify_token.outputs.value }}
           store: ${{ env.TARGET_STORE }}

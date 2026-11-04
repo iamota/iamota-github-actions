@@ -112,7 +112,7 @@ jobs:
             # var) narrows the fan-out, e.g. to production stores only; otherwise
             # every SHOPIFY_STORE store gets a preview.
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@test/multistore-named-vars
               with:
                   stores: ${{ inputs.SHOPIFY_PREVIEW_STORE || fromJSON(inputs.env_vars || '{}').SHOPIFY_PREVIEW_STORE || vars.SHOPIFY_PREVIEW_STORE || inputs.SHOPIFY_STORE }}
             - id: branch_policy
@@ -172,7 +172,7 @@ jobs:
 
             - name: Resolve theme root path
               id: resolve_theme_root
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
               with:
                   store: ${{ needs.resolve_targets.outputs.first_store }}
                   raw: ${{ inputs.theme_root }}
@@ -248,7 +248,7 @@ jobs:
 
             - name: Resolve build install command
               id: resolve_build_install
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/multistore-named-vars
               with:
                   store: ${{ needs.resolve_targets.outputs.first_store }}
                   raw: ${{ inputs.build_install_command }}
@@ -256,7 +256,7 @@ jobs:
             - name: NPM install (self-aware)
               if: steps.npm_cache.outputs.enabled != 'true' || steps.nm_cache.outputs.cache-hit != 'true'
               id: npm
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@test/multistore-named-vars
               with:
                   working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
                   install_command: ${{ steps.resolve_build_install.outputs.value }}
@@ -309,14 +309,14 @@ jobs:
             # Stages variables so "Resolve store-scoped values" can apply per-store
             # NAME__STORE_KEY / NAME_N overrides.
             - name: Load per-store variable overrides
-              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@test/multistore-named-vars
               with:
                   vars_json: ${{ toJSON(vars) }}
                   env_vars_json: ${{ inputs.env_vars }}
 
             - name: Resolve effective AWS access key id
               id: resolve_aws_access_key_id
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/multistore-named-vars
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_AWS_ACCESS_KEY_ID }}
@@ -325,7 +325,7 @@ jobs:
 
             - name: Resolve effective AWS secret access key
               id: resolve_aws_secret_access_key
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/multistore-named-vars
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_AWS_SECRET_ACCESS_KEY }}
@@ -334,7 +334,7 @@ jobs:
 
             - name: Resolve effective Shopify token
               id: resolve_shopify_theme_access_token
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/multistore-named-vars
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
@@ -459,13 +459,13 @@ jobs:
                     fi
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@test/multistore-named-vars
               with:
                   cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}
 
             - name: Checkout helper scripts
               id: helper_checkout
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@test/multistore-named-vars
               with:
                   token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
@@ -535,7 +535,7 @@ jobs:
               id: marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@test/multistore-named-vars
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
@@ -562,7 +562,7 @@ jobs:
 
             - name: Pull existing preview theme for backup
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-backup@test/multistore-named-vars
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.marker.outputs.extracted_value }}
@@ -580,7 +580,7 @@ jobs:
 
             - name: Upload preview backup zip to S3 (optional)
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true' && env.AWS_S3_BUCKET != '' && env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
-              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@v1
+              uses: iamota/iamota-github-actions/.github/actions/aws-s3-upload@test/multistore-named-vars
               with:
                   file: ${{ env.PREVIEW_BACKUP_ZIP }}
                   bucket: ${{ env.AWS_S3_BUCKET }}
@@ -588,7 +588,7 @@ jobs:
 
             - name: Upload preview backup artifact (optional)
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
-              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@test/multistore-named-vars
               with:
                   name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}-${{ env.TARGET_STORE_SLUG }}
                   path: ${{ env.PREVIEW_BACKUP_ZIP }}
@@ -621,7 +621,7 @@ jobs:
             - name: Create preview theme (duplicate base) if missing
               if: steps.marker.outputs.extracted_value == ''
               id: createtheme
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@test/multistore-named-vars
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   base_theme_id: ${{ env.SHOPIFY_PREVIEW_BASE_ID }}
@@ -657,7 +657,7 @@ jobs:
                   fi
 
             - name: Restore node_modules
-              uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+              uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@test/multistore-named-vars
               with:
                   cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
                   cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
@@ -665,7 +665,7 @@ jobs:
 
             - name: Prepare theme (install + build + resolve dist)
               id: prepare
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@test/multistore-named-vars
               env:
                   GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
               with:
@@ -735,7 +735,7 @@ jobs:
 
             - name: Push branch theme output into preview theme
               id: push
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@test/multistore-named-vars
               with:
                   store: ${{ env.SHOPIFY_STORE }}
                   theme_id: ${{ steps.finaltheme.outputs.theme_id }}
@@ -900,7 +900,7 @@ jobs:
         steps:
             - name: Checkout helper scripts
               id: helper_checkout
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@test/multistore-named-vars
               with:
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
@@ -966,7 +966,7 @@ jobs:
             - name: Sync preview summary PR comment marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@test/multistore-named-vars
               with:
                   repo: ${{ github.repository }}
                   pr: ${{ github.event.pull_request.number }}
@@ -997,7 +997,7 @@ jobs:
         steps:
             - name: Resolve effective Shopify token
               id: resolve_theme_token
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/multistore-named-vars
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
@@ -1025,13 +1025,13 @@ jobs:
                   fi
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@test/multistore-named-vars
               with:
                   cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}
 
             - name: Checkout helper scripts
               id: helper_checkout
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@test/multistore-named-vars
               with:
                   token: ${{ env.RAW_IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions
@@ -1054,7 +1054,7 @@ jobs:
               id: marker
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@test/multistore-named-vars
               with:
                   repo         : ${{ github.repository }}
                   pr           : ${{ github.event.pull_request.number }}
@@ -1072,7 +1072,7 @@ jobs:
             - name: Delete preview theme (if exists)
               id: delete_preview
               if: steps.marker_norm.outputs.theme_id != ''
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@test/multistore-named-vars
               with:
                   store           : ${{ env.SHOPIFY_STORE }}
                   theme_id        : ${{ steps.marker_norm.outputs.theme_id }}
@@ -1103,7 +1103,7 @@ jobs:
             - name: Add cleanup comment
               env:
                   GH_TOKEN: ${{ github.token }}
-              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-add@v1
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-add@test/multistore-named-vars
               with:
                   repo: ${{ github.repository }}
                   pr  : ${{ github.event.pull_request.number }}
