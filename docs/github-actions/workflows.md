@@ -181,6 +181,17 @@ Notes:
 Purpose:
 
 - PR preview lifecycle per store: resolve/create preview theme, optional backup, build/push, comment sync, and cleanup on close.
+- Two modes (`preview_mode`):
+  - `auto` (input default, so existing wrappers keep working): previews build on every PR open/push.
+  - `on_demand` (the trailhead template's default): previews build only when someone with write access comments `/preview` on the PR. Opening the PR posts a help comment instead.
+- Comment commands work in both modes. The command must be the comment's first line:
+  - `/preview`: build the previews, or update them with the latest commit (same themes and links).
+  - `/preview fresh`: back up, delete and re-create them from the current live theme (new theme IDs).
+  - `/preview stop`: delete them.
+  - `/preview help`: reply with the help comment.
+- The bot reacts 👀 when it starts, then 🚀 on success, or 😕 with a link to the run on failure. Commands from users without write access, on closed PRs, or on PRs from forks get a reply explaining why nothing ran.
+- In `on_demand` mode previews don't update on push. The summary comment shows the commit they were built from, and a collapsed "Preview commands" section lists the commands.
+- Comment commands need the wrapper on the default branch, with an `issue_comment` trigger and a job that looks up the PR's base branch for `resolve_env`. See the trailhead template, or [the consumer setup example](./consumer-setup.md#example-pr-preview).
 
 Inputs:
 
@@ -196,6 +207,8 @@ Inputs:
 - `SHOPIFY_PREVIEW_BASE_THEME_ID` (preferred source/base)
 - `SHOPIFY_PREVIEW_STORE` (optional; stores to preview on instead of `SHOPIFY_STORE`. Falls back to the `SHOPIFY_PREVIEW_STORE` variable from `env_vars`, then repo/org, then `SHOPIFY_STORE`)
 - `env_vars` (optional; `toJSON(vars)` from the wrapper's environment job, for environment-level per-store overrides and `SHOPIFY_PREVIEW_STORE`)
+- `preview_mode` (optional; `auto` (default) or `on_demand`)
+- `preview_command` (optional; default `/preview`)
 
 Secrets:
 
@@ -206,7 +219,8 @@ Secrets:
 Notes:
 
 - Per-store marker comments prevent cross-store preview ID collisions.
-- Cleanup posts a new historical cleanup comment and clears marker theme_id for reopen freshness.
+- Cleanup (on close or `/preview stop`) rewrites the summary comment with every store's result and empties its markers, so the next preview creates new themes. It runs only when the PR has previews.
+- Only runs that do work share the PR's concurrency group, so an ordinary comment, or a push in `on_demand` mode, doesn't cancel a preview that's building.
 - Cleanup tolerates missing/deleted preview themes.
 
 ### `.github/workflows/shopify-warn-locale-edits.yml`

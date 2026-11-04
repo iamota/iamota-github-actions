@@ -45,6 +45,8 @@ jobs:
               run: node --test tools/tests/shopify-cli-compatibility.test.mjs
             - name: Test per-store variable resolution
               run: node --test tools/tests/multistore-store-vars.test.mjs
+            - name: Test preview request handling
+              run: node --test tools/tests/github-pr-preview-request.test.mjs
 
     actionlint:
         # Resolve effective config: workflow_dispatch input > repo variable >

@@ -79,7 +79,7 @@ Shared PR comment helpers:
 
 ### `.github/scripts/github/github-pr-comment-marker-get.mjs`
 
-Reads latest matching marker comment and emits metadata JSON.
+Reads the most recently written (last created or edited) matching marker comment and emits metadata JSON.
 
 Supports:
 
@@ -93,6 +93,10 @@ Create/update/refresh marker comment.
 Supports:
 
 - `--refresh-after-comments N` to force a new marker comment when old marker has at least `N` newer comments.
+
+### `.github/scripts/github/github-pr-preview-request.mjs`
+
+Backs the `github-pr-preview-request` action. It parses `/preview` commands and checks the commenter's permission and the PR's state. The decision is written to `GITHUB_OUTPUT`. The pure logic lives in `github-pr-preview-request-lib.mjs`, tested by `tools/tests/github-pr-preview-request.test.mjs`.
 
 ### `.github/scripts/github/github-pr-guard-core.mjs`
 

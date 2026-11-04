@@ -36,7 +36,9 @@ export function findLatestMarkerComment(comments, marker) {
     const matches = (body) => markerMatches(body, marker);
     return (comments || [])
         .filter((c) => matches(c?.body))
-        .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))[0];
+        // Most recently written wins: a summary comment edited in place must beat
+        // an older cleanup comment that carries the same marker.
+        .sort((a, b) => new Date(b?.updated_at || b?.created_at || 0) - new Date(a?.updated_at || a?.created_at || 0))[0];
 }
 
 export function countNewerComments(comments, commentId) {
