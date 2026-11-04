@@ -868,6 +868,8 @@ jobs:
 
             - name: Build preview comment body
               id: preview_comment
+              env:
+                  PREVIEW_THEME_NAME_RAW: ${{ steps.comment_meta.outputs.preview_theme_name }}
               run: |
                   set -euo pipefail
 
@@ -876,7 +878,7 @@ jobs:
                   BASE_THEME_ID_RAW="${{ steps.source.outputs.source_theme_id }}"
                   SOURCE_HOST="${{ steps.source.outputs.source_store_host }}"
                   STORE_SLUG="${{ steps.source.outputs.source_store_slug }}"
-                  PREVIEW_THEME_NAME="${{ steps.comment_meta.outputs.preview_theme_name }}"
+                  PREVIEW_THEME_NAME="${PREVIEW_THEME_NAME_RAW}"
                   SYNC_AT="${{ steps.comment_meta.outputs.sync_at }}"
                   MARKER="${PREVIEW_MARKER:-iamota-shopify-preview}"
 
