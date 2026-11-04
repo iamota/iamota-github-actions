@@ -18,9 +18,18 @@ inputs:
 runs:
     using: "composite"
     steps:
-        - run: |
+        # Inputs go through env, never inline in the script: comment bodies carry
+        # branch names and backticks that bash would otherwise execute.
+        - env:
+              INPUT_SCRIPTS_ROOT: ${{ inputs.scripts_root }}
+              INPUT_REPO: ${{ inputs.repo }}
+              INPUT_PR: ${{ inputs.pr }}
+              INPUT_BODY: ${{ inputs.body }}
+              INPUT_MARKER: ${{ inputs.marker }}
+              INPUT_REFRESH_AFTER_COMMENTS: ${{ inputs.refresh_after_comments }}
+          run: |
               set -euo pipefail
-              ROOT="${{ inputs.scripts_root }}"
+              ROOT="${INPUT_SCRIPTS_ROOT}"
               SCRIPT="${ROOT}/github-pr-comment-marker-set.mjs"
 
               if [ ! -f "${SCRIPT}" ]; then
@@ -29,9 +38,9 @@ runs:
               fi
 
               node "${SCRIPT}" \
-                --repo "${{ inputs.repo }}" \
-                --pr "${{ inputs.pr }}" \
-                --marker "${{ inputs.marker }}" \
-                --body "${{ inputs.body }}" \
-                --refresh-after-comments "${{ inputs.refresh_after_comments }}"
+                --repo "${INPUT_REPO}" \
+                --pr "${INPUT_PR}" \
+                --marker "${INPUT_MARKER}" \
+                --body "${INPUT_BODY}" \
+                --refresh-after-comments "${INPUT_REFRESH_AFTER_COMMENTS}"
           shell: bash
