@@ -1056,7 +1056,7 @@ jobs:
                   }
                   if (notes.length) lines.push(`<sub>${notes.join(" ")}</sub>`);
 
-                  process.stdout.write(lines.join("\n"));
+                  process.stdout.write(lines.join("\n") + "\n");
                   NODE
                   {
                     echo "body<<EOF"
