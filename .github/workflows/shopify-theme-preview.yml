@@ -82,6 +82,19 @@ on:
                 type: string
                 required: false
                 default: ""
+            preview_mode:
+                description: >-
+                    auto: build previews on every PR open/push. on_demand: build them
+                    only when someone comments the preview command (the wrapper must
+                    also trigger on issue_comment). PR close always cleans up.
+                type: string
+                required: false
+                default: "auto"
+            preview_command:
+                description: "Comment command that requests previews (works in either mode)."
+                type: string
+                required: false
+                default: "/preview"
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
                 required: false
@@ -96,12 +109,57 @@ permissions:
     contents: write
     pull-requests: write
 
+# Only runs that do work share the PR's group, so an ordinary PR comment (or, in
+# on_demand mode, a push) can't cancel a preview that is building.
 concurrency:
-    group: iamota-shopify-theme-preview-${{ github.event.pull_request.number || github.run_id }}
+    group: iamota-shopify-theme-preview-${{ ((github.event_name == 'pull_request' && (github.event.action == 'closed' || inputs.preview_mode != 'on_demand')) || (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, inputs.preview_command))) && format('pr-{0}', github.event.pull_request.number || github.event.issue.number) || github.run_id }}
     cancel-in-progress: true
 
 jobs:
+    # What this run does: preview | cleanup | help | reply | skip. Normalizes the
+    # PR (number, refs, SHAs) for pull_request and issue_comment events alike.
+    context:
+        runs-on: ubuntu-latest
+        outputs:
+            action      : ${{ steps.request.outputs.action }}
+            reason      : ${{ steps.request.outputs.reason }}
+            mode        : ${{ steps.request.outputs.mode }}
+            fresh       : ${{ steps.request.outputs.fresh }}
+            pr_number   : ${{ steps.request.outputs.pr_number }}
+            head_ref    : ${{ steps.request.outputs.head_ref }}
+            head_sha    : ${{ steps.request.outputs.head_sha }}
+            base_sha    : ${{ steps.request.outputs.base_sha }}
+            checkout_ref: ${{ steps.request.outputs.checkout_ref }}
+            comment_id  : ${{ steps.request.outputs.comment_id }}
+        steps:
+            - id: request
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-preview-request@v1
+              with:
+                  mode: ${{ inputs.preview_mode }}
+                  command: ${{ inputs.preview_command }}
+
+            - name: Acknowledge preview command
+              if: steps.request.outputs.comment_id != '' && (steps.request.outputs.action == 'preview' || steps.request.outputs.action == 'cleanup')
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  COMMENT_ID: ${{ steps.request.outputs.comment_id }}
+              run: gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=eyes --silent
+
+            - name: Reply to preview command
+              if: steps.request.outputs.action == 'reply'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  COMMENT_ID: ${{ steps.request.outputs.comment_id }}
+                  PR_NUMBER: ${{ steps.request.outputs.pr_number }}
+                  REASON: ${{ steps.request.outputs.reason }}
+              run: |
+                  set -euo pipefail
+                  gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=confused --silent || true
+                  gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="${REASON}" --silent
+
     resolve_targets:
+        needs: [context]
+        if: contains(fromJSON('["preview","cleanup","help"]'), needs.context.outputs.action)
         runs-on: ubuntu-latest
         outputs:
             matrix_json: ${{ steps.stores.outputs.matrix_json }}
@@ -117,7 +175,7 @@ jobs:
                   stores: ${{ inputs.SHOPIFY_PREVIEW_STORE || fromJSON(inputs.env_vars || '{}').SHOPIFY_PREVIEW_STORE || vars.SHOPIFY_PREVIEW_STORE || inputs.SHOPIFY_STORE }}
             - id: branch_policy
               env:
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+                  HEAD_REF: ${{ needs.context.outputs.head_ref }}
                   PRODUCTION_BRANCH: ${{ inputs.production_branch }}
                   NON_PREVIEW_BRANCHES: ${{ inputs.non_preview_branches }}
               run: |
@@ -159,8 +217,8 @@ jobs:
                   echo "skip_preview=${SKIP_PREVIEW}" >> "$GITHUB_OUTPUT"
 
     install_dependencies:
-        needs: [resolve_targets]
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.resolve_targets.outputs.skip_preview != 'true'
+        needs: [context, resolve_targets]
+        if: needs.context.outputs.action == 'preview' && needs.resolve_targets.outputs.skip_preview != 'true'
         runs-on: ubuntu-latest
         outputs:
             theme_root_effective: ${{ steps.inputs.outputs.theme_root_effective }}
@@ -169,6 +227,8 @@ jobs:
             node_modules_cache_path: ${{ steps.nm_cache_key.outputs.path }}
         steps:
             - uses: actions/checkout@v5
+              with:
+                  ref: ${{ needs.context.outputs.checkout_ref }}
 
             - name: Resolve theme root path
               id: resolve_theme_root
@@ -263,11 +323,11 @@ jobs:
                   if_package_json: "1"
 
     shopify_theme_preview:
-        needs: [resolve_targets, install_dependencies]
+        needs: [context, resolve_targets, install_dependencies]
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.resolve_targets.outputs.skip_preview != 'true'
+        if: needs.context.outputs.action == 'preview' && needs.resolve_targets.outputs.skip_preview != 'true'
         runs-on: ubuntu-latest
         env:
             TARGET_STORE                          : ${{ matrix.store }}
@@ -304,6 +364,7 @@ jobs:
             - name: Checkout PR head
               uses: actions/checkout@v5
               with:
+                  ref: ${{ needs.context.outputs.checkout_ref }}
                   fetch-depth: 0
 
             # Stages variables so "Resolve store-scoped values" can apply per-store
@@ -538,18 +599,34 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@v1
               with:
                   repo: ${{ github.repository }}
-                  pr: ${{ github.event.pull_request.number }}
+                  pr: ${{ needs.context.outputs.pr_number }}
                   marker: ${{ env.PREVIEW_MARKER }}
                   extract_regex: theme_id=(\d+)
                   refresh_after_comments: "75"
 
+            # /preview fresh rebuilds from the live theme: the existing preview is
+            # backed up below as usual, then deleted and re-created.
+            - name: Resolve existing preview theme
+              id: existing
+              env:
+                  MARKER_THEME_ID: ${{ steps.marker.outputs.extracted_value }}
+                  FRESH: ${{ needs.context.outputs.fresh }}
+              run: |
+                  set -euo pipefail
+                  if [ "${FRESH}" = "true" ]; then
+                      echo "theme_id=" >> "$GITHUB_OUTPUT"
+                      [ -z "${MARKER_THEME_ID}" ] || echo "Fresh rebuild: replacing preview theme ${MARKER_THEME_ID}."
+                  else
+                      echo "theme_id=${MARKER_THEME_ID}" >> "$GITHUB_OUTPUT"
+                  fi
+
             - name: Prepare preview backup filename
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
               env:
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+                  HEAD_REF: ${{ needs.context.outputs.head_ref }}
               run: |
                   set -euo pipefail
-                  PR_NUMBER="${{ github.event.pull_request.number }}"
+                  PR_NUMBER="${{ needs.context.outputs.pr_number }}"
                   BRANCH="${HEAD_REF}"
                   THEME_ID="${{ steps.marker.outputs.extracted_value }}"
                   TS="$(TZ=America/Los_Angeles date '+%Y-%m-%d_%H%M%S_%Z')"
@@ -590,8 +667,17 @@ jobs:
               if: steps.marker.outputs.extracted_value != '' && env.ENABLE_PREVIEW_BACKUP == 'true'
               uses: iamota/iamota-github-actions/.github/actions/github-artifact-upload@v1
               with:
-                  name: shopify-preview-backup-pr-${{ github.event.pull_request.number }}-${{ env.TARGET_STORE_SLUG }}
+                  name: shopify-preview-backup-pr-${{ needs.context.outputs.pr_number }}-${{ env.TARGET_STORE_SLUG }}
                   path: ${{ env.PREVIEW_BACKUP_ZIP }}
+
+            - name: Delete existing preview theme (fresh rebuild)
+              if: needs.context.outputs.fresh == 'true' && steps.marker.outputs.extracted_value != ''
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-delete@v1
+              with:
+                  store: ${{ env.SHOPIFY_STORE }}
+                  theme_id: ${{ steps.marker.outputs.extracted_value }}
+                  token: ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
+                  ignore_not_found: "true"
 
             # Shopify rejects theme names over 50 characters, so long branch names
             # drop a leading type prefix (feature/, fix/, ...) and then keep their
@@ -599,8 +685,8 @@ jobs:
             - name: Build preview theme name
               id: theme_name
               env:
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
-                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  HEAD_REF: ${{ needs.context.outputs.head_ref }}
+                  PR_NUMBER: ${{ needs.context.outputs.pr_number }}
               run: |
                   set -euo pipefail
                   node - <<'NODE'
@@ -619,7 +705,7 @@ jobs:
                   NODE
 
             - name: Create preview theme (duplicate base) if missing
-              if: steps.marker.outputs.extracted_value == ''
+              if: steps.existing.outputs.theme_id == ''
               id: createtheme
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-create@v1
               with:
@@ -632,12 +718,12 @@ jobs:
               id: finaltheme
               run: |
                   set -euo pipefail
-                  if [ -n "${{ steps.marker.outputs.extracted_value }}" ]; then
-                      echo "theme_id=${{ steps.marker.outputs.extracted_value }}" >> "$GITHUB_OUTPUT"
+                  if [ -n "${{ steps.existing.outputs.theme_id }}" ]; then
+                      echo "theme_id=${{ steps.existing.outputs.theme_id }}" >> "$GITHUB_OUTPUT"
                   else
                       echo "theme_id=${{ steps.createtheme.outputs.theme_id }}" >> "$GITHUB_OUTPUT"
                   fi
-                  if [ -z "${{ steps.marker.outputs.extracted_value }}" ] && [ -z "${{ steps.createtheme.outputs.theme_id }}" ]; then
+                  if [ -z "${{ steps.existing.outputs.theme_id }}" ] && [ -z "${{ steps.createtheme.outputs.theme_id }}" ]; then
                       echo "Failed to resolve preview theme id from marker or create step."
                       exit 1
                   fi
@@ -667,7 +753,7 @@ jobs:
               id: prepare
               uses: iamota/iamota-github-actions/.github/actions/shopify-theme-prepare@v1
               env:
-                  GITHUB_BRANCH: ${{ github.event.pull_request.head.ref }}
+                  GITHUB_BRANCH: ${{ needs.context.outputs.head_ref }}
               with:
                   theme_root: ${{ env.THEME_ROOT }}
                   theme_src: ${{ env.THEME_SRC }}
@@ -689,8 +775,8 @@ jobs:
                   DIST_ROOT="${DIST_ROOT%/}"
                   [ -n "${DIST_ROOT}" ] || DIST_ROOT="."
 
-                  BASE_SHA="${{ github.event.pull_request.base.sha }}"
-                  HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+                  BASE_SHA="${{ needs.context.outputs.base_sha }}"
+                  HEAD_SHA="${{ needs.context.outputs.head_sha }}"
 
                   CHANGED_REL="/tmp/preview-json-changed.rel.txt"
                   DIST_REL="/tmp/preview-json-dist.rel.txt"
@@ -894,8 +980,8 @@ jobs:
                   if-no-files-found: error
 
     shopify_theme_preview_summary:
-        needs: [resolve_targets, shopify_theme_preview]
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && needs.resolve_targets.outputs.skip_preview != 'true' && needs.shopify_theme_preview.result == 'success'
+        needs: [context, resolve_targets, shopify_theme_preview]
+        if: needs.context.outputs.action == 'preview' && needs.resolve_targets.outputs.skip_preview != 'true' && needs.shopify_theme_preview.result == 'success'
         runs-on: ubuntu-latest
         steps:
             - name: Checkout helper scripts
@@ -915,6 +1001,10 @@ jobs:
             - name: Build preview summary comment body
               id: summary_comment
               shell: bash
+              env:
+                  HEAD_SHA: ${{ needs.context.outputs.head_sha }}
+                  PREVIEW_MODE: ${{ needs.context.outputs.mode }}
+                  PREVIEW_COMMAND: ${{ inputs.preview_command }}
               run: |
                   set -euo pipefail
                   node - <<'NODE' > preview-summary/body.md
@@ -955,6 +1045,15 @@ jobs:
                     lines.push("");
                   }
 
+                  const sha = String(process.env.HEAD_SHA || "").slice(0, 7);
+                  const cmd = process.env.PREVIEW_COMMAND || "/preview";
+                  const notes = [];
+                  if (sha) notes.push(`Built from ${sha}.`);
+                  if (process.env.PREVIEW_MODE === "on_demand") {
+                    notes.push(`Previews don't update on push: comment \`${cmd}\` to update them, \`${cmd} fresh\` to rebuild from the live theme, or \`${cmd} stop\` to delete them.`);
+                  }
+                  if (notes.length) lines.push(`<sub>${notes.join(" ")}</sub>`);
+
                   process.stdout.write(lines.join("\n"));
                   NODE
                   {
@@ -969,17 +1068,17 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@v1
               with:
                   repo: ${{ github.repository }}
-                  pr: ${{ github.event.pull_request.number }}
+                  pr: ${{ needs.context.outputs.pr_number }}
                   marker: iamota-shopify-preview-summary
                   body: ${{ steps.summary_comment.outputs.body }}
                   refresh_after_comments: "75"
 
     shopify_theme_preview_cleanup:
-        needs: [resolve_targets]
+        needs: [context, resolve_targets]
         strategy:
             fail-fast: false
             matrix: ${{ fromJson(needs.resolve_targets.outputs.matrix_json) }}
-        if: github.event_name == 'pull_request' && github.event.action == 'closed' && needs.resolve_targets.outputs.skip_preview != 'true'
+        if: needs.context.outputs.action == 'cleanup' && needs.resolve_targets.outputs.skip_preview != 'true'
         runs-on: ubuntu-latest
         env:
             TARGET_STORE                          : ${{ matrix.store }}
@@ -1057,7 +1156,7 @@ jobs:
               uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-get@v1
               with:
                   repo         : ${{ github.repository }}
-                  pr           : ${{ github.event.pull_request.number }}
+                  pr           : ${{ needs.context.outputs.pr_number }}
                   marker       : ${{ env.PREVIEW_MARKER }}
                   extract_regex: theme_id=(\d+)
 
@@ -1079,32 +1178,203 @@ jobs:
                   token           : ${{ env.SHOPIFY_THEME_ACCESS_TOKEN }}
                   ignore_not_found: "true"
 
-            - name: Build cleanup comment body
-              id: cleanup_comment
+            - name: Write cleanup result payload
+              env:
+                  THEME_ID: ${{ steps.marker_norm.outputs.theme_id }}
+                  DELETE_STATUS: ${{ steps.delete_preview.outputs.status }}
               run: |
                   set -euo pipefail
-                  MARKER="${PREVIEW_MARKER:-iamota-shopify-preview}"
-                  THEME_ID="${{ steps.marker_norm.outputs.theme_id }}"
-                  DELETE_STATUS="${{ steps.delete_preview.outputs.status }}"
-                  STORE_HOST="${SHOPIFY_STORE:-unknown-store.myshopify.com}"
-                  if [ -n "${THEME_ID}" ] && [ "${DELETE_STATUS}" = "deleted" ]; then
-                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Deleted preview theme **${THEME_ID}** from **${STORE_HOST}**")"
-                  elif [ -n "${THEME_ID}" ] && [ "${DELETE_STATUS}" = "missing" ]; then
-                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] Preview theme already missing on **${STORE_HOST}** (nothing to delete): **${THEME_ID}**")"
-                  else
-                      BODY="$(printf '%s\n%s' "<!-- ${MARKER}:theme_id= -->" "[CLEANUP] No preview theme found to delete on **${STORE_HOST}**.")"
-                  fi
+                  mkdir -p preview-cleanup
+                  node -e '
+                  const fs = require("node:fs");
+                  const payload = {
+                    marker: process.env.PREVIEW_MARKER || "",
+                    store_host: process.env.SHOPIFY_STORE || "",
+                    store_slug: process.env.TARGET_STORE_SLUG || "",
+                    theme_id: process.env.THEME_ID || "",
+                    status: process.env.THEME_ID ? (process.env.DELETE_STATUS || "unknown") : "none",
+                  };
+                  fs.writeFileSync(`preview-cleanup/${process.env.TARGET_STORE_SLUG}.json`, JSON.stringify(payload, null, 2) + "\n");
+                  '
+
+            - name: Upload cleanup result payload
+              uses: actions/upload-artifact@v7
+              with:
+                  name: shopify-preview-cleanup-${{ env.TARGET_STORE_SLUG }}
+                  path: preview-cleanup/${{ env.TARGET_STORE_SLUG }}.json
+                  if-no-files-found: error
+
+    # Rewrites the summary comment in place: per-store markers are emptied so a
+    # later /preview (or reopen in auto mode) creates new themes.
+    shopify_theme_preview_cleanup_summary:
+        needs: [context, resolve_targets, shopify_theme_preview_cleanup]
+        if: always() && needs.context.outputs.action == 'cleanup' && needs.shopify_theme_preview_cleanup.result != 'skipped'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Download cleanup result payloads
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: shopify-preview-cleanup-*
+                  path: preview-cleanup
+                  merge-multiple: true
+
+            - name: Build cleanup summary comment body
+              id: cleanup_comment
+              env:
+                  REASON: ${{ needs.context.outputs.reason }}
+                  CLEANUP_RESULT: ${{ needs.shopify_theme_preview_cleanup.result }}
+                  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              run: |
+                  set -euo pipefail
+                  mkdir -p preview-cleanup
+                  node - <<'NODE' > preview-cleanup/body.md
+                  const fs = require("node:fs");
+                  const path = require("node:path");
+                  const dir = path.join(process.cwd(), "preview-cleanup");
+                  const rows = fs.readdirSync(dir).filter((n) => n.endsWith(".json")).sort()
+                    .map((n) => JSON.parse(fs.readFileSync(path.join(dir, n), "utf8")));
+                  const why = process.env.REASON === "PR closed" ? "the PR was closed" : "of a stop request";
+                  const lines = ["<!-- iamota-shopify-preview-summary -->"];
+                  for (const row of rows) lines.push(`<!-- ${row.marker}:theme_id= -->`);
+                  lines.push("", "# Preview Themes", "", `Preview themes were deleted because ${why}.`, "");
+                  const label = { deleted: "deleted", missing: "already gone", none: "nothing to delete" };
+                  for (const row of rows) {
+                    const theme = row.theme_id ? `theme ${row.theme_id}` : "no preview theme";
+                    lines.push(`- **${row.store_slug || row.store_host}**: ${theme}, ${label[row.status] || row.status}`);
+                  }
+                  if (process.env.CLEANUP_RESULT !== "success") {
+                    lines.push("", `Some stores failed to clean up; see [the run](${process.env.RUN_URL}).`);
+                  }
+                  process.stdout.write(lines.join("\n") + "\n");
+                  NODE
                   {
                     echo "body<<EOF"
-                    printf '%s\n' "${BODY}"
+                    cat preview-cleanup/body.md
                     echo "EOF"
                   } >> "$GITHUB_OUTPUT"
 
-            - name: Add cleanup comment
+            - name: Sync preview summary PR comment marker
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@v1
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ needs.context.outputs.pr_number }}
+                  marker: iamota-shopify-preview-summary
+                  body: ${{ steps.cleanup_comment.outputs.body }}
+                  refresh_after_comments: "75"
+
+    # How to request previews: posted once when a PR opens in on_demand mode,
+    # and as a reply to "/preview help".
+    shopify_theme_preview_help:
+        needs: [context, resolve_targets]
+        if: needs.context.outputs.action == 'help' && needs.resolve_targets.outputs.skip_preview != 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout helper scripts
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              with:
+                  token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+                  path: .iamota-actions
+
+            - name: Build help comment body
+              id: help_comment
+              env:
+                  MATRIX_JSON: ${{ needs.resolve_targets.outputs.matrix_json }}
+                  PREVIEW_COMMAND: ${{ inputs.preview_command }}
+                  PREVIEW_MODE: ${{ needs.context.outputs.mode }}
+                  REASON: ${{ needs.context.outputs.reason }}
+              run: |
+                  set -euo pipefail
+                  node - <<'NODE' > help.md
+                  const matrix = JSON.parse(process.env.MATRIX_JSON || "{}");
+                  const stores = (matrix.include || []).map((m) => m.store_slug || m.store).filter(Boolean);
+                  const cmd = process.env.PREVIEW_COMMAND || "/preview";
+                  const reason = process.env.REASON || "";
+                  const lines = ["<!-- iamota-shopify-preview-help -->", "", "### Shopify preview themes", ""];
+                  if (reason.startsWith("unknown option")) lines.push(`I didn't recognise that: ${reason}.`, "");
+                  lines.push(
+                    stores.length
+                      ? `Comment \`${cmd}\` to build preview themes for this PR on ${stores.map((s) => `**${s}**`).join(", ")}.`
+                      : `Comment \`${cmd}\` to build preview themes for this PR.`,
+                    "",
+                    `- \`${cmd}\`: build the previews, or update them with the latest commit`,
+                    `- \`${cmd} fresh\`: delete and rebuild them from the current live theme (new theme IDs and links)`,
+                    `- \`${cmd} stop\`: delete them`,
+                    "",
+                    process.env.PREVIEW_MODE === "on_demand"
+                      ? "Previews don't update on push, so comment again after new commits. They're deleted when the PR closes."
+                      : "Previews also update on every push, and are deleted when the PR closes.",
+                  );
+                  process.stdout.write(lines.join("\n") + "\n");
+                  NODE
+                  {
+                    echo "body<<EOF"
+                    cat help.md
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Post help comment (PR opened)
+              if: needs.context.outputs.comment_id == ''
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-marker-set@v1
+              with:
+                  repo: ${{ github.repository }}
+                  pr: ${{ needs.context.outputs.pr_number }}
+                  marker: iamota-shopify-preview-help
+                  body: ${{ steps.help_comment.outputs.body }}
+
+            - name: Reply with help comment
+              if: needs.context.outputs.comment_id != ''
               env:
                   GH_TOKEN: ${{ github.token }}
               uses: iamota/iamota-github-actions/.github/actions/github-pr-comment-add@v1
               with:
                   repo: ${{ github.repository }}
-                  pr  : ${{ github.event.pull_request.number }}
-                  body: ${{ steps.cleanup_comment.outputs.body }}
+                  pr: ${{ needs.context.outputs.pr_number }}
+                  body: ${{ steps.help_comment.outputs.body }}
+
+    # Reacts to the /preview comment with the outcome: rocket on success,
+    # confused plus a link to the run on failure.
+    shopify_theme_preview_command_result:
+        needs: [context, shopify_theme_preview, shopify_theme_preview_summary, shopify_theme_preview_cleanup, shopify_theme_preview_cleanup_summary]
+        if: always() && needs.context.outputs.comment_id != '' && (needs.context.outputs.action == 'preview' || needs.context.outputs.action == 'cleanup')
+        runs-on: ubuntu-latest
+        steps:
+            - name: Report result on the command comment
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  COMMENT_ID: ${{ needs.context.outputs.comment_id }}
+                  PR_NUMBER: ${{ needs.context.outputs.pr_number }}
+                  ACTION: ${{ needs.context.outputs.action }}
+                  RESULTS: ${{ toJSON(needs) }}
+                  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              run: |
+                  set -euo pipefail
+                  FAILED="$(node -e '
+                  const needs = JSON.parse(process.env.RESULTS || "{}");
+                  const jobs = process.env.ACTION === "cleanup"
+                    ? ["shopify_theme_preview_cleanup", "shopify_theme_preview_cleanup_summary"]
+                    : ["shopify_theme_preview", "shopify_theme_preview_summary"];
+                  const results = jobs.map((j) => (needs[j] && needs[j].result) || "skipped");
+                  process.stdout.write(results.every((r) => r === "skipped") ? "skipped" : results.some((r) => r !== "success") ? "true" : "false");
+                  ')"
+                  if [ "${FAILED}" = "skipped" ]; then
+                      gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=confused --silent || true
+                      gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="Previews aren't built for this PR's branch (see \`non_preview_branches\`)." --silent
+                      exit 0
+                  fi
+                  if [ "${FAILED}" = "true" ]; then
+                      gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=confused --silent || true
+                      gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+                          -f body="The \`${ACTION}\` request didn't finish. See [the run](${RUN_URL})." --silent
+                      exit 0
+                  fi
+                  gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=rocket --silent
