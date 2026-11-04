@@ -51,7 +51,7 @@ jobs:
             first_store: ${{ steps.stores.outputs.first_store }}
         steps:
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@test/preview-on-demand
               with:
                   stores: ${{ inputs.shopify_store }}
                   allow_empty: "true"
@@ -71,14 +71,14 @@ jobs:
             # Stages variables so the resolve steps below can apply per-store
             # NAME__STORE_KEY / NAME_N overrides.
             - name: Load per-store variable overrides
-              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@test/preview-on-demand
               with:
                   vars_json: ${{ toJSON(vars) }}
                   env_vars_json: ${{ inputs.env_vars }}
 
             - name: Resolve master theme id (metadata)
               id: resolve_theme_id
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
@@ -87,7 +87,7 @@ jobs:
 
             - name: Resolve master theme name (metadata)
               id: resolve_theme_name
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_NAME }}

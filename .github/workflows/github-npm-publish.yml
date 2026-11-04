@@ -125,7 +125,7 @@ jobs:
                   scope: ${{ inputs.scope }}
 
             - name: Install npm dependencies
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@test/preview-on-demand
               with:
                   working_directory: ${{ inputs.working_directory }}
                   install_command: ${{ inputs.install_command }}

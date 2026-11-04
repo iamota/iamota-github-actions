@@ -42,7 +42,7 @@ jobs:
 
         steps:
             - name: Checkout helper scripts
-              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@v1
+              uses: iamota/iamota-github-actions/.github/actions/iamota-helper-checkout@test/preview-on-demand
               with:
                   token: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
                   path: .iamota-actions

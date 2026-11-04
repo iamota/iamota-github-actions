@@ -68,7 +68,7 @@ jobs:
             first_store: ${{ steps.stores.outputs.first_store }}
         steps:
             - id: stores
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@test/preview-on-demand
               with:
                   stores: ${{ inputs.SHOPIFY_STORE }}
 
@@ -85,7 +85,7 @@ jobs:
 
             - name: Resolve theme root path
               id: resolve_theme_root
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ needs.resolve_targets.outputs.first_store }}
                   raw: ${{ inputs.theme_root }}
@@ -161,7 +161,7 @@ jobs:
 
             - name: Resolve build install command
               id: resolve_build_install
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ needs.resolve_targets.outputs.first_store }}
                   raw: ${{ inputs.build_install_command }}
@@ -169,7 +169,7 @@ jobs:
             - name: NPM install (self-aware)
               if: steps.npm_cache.outputs.enabled != 'true' || steps.nm_cache.outputs.cache-hit != 'true'
               id: npm
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@test/preview-on-demand
               with:
                   working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
                   install_command: ${{ steps.resolve_build_install.outputs.value }}
@@ -206,13 +206,13 @@ jobs:
             # Stages repo/org/environment variables so the resolve steps below can
             # apply per-store NAME__STORE_KEY / NAME_N overrides.
             - name: Load per-store variable overrides
-              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@test/preview-on-demand
               with:
                   vars_json: ${{ toJSON(vars) }}
 
             - name: Resolve theme id
               id: resolve_theme_id
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
@@ -221,14 +221,14 @@ jobs:
 
             - name: Resolve theme root path
               id: resolve_theme_root
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_THEME_ROOT }}
 
             - name: Resolve theme source path
               id: resolve_theme_src
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_THEME_SRC }}
@@ -237,7 +237,7 @@ jobs:
 
             - name: Resolve theme dist path
               id: resolve_theme_dist
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_THEME_DIST }}
@@ -246,14 +246,14 @@ jobs:
 
             - name: Resolve build install command
               id: resolve_build_install
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_BUILD_INSTALL_COMMAND }}
 
             - name: Resolve build command
               id: resolve_build_command
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_BUILD_COMMAND }}
@@ -262,7 +262,7 @@ jobs:
 
             - name: Resolve allow-live override
               id: resolve_allow_live
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_ALLOW_LIVE }}
@@ -271,7 +271,7 @@ jobs:
 
             - name: Resolve nodelete override
               id: resolve_nodelete
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_NODELETE }}
@@ -280,7 +280,7 @@ jobs:
 
             - name: Resolve ignore pattern
               id: resolve_ignore
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_IGNORE }}
@@ -289,7 +289,7 @@ jobs:
 
             - name: Resolve JSON output mode
               id: resolve_json
-              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_JSON }}
@@ -298,7 +298,7 @@ jobs:
 
             - name: Resolve effective Shopify token
               id: resolve_token_effective
-              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
+              uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@test/preview-on-demand
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ACCESS_TOKEN }}
@@ -318,12 +318,12 @@ jobs:
                   fi
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@test/preview-on-demand
               with:
                   cli_version: ${{ vars.SHOPIFY_CLI_VERSION }}
 
             - name: Restore node_modules
-              uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@v1
+              uses: iamota/iamota-github-actions/.github/actions/node-modules-restore@test/preview-on-demand
               with:
                   cache_key: ${{ needs.install_dependencies.outputs.node_modules_cache_key }}
                   cache_path: ${{ needs.install_dependencies.outputs.node_modules_cache_path }}
@@ -331,7 +331,7 @@ jobs:
 
             - name: Build theme when webpack is configured
               id: webpack
-              uses: iamota/iamota-github-actions/.github/actions/webpack-build@v1
+              uses: iamota/iamota-github-actions/.github/actions/webpack-build@test/preview-on-demand
               env:
                   GITHUB_BRANCH: ${{ inputs.branch }}
               with:
@@ -446,7 +446,7 @@ jobs:
                   echo "NODELETE_INPUT=${NODELETE_INPUT}" >> "$GITHUB_ENV"
 
             - name: Deploy
-              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-theme-push@test/preview-on-demand
               with:
                   store     : ${{ env.TARGET_STORE }}
                   theme_id  : ${{ steps.resolve_theme_id.outputs.value }}

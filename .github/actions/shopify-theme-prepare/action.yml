@@ -72,14 +72,14 @@ runs:
           shell: bash
 
         - id: npm
-          uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+          uses: iamota/iamota-github-actions/.github/actions/npm-install@test/preview-on-demand
           with:
               working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
               install_command: ${{ inputs.build_install_command }}
               if_package_json: "1"
 
         - id: webpack
-          uses: iamota/iamota-github-actions/.github/actions/webpack-build@v1
+          uses: iamota/iamota-github-actions/.github/actions/webpack-build@test/preview-on-demand
           with:
               working_directory: ${{ steps.inputs.outputs.theme_root_effective }}
               build_command: ${{ inputs.build_command }}

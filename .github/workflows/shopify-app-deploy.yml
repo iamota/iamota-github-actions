@@ -92,13 +92,13 @@ jobs:
             - uses: actions/checkout@v5
 
             - name: Setup Node + Install Shopify CLI
-              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/shopify-cli-install@test/preview-on-demand
               with:
                   node_version: ${{ inputs.node_version }}
                   cli_version: ${{ inputs.cli_version || vars.SHOPIFY_CLI_VERSION }}
 
             - name: Install npm dependencies
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
+              uses: iamota/iamota-github-actions/.github/actions/npm-install@test/preview-on-demand
               with:
                   working_directory: ${{ inputs.working_directory }}
                   install_command: ${{ inputs.install_command }}
