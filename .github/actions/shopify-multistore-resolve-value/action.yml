@@ -1,15 +1,31 @@
 name: "Shopify Multistore Resolve Value"
-description: "Resolve a scalar or store-keyed JSON object value for a specific store"
+description: >-
+    Resolve a value for a specific store: a per-store named (NAME__STORE_KEY) or
+    indexed (NAME_N) variable when `names` is given and multistore-vars-load ran
+    earlier in the job, else the raw scalar or store-keyed JSON object value.
 inputs:
     store:
         required: true
     raw:
         required: false
         default: ""
+    names:
+        description: >-
+            Optional variable base name(s), space- or comma-separated, checked in
+            order for NAME__STORE_KEY then NAME_N overrides before `raw`.
+        required: false
+        default: ""
+    store_index:
+        description: "Optional 1-based store index (matrix.store_index) for NAME_N lookups."
+        required: false
+        default: ""
 outputs:
     value:
         description: "Resolved value for this store"
         value: ${{ steps.resolve.outputs.value }}
+    source:
+        description: "Resolution source: named, indexed, store_scoped, scalar, or empty"
+        value: ${{ steps.resolve.outputs.source }}
 runs:
     using: "composite"
     steps:
@@ -17,16 +33,9 @@ runs:
           env:
               INPUT_STORE: ${{ inputs.store }}
               INPUT_RAW: ${{ inputs.raw }}
+              INPUT_NAMES: ${{ inputs.names }}
+              INPUT_STORE_INDEX: ${{ inputs.store_index }}
           run: |
               set -euo pipefail
-              STORE="${INPUT_STORE}"
-              RAW="${INPUT_RAW}"
-
-              VALUE="$(node "${GITHUB_ACTION_PATH}/resolve-value.mjs" "${STORE}" "${RAW}")"
-
-              {
-                echo "value<<EOF"
-                printf '%s\n' "${VALUE}"
-                echo "EOF"
-              } >> "$GITHUB_OUTPUT"
+              node "${GITHUB_ACTION_PATH}/resolve-value.mjs" "${INPUT_STORE}" "${INPUT_RAW}" "${INPUT_NAMES}" "${INPUT_STORE_INDEX}"
           shell: bash

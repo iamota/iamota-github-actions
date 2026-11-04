@@ -33,6 +33,14 @@ on:
                 type: string
                 required: false
                 default: ""
+            env_vars:
+                description: >-
+                    Optional toJSON(vars) from a wrapper job that declares an environment,
+                    so environment-level per-store overrides (NAME__STORE_KEY / NAME_N)
+                    apply. Repo/org-level overrides apply without it.
+                type: string
+                required: false
+                default: ""
 
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
@@ -82,6 +90,14 @@ jobs:
             SHOPIFY_CLI_TTY           : "0"
 
         steps:
+            # Stages variables so the resolve steps below can apply per-store
+            # NAME__STORE_KEY / NAME_N overrides.
+            - name: Load per-store variable overrides
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              with:
+                  vars_json: ${{ toJSON(vars) }}
+                  env_vars_json: ${{ inputs.env_vars }}
+
             - name: Resolve master theme root path
               id: resolve_theme_root
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
@@ -95,6 +111,8 @@ jobs:
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_THEME_SRC }}
+                  names: THEME_SRC
+                  store_index: ${{ env.MASTER_STORE_INDEX }}
 
             - name: Resolve master theme pull path
               id: resolve_theme_pull_dir
@@ -102,6 +120,8 @@ jobs:
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_THEME_PULL_DIR }}
+                  names: THEME_PULL_DIR
+                  store_index: ${{ env.MASTER_STORE_INDEX }}
 
             - name: Resolve master source theme id
               id: resolve_theme_id
@@ -109,6 +129,8 @@ jobs:
               with:
                   store: ${{ env.MASTER_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
+                  names: SHOPIFY_PRODUCTION_THEME_ID SHOPIFY_THEME_ID
+                  store_index: ${{ env.MASTER_STORE_INDEX }}
 
             - name: Resolve effective master Shopify token
               id: resolve_shopify_token

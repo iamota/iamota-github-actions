@@ -1,0 +1,37 @@
+name: "Multistore Vars Load"
+description: >-
+    Stage the caller's configuration variables once per job so later
+    shopify-multistore-resolve-value steps can apply per-store named
+    (NAME__STORE_KEY) and indexed (NAME_N) variable overrides.
+inputs:
+    vars_json:
+        description: >-
+            The calling job's variables, passed as toJSON(vars). In a reusable
+            workflow this holds the caller repo's repository and organization
+            variables, plus environment variables when the job declares an
+            environment.
+        required: false
+        default: "{}"
+    env_vars_json:
+        description: >-
+            Optional extra variables, passed as toJSON(vars) from a caller job that
+            declares an environment (e.g. the wrapper's resolve_env job). Takes
+            precedence over vars_json, matching GitHub's environment-over-repository
+            rule.
+        required: false
+        default: ""
+outputs:
+    file:
+        description: "Path of the staged variables file (also exported as IAMOTA_STORE_VARS_FILE)"
+        value: ${{ steps.load.outputs.file }}
+runs:
+    using: "composite"
+    steps:
+        - id: load
+          env:
+              INPUT_VARS_JSON: ${{ inputs.vars_json }}
+              INPUT_ENV_VARS_JSON: ${{ inputs.env_vars_json }}
+          run: |
+              set -euo pipefail
+              node "${GITHUB_ACTION_PATH}/load-vars.mjs"
+          shell: bash

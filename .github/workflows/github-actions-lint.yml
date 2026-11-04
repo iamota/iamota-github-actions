@@ -43,6 +43,8 @@ jobs:
                   node-version: "24"
             - name: Test Shopify CLI JSON compatibility and version selection
               run: node --test tools/tests/shopify-cli-compatibility.test.mjs
+            - name: Test per-store variable resolution
+              run: node --test tools/tests/multistore-store-vars.test.mjs
 
     actionlint:
         # Resolve effective config: workflow_dispatch input > repo variable >

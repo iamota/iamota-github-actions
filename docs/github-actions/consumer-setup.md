@@ -37,6 +37,7 @@ Repository/org secrets:
 - `SHOPIFY_THEME_ID`
 - `SHOPIFY_PRODUCTION_THEME_ID`
 - `SHOPIFY_PREVIEW_BASE_THEME_ID`
+- `SHOPIFY_PREVIEW_STORE` — stores to create PR previews on, when that should be fewer than `SHOPIFY_STORE` (e.g. production stores only). Defaults to `SHOPIFY_STORE`.
 - `THEME_SRC`
 - `THEME_DIST`
 - `THEME_PULL_DIR`
@@ -81,6 +82,21 @@ Notes:
 
 - Store keys may be slug or full host.
 - Single scalar values apply to all stores.
+
+### One variable per store (instead of JSON)
+
+Any store-scoped variable or secret can instead be set once per store, which is easier to read and edit than a long JSON object:
+
+| Store | Variable |
+|---|---|
+| `production-acme-us.myshopify.com` | `SHOPIFY_PRODUCTION_THEME_ID__PRODUCTION_ACME_US` |
+| `production-acme-ca.myshopify.com` | `SHOPIFY_PRODUCTION_THEME_ID__PRODUCTION_ACME_CA` |
+
+- The suffix is a double underscore plus the store slug upper-cased, with `-`/`.` turned into `_`.
+- Indexed form `NAME_1`, `NAME_2`, … (position in the store list) also works, but named is safer: indexes shift when the list changes, and the preview list can differ from `SHOPIFY_STORE`.
+- For each store: named → indexed → JSON/scalar. You can mix them, e.g. a scalar default plus a named override for one store.
+- Not per-store: `THEME_ROOT` and `BUILD_INSTALL_COMMAND` (dependencies are installed once for all stores), and `SHOPIFY_STORE` itself.
+- Put per-store variables at **repository** level unless they really differ by environment. Deploy and backup read environment-level ones directly. Preview and CI read them only when the wrapper passes `env_vars: ${{ toJSON(vars) }}` (the trailhead preview template does).
 
 ## 4) Input Name Casing Is Strict
 
