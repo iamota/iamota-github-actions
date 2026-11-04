@@ -41,6 +41,8 @@ Runs internally on this repo's release branches, and is callable by consumer rep
 - `.github/actions/iamota-helper-checkout/action.yml`
 - `.github/actions/npm-install/action.yml`
 - `.github/actions/shopify-cli-install/action.yml`
+- `.github/actions/multistore-resolve-secret/action.yml`
+- `.github/actions/multistore-vars-load/action.yml`
 - `.github/actions/shopify-multistore-matrix/action.yml`
 - `.github/actions/shopify-multistore-resolve-value/action.yml`
 - `.github/actions/shopify-theme-backup/action.yml`

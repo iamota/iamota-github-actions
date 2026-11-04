@@ -13,6 +13,21 @@ Store-aware workflows use the same resolution model:
 - Non-object values are treated as scalars and applied to all stores.
 - Theme-id inputs also support the alias `live` (resolved to current main theme id at runtime).
 
+Per-store variables and secrets:
+
+- Instead of (or on top of) one JSON value, a store-scoped setting can be one variable per store:
+  - named: `NAME__STORE_KEY`, e.g. `SHOPIFY_THEME_ID__PRODUCTION_ACME_US` for `production-acme-us.myshopify.com`
+  - indexed: `NAME_N`, where `N` is the store's 1-based position in the store list the workflow fans out over
+- `STORE_KEY` is the store slug (no `.myshopify.com`) upper-cased, with each run of non-alphanumerics replaced by `_`.
+- For each store the order is: named → indexed → the JSON/scalar value the wrapper passes. An empty per-store variable is ignored.
+- Secrets have always worked this way. Variables now do too, for every per-store value in the store matrix jobs and the JSON sync master store, except `THEME_ROOT` and `BUILD_INSTALL_COMMAND`, which stay repo-wide because `node_modules` is installed once and shared by every store.
+- When a wrapper value falls back between names (e.g. `vars.SHOPIFY_PRODUCTION_THEME_ID || vars.SHOPIFY_THEME_ID`), the shared workflow checks the per-store forms of each name, in that order, before the passed value.
+- Where per-store variables are read from:
+  - `shopify-theme-deploy` and `shopify-theme-backup` matrix jobs declare the branch environment, so repository, organization **and** environment variables apply.
+  - `shopify-theme-preview`, `shopify-theme-ci` and the JSON sync workflows run without an environment. Repository and organization variables apply directly. For environment-level ones, pass `env_vars: ${{ toJSON(vars) }}` from a wrapper job that declares the environment (the preview template's `resolve_env` job does this).
+  - The `SHOPIFY_BACKUP` store filter runs before the matrix, so only repository/organization `SHOPIFY_BACKUP__STORE_KEY` variables apply to it.
+- Prefer named over indexed: indexes follow list order, and the preview list (`SHOPIFY_PREVIEW_STORE`) can differ from `SHOPIFY_STORE`.
+
 Resolution behavior:
 
 - `shopify-theme-backup`, `shopify-theme-deploy`, `shopify-theme-backup-deploy`, `shopify-theme-preview`, and lighthouse in `shopify-theme-ci` run as store matrix jobs.
@@ -179,6 +194,8 @@ Inputs:
 - `SHOPIFY_THEME_ID` (optional metadata)
 - `SHOPIFY_PRODUCTION_THEME_ID` (fallback source)
 - `SHOPIFY_PREVIEW_BASE_THEME_ID` (preferred source/base)
+- `SHOPIFY_PREVIEW_STORE` (optional; stores to preview on instead of `SHOPIFY_STORE`. Falls back to the `SHOPIFY_PREVIEW_STORE` variable from `env_vars`, then repo/org, then `SHOPIFY_STORE`)
+- `env_vars` (optional; `toJSON(vars)` from the wrapper's environment job, for environment-level per-store overrides and `SHOPIFY_PREVIEW_STORE`)
 
 Secrets:
 

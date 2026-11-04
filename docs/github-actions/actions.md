@@ -214,16 +214,46 @@ Outputs:
 
 ### `.github/actions/shopify-multistore-resolve-value/action.yml`
 
-Resolves scalar/store-keyed value for a specific store.
+Resolves a value for a specific store: a per-store named (`NAME__STORE_KEY`) or indexed (`NAME_N`) variable when `names` is given and `multistore-vars-load` ran earlier in the job, otherwise the scalar or store-keyed JSON `raw` value.
 
 Inputs:
 
 - `store` (required)
 - `raw` (optional)
+- `names` (optional; variable base names, space/comma separated, checked in order)
+- `store_index` (optional; 1-based store index for `NAME_N`)
 
 Outputs:
 
 - `value`
+- `source` (`named`, `indexed`, `store_scoped`, `scalar`, or `empty`)
+
+### `.github/actions/multistore-vars-load/action.yml`
+
+Stages the job's variables once (to `$RUNNER_TEMP`, exported as `IAMOTA_STORE_VARS_FILE`) so later `shopify-multistore-resolve-value` steps can apply per-store overrides without each step taking the whole variable set as an input.
+
+Inputs:
+
+- `vars_json` (pass `${{ toJSON(vars) }}`)
+- `env_vars_json` (optional; `toJSON(vars)` from a caller job that declares an environment; wins over `vars_json`)
+
+Outputs:
+
+- `file`
+
+### `.github/actions/multistore-resolve-secret/action.yml`
+
+Resolves a secret for a specific store: named (`NAME__STORE_KEY`), then indexed (`NAME_N`), then the scalar/store-keyed `raw` value. The workflow passes the named/indexed candidates, as `secrets[format(...)]`.
+
+Inputs:
+
+- `store` (required)
+- `raw`, `raw_named`, `raw_indexed` (optional)
+
+Outputs:
+
+- `value`
+- `source`
 
 ## Build and Artifact Helpers
 

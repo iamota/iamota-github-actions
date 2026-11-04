@@ -63,6 +63,25 @@ on:
                 type: string
                 required: false
                 default: ""
+            SHOPIFY_PREVIEW_STORE:
+                description: >-
+                    Optional store list (same format as SHOPIFY_STORE) to preview on
+                    instead of SHOPIFY_STORE, e.g. only the production stores of a
+                    multi-store project. When empty, falls back to the
+                    SHOPIFY_PREVIEW_STORE variable (env_vars, then repo/org), then
+                    SHOPIFY_STORE.
+                type: string
+                required: false
+                default: ""
+            env_vars:
+                description: >-
+                    Optional toJSON(vars) from a wrapper job that declares an environment
+                    (the resolve_env job), so environment-level per-store overrides
+                    (NAME__STORE_KEY / NAME_N) and SHOPIFY_PREVIEW_STORE apply.
+                    Repo/org-level ones apply without it.
+                type: string
+                required: false
+                default: ""
         secrets:
             SHOPIFY_THEME_ACCESS_TOKEN:
                 required: false
@@ -89,10 +108,13 @@ jobs:
             first_store: ${{ steps.stores.outputs.first_store }}
             skip_preview: ${{ steps.branch_policy.outputs.skip_preview }}
         steps:
+            # Preview targets: SHOPIFY_PREVIEW_STORE (input, environment var, repo/org
+            # var) narrows the fan-out, e.g. to production stores only; otherwise
+            # every SHOPIFY_STORE store gets a preview.
             - id: stores
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-matrix@v1
               with:
-                  stores: ${{ inputs.SHOPIFY_STORE }}
+                  stores: ${{ inputs.SHOPIFY_PREVIEW_STORE || fromJSON(inputs.env_vars || '{}').SHOPIFY_PREVIEW_STORE || vars.SHOPIFY_PREVIEW_STORE || inputs.SHOPIFY_STORE }}
             - id: branch_policy
               env:
                   HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -284,6 +306,14 @@ jobs:
               with:
                   fetch-depth: 0
 
+            # Stages variables so "Resolve store-scoped values" can apply per-store
+            # NAME__STORE_KEY / NAME_N overrides.
+            - name: Load per-store variable overrides
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              with:
+                  vars_json: ${{ toJSON(vars) }}
+                  env_vars_json: ${{ inputs.env_vars }}
+
             - name: Resolve effective AWS access key id
               id: resolve_aws_access_key_id
               uses: iamota/iamota-github-actions/.github/actions/multistore-resolve-secret@v1
@@ -358,26 +388,51 @@ jobs:
                   const envFile = process.env.GITHUB_ENV;
                   const marker = `iamota-shopify-preview-${(process.env.TARGET_STORE_SLUG || "").replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 
-                  const productionThemeId = resolveValue(process.env.RAW_SHOPIFY_PRODUCTION_THEME_ID, store) || "";
-                  const previewBaseId = resolveValue(process.env.RAW_SHOPIFY_PREVIEW_BASE_ID, store) || "";
+                  // Per-store variable overrides staged by multistore-vars-load: for each
+                  // name, NAME__STORE_KEY then NAME_N win over the wrapper's JSON/scalar value.
+                  // Same rules as shopify-multistore-resolve-value.
+                  let storeVars = {};
+                  try {
+                    if (process.env.IAMOTA_STORE_VARS_FILE) storeVars = JSON.parse(fs.readFileSync(process.env.IAMOTA_STORE_VARS_FILE, "utf8")) || {};
+                  } catch { storeVars = {}; }
+                  const storeKey = process.env.TARGET_STORE_SECRET_KEY || "";
+                  const storeIndex = process.env.TARGET_STORE_INDEX || "";
+                  function pick(names, raw) {
+                    for (const name of names) {
+                      for (const variable of [storeKey && `${name}__${storeKey}`, storeIndex && `${name}_${storeIndex}`]) {
+                        if (!variable) continue;
+                        const v = storeVars[variable];
+                        if (v !== undefined && v !== null && String(v) !== "") {
+                          console.log(`${name}: using ${variable}`);
+                          return String(v);
+                        }
+                      }
+                    }
+                    return resolveValue(raw, store);
+                  }
 
+                  const productionThemeId = pick(["SHOPIFY_PRODUCTION_THEME_ID"], process.env.RAW_SHOPIFY_PRODUCTION_THEME_ID) || "";
+                  const previewBaseId = pick(["SHOPIFY_PREVIEW_BASE_THEME_ID", "SHOPIFY_PRODUCTION_THEME_ID"], process.env.RAW_SHOPIFY_PREVIEW_BASE_ID) || "";
+
+                  // THEME_ROOT and BUILD_INSTALL_COMMAND stay repo-wide: node_modules is
+                  // installed once (install_dependencies) and shared by every store.
                   const resolvedThemeRoot = resolveValue(process.env.RAW_THEME_ROOT, store) || ".";
-                  const resolvedThemeSrc = resolveValue(process.env.RAW_THEME_SRC, store) || (resolvedThemeRoot !== "." ? resolvedThemeRoot : "src");
+                  const resolvedThemeSrc = pick(["THEME_SRC"], process.env.RAW_THEME_SRC) || (resolvedThemeRoot !== "." ? resolvedThemeRoot : "src");
 
                   const values = {
                     SHOPIFY_STORE: store,
                     THEME_ROOT: resolvedThemeRoot,
                     THEME_SRC: resolvedThemeSrc,
-                    THEME_DIST: resolveValue(process.env.RAW_THEME_DIST, store) || "",
+                    THEME_DIST: pick(["THEME_DIST"], process.env.RAW_THEME_DIST) || "",
                     BUILD_INSTALL_COMMAND: resolveValue(process.env.RAW_BUILD_INSTALL_COMMAND, store) || "npm ci",
-                    BUILD_COMMAND: resolveValue(process.env.RAW_BUILD_COMMAND, store) || "npx webpack --env target=${GITHUB_BRANCH}",
-                    SHOPIFY_IGNORE: resolveValue(process.env.RAW_SHOPIFY_IGNORE, store) || "",
-                    ENABLE_PREVIEW_BACKUP: resolveValue(process.env.RAW_ENABLE_PREVIEW_BACKUP, store) || "true",
-                    AWS_REGION: resolveValue(process.env.RAW_AWS_REGION, store) || "us-west-2",
-                    AWS_S3_BUCKET: resolveValue(process.env.RAW_AWS_S3_BUCKET, store) || "",
+                    BUILD_COMMAND: pick(["BUILD_COMMAND"], process.env.RAW_BUILD_COMMAND) || "npx webpack --env target=${GITHUB_BRANCH}",
+                    SHOPIFY_IGNORE: pick(["SHOPIFY_IGNORE"], process.env.RAW_SHOPIFY_IGNORE) || "",
+                    ENABLE_PREVIEW_BACKUP: pick(["ENABLE_PREVIEW_BACKUP"], process.env.RAW_ENABLE_PREVIEW_BACKUP) || "true",
+                    AWS_REGION: pick(["AWS_REGION"], process.env.RAW_AWS_REGION) || "us-west-2",
+                    AWS_S3_BUCKET: pick(["AWS_S3_BUCKET_SHOPIFY_BACKUPS"], process.env.RAW_AWS_S3_BUCKET) || "",
                     AWS_ACCESS_KEY_ID: process.env.RESOLVED_AWS_ACCESS_KEY_ID || "",
                     AWS_SECRET_ACCESS_KEY: process.env.RESOLVED_AWS_SECRET_ACCESS_KEY || "",
-                    SHOPIFY_THEME_ID: resolveValue(process.env.RAW_SHOPIFY_THEME_ID, store) || "",
+                    SHOPIFY_THEME_ID: pick(["SHOPIFY_THEME_ID"], process.env.RAW_SHOPIFY_THEME_ID) || "",
                     SHOPIFY_PRODUCTION_THEME_ID: productionThemeId,
                     SHOPIFY_PREVIEW_BASE_ID: previewBaseId || productionThemeId || "",
                     SHOPIFY_THEME_ACCESS_TOKEN: process.env.RESOLVED_SHOPIFY_THEME_ACCESS_TOKEN || "",

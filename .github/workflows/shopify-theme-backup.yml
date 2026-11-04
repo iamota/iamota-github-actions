@@ -61,12 +61,25 @@ jobs:
               env:
                   MATRIX_JSON: ${{ steps.stores.outputs.matrix_json }}
                   SHOPIFY_BACKUP: ${{ inputs.SHOPIFY_BACKUP }}
+                  # Repo/org variables, for SHOPIFY_BACKUP__STORE_KEY / SHOPIFY_BACKUP_N
+                  # overrides (this job declares no environment).
+                  VARS_JSON: ${{ toJSON(vars) }}
               run: |
                   set -euo pipefail
                   node - <<'NODE' >> "$GITHUB_OUTPUT"
                   const matrix = JSON.parse(process.env.MATRIX_JSON || '{"include":[]}');
                   const raw = String(process.env.SHOPIFY_BACKUP ?? "").trim();
                   const include = Array.isArray(matrix.include) ? matrix.include : [];
+                  let vars = {};
+                  try { vars = JSON.parse(process.env.VARS_JSON || "{}") || {}; } catch { vars = {}; }
+                  const override = (entry) => {
+                      for (const name of [`SHOPIFY_BACKUP__${entry.store_secret_key || ""}`, `SHOPIFY_BACKUP_${entry.store_index || ""}`]) {
+                          if (/__$|_$/.test(name)) continue;
+                          const v = vars[name];
+                          if (v !== undefined && v !== null && String(v) !== "") return String(v);
+                      }
+                      return null;
+                  };
 
                   // Resolve the backup flag for one store, mirroring the
                   // key-variant matching used by shopify-multistore-resolve-value.
@@ -74,7 +87,9 @@ jobs:
                   if (raw.startsWith("{") && raw.endsWith("}")) {
                       try { map = JSON.parse(raw); } catch { map = null; }
                   }
-                  const enabledFor = (store, slug) => {
+                  const enabledFor = (store, slug, entry) => {
+                      const named = override(entry);
+                      if (named !== null) return named.trim().toLowerCase() !== "false";
                       let value = raw;
                       if (map && typeof map === "object" && !Array.isArray(map)) {
                           const variants = [store, slug, String(store || "").toLowerCase(), String(slug || "").toLowerCase()];
@@ -89,7 +104,7 @@ jobs:
 
                   const kept = include.filter((entry) => {
                       const slug = entry.store_slug || String(entry.store || "").replace(/\.myshopify\.com$/i, "");
-                      const keep = enabledFor(entry.store, slug);
+                      const keep = enabledFor(entry.store, slug, entry);
                       if (!keep) console.error(`Backup disabled for ${entry.store}; skipping.`);
                       return keep;
                   });
@@ -124,12 +139,21 @@ jobs:
         steps:
             - uses: actions/checkout@v5
 
+            # Stages repo/org/environment variables so the resolve steps below can
+            # apply per-store NAME__STORE_KEY / NAME_N overrides.
+            - name: Load per-store variable overrides
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              with:
+                  vars_json: ${{ toJSON(vars) }}
+
             - name: Resolve theme id
               id: resolve_theme_id
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_SHOPIFY_THEME_ID }}
+                  names: SHOPIFY_THEME_ID
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve effective Shopify token
               id: resolve_theme_token
@@ -146,6 +170,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_REGION }}
+                  names: AWS_REGION
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve AWS bucket
               id: resolve_aws_bucket
@@ -153,6 +179,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw  : ${{ env.RAW_AWS_S3_BUCKET }}
+                  names: AWS_S3_BUCKET_SHOPIFY_BACKUPS
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve effective AWS access key id
               id: resolve_aws_key

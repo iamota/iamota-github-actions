@@ -203,12 +203,21 @@ jobs:
         steps:
             - uses: actions/checkout@v5
 
+            # Stages repo/org/environment variables so the resolve steps below can
+            # apply per-store NAME__STORE_KEY / NAME_N overrides.
+            - name: Load per-store variable overrides
+              uses: iamota/iamota-github-actions/.github/actions/multistore-vars-load@v1
+              with:
+                  vars_json: ${{ toJSON(vars) }}
+
             - name: Resolve theme id
               id: resolve_theme_id
               uses: iamota/iamota-github-actions/.github/actions/shopify-multistore-resolve-value@v1
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_SHOPIFY_THEME_ID }}
+                  names: SHOPIFY_THEME_ID
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve theme root path
               id: resolve_theme_root
@@ -223,6 +232,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_THEME_SRC }}
+                  names: THEME_SRC
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve theme dist path
               id: resolve_theme_dist
@@ -230,6 +241,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_THEME_DIST }}
+                  names: THEME_DIST
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve build install command
               id: resolve_build_install
@@ -244,6 +257,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_BUILD_COMMAND }}
+                  names: BUILD_COMMAND
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve allow-live override
               id: resolve_allow_live
@@ -251,6 +266,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_ALLOW_LIVE }}
+                  names: ALLOW_LIVE
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve nodelete override
               id: resolve_nodelete
@@ -258,6 +275,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_NODELETE }}
+                  names: NODELETE
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve ignore pattern
               id: resolve_ignore
@@ -265,6 +284,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_IGNORE }}
+                  names: IGNORE SHOPIFY_IGNORE
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve JSON output mode
               id: resolve_json
@@ -272,6 +293,8 @@ jobs:
               with:
                   store: ${{ env.TARGET_STORE }}
                   raw: ${{ env.RAW_JSON }}
+                  names: JSON
+                  store_index: ${{ matrix.store_index }}
 
             - name: Resolve effective Shopify token
               id: resolve_token_effective
