@@ -190,7 +190,7 @@ Purpose:
   - `/preview stop`: delete them.
   - `/preview help`: reply with the help comment.
 - The bot reacts 👀 when it starts, then 🚀 on success, or 😕 with a link to the run on failure. Commands from users without write access, on closed PRs, or on PRs from forks get a reply explaining why nothing ran.
-- In `on_demand` mode previews don't update on push. The summary comment shows the commit they were built from.
+- In `on_demand` mode previews don't update on push. The summary comment shows the commit they were built from, and a collapsed "Preview commands" section lists the commands.
 - Comment commands need the wrapper on the default branch, with an `issue_comment` trigger and a job that looks up the PR's base branch for `resolve_env`. See the trailhead template, or [the consumer setup example](./consumer-setup.md#example-pr-preview).
 
 Inputs:
