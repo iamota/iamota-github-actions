@@ -33,6 +33,27 @@ Outputs:
 - `newer_comment_count`
 - `raw_output`
 
+### `.github/actions/github-pr-preview-request/action.yml`
+
+Decides what a theme preview run should do for the triggering `pull_request` or `issue_comment` event. Read-only: it posts nothing.
+
+Inputs:
+
+- `mode` (optional; `auto` or `on_demand`, default `auto`)
+- `command` (optional; default `/preview`)
+- `token` (optional; default `github.token`)
+
+Outputs:
+
+- `action`: `preview`, `cleanup`, `help`, `reply` or `skip`
+- `reason`: why. For `reply`, the message to post
+- `mode`, `fresh` (`true` for `/preview fresh`)
+- `pr_number`, `head_ref`, `head_sha`, `base_ref`, `base_sha`
+- `checkout_ref`: empty on `pull_request` (checkout's default merge ref), the head SHA on `issue_comment`
+- `comment_id`, `requested_by`
+
+Checks commenter write access, closed PRs and fork PRs, and on close only cleans up when previews exist. Wrappers use it to find the PR's base branch for `resolve_env`, because comment events don't carry it.
+
 ### `.github/actions/github-pr-comment-marker-set/action.yml`
 
 Creates/updates marker comment (or refreshes by threshold).

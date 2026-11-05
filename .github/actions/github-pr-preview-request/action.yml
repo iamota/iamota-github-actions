@@ -1,0 +1,57 @@
+name: "GitHub PR Preview Request"
+description: >-
+    Decide what a theme preview run should do for the triggering pull_request or
+    issue_comment event (preview | cleanup | help | reply | skip), handling the
+    /preview command, commenter permission, closed and fork PRs. Read-only.
+inputs:
+    mode:
+        description: "auto (preview on every PR push) or on_demand (only on /preview)"
+        required: false
+        default: "auto"
+    command:
+        description: "Comment command that requests previews"
+        required: false
+        default: "/preview"
+    token:
+        description: "Token that can read the repo's PRs, comments and collaborators"
+        required: false
+        default: ${{ github.token }}
+outputs:
+    action:
+        description: "preview | cleanup | help | reply | skip"
+        value: ${{ steps.run.outputs.action }}
+    reason:
+        value: ${{ steps.run.outputs.reason }}
+    mode:
+        value: ${{ steps.run.outputs.mode }}
+    fresh:
+        description: "true when /preview fresh asked to rebuild themes from the live theme"
+        value: ${{ steps.run.outputs.fresh }}
+    pr_number:
+        value: ${{ steps.run.outputs.pr_number }}
+    head_ref:
+        value: ${{ steps.run.outputs.head_ref }}
+    head_sha:
+        value: ${{ steps.run.outputs.head_sha }}
+    base_ref:
+        value: ${{ steps.run.outputs.base_ref }}
+    base_sha:
+        value: ${{ steps.run.outputs.base_sha }}
+    checkout_ref:
+        description: "Ref for actions/checkout: empty on pull_request (default merge ref), the head SHA on issue_comment"
+        value: ${{ steps.run.outputs.checkout_ref }}
+    comment_id:
+        description: "The /preview comment's id (empty for pull_request events)"
+        value: ${{ steps.run.outputs.comment_id }}
+    requested_by:
+        value: ${{ steps.run.outputs.requested_by }}
+runs:
+    using: "composite"
+    steps:
+        - id: run
+          shell: bash
+          env:
+              GH_TOKEN: ${{ inputs.token }}
+              INPUT_MODE: ${{ inputs.mode }}
+              INPUT_COMMAND: ${{ inputs.command }}
+          run: node "${GITHUB_ACTION_PATH}/../../scripts/github/github-pr-preview-request.mjs"

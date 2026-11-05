@@ -38,6 +38,7 @@ Repository/org secrets:
 - `SHOPIFY_PRODUCTION_THEME_ID`
 - `SHOPIFY_PREVIEW_BASE_THEME_ID`
 - `SHOPIFY_PREVIEW_STORE` — stores to create PR previews on, when that should be fewer than `SHOPIFY_STORE` (e.g. production stores only). Defaults to `SHOPIFY_STORE`.
+- `PREVIEW_MODE`: `on_demand` (template default) builds PR previews only when someone comments `/preview`. `auto` builds them on every push.
 - `THEME_SRC`
 - `THEME_DIST`
 - `THEME_PULL_DIR`
@@ -255,21 +256,59 @@ jobs:
 
 ### Example: PR Preview
 
+Previews build when someone comments `/preview` on the PR (`PREVIEW_MODE` unset or `on_demand`). Set the repo variable `PREVIEW_MODE=auto` to build them on every push instead. Comment commands only work once this file is on the default branch. The `request` job looks up the PR's base branch so `resolve_env` loads the right environment, because comment events don't carry it. The trailhead template is the full version.
+
 ```yaml
 name: Shopify Theme Preview
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, closed]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: write
   pull-requests: write
 
+# Only runs that do work share the PR's group, so an ordinary comment (or a push in
+# on_demand mode) can't cancel a preview that is building.
+concurrency:
+  group: shopify-preview-${{ ((github.event_name == 'pull_request' && (github.event.action == 'closed' || vars.PREVIEW_MODE == 'auto')) || (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/preview'))) && format('pr-{0}', github.event.pull_request.number || github.event.issue.number) || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
+  request:
+    if: >-
+      (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')
+      || (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/preview'))
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.request.outputs.action }}
+      base_ref: ${{ steps.request.outputs.base_ref }}
+    steps:
+      - id: request
+        uses: iamota/iamota-github-actions/.github/actions/github-pr-preview-request@v1
+        with:
+          mode: ${{ vars.PREVIEW_MODE || 'on_demand' }}
+
+  resolve_env:
+    needs: [request]
+    if: needs.request.outputs.action != 'skip'
+    runs-on: ubuntu-latest
+    environment: ${{ needs.request.outputs.base_ref }}
+    outputs:
+      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE }}
+      SHOPIFY_PRODUCTION_THEME_ID: ${{ vars.SHOPIFY_PRODUCTION_THEME_ID }}
+      ENV_VARS: ${{ toJSON(vars) }}
+    steps:
+      - run: echo "Resolved environment ${{ needs.request.outputs.base_ref }}"
+
   run:
+    needs: [request, resolve_env]
     uses: iamota/iamota-github-actions/.github/workflows/shopify-theme-preview.yml@v1
     with:
+      preview_mode: ${{ vars.PREVIEW_MODE || 'on_demand' }}
       production_branch: ${{ vars.PRODUCTION_BRANCH || 'production' }}
       theme_root: ${{ vars.THEME_ROOT || '' }}
       theme_src: ${{ vars.THEME_SRC || '' }}
@@ -280,14 +319,10 @@ jobs:
       aws_s3_bucket: ${{ vars.AWS_S3_BUCKET_SHOPIFY_BACKUPS || '' }}
       aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
       shopify_ignore: ${{ vars.SHOPIFY_IGNORE || '' }}
-      SHOPIFY_STORE: ${{ vars.SHOPIFY_STORE || '' }}
-      SHOPIFY_PRODUCTION_THEME_ID: ${{ vars.SHOPIFY_PRODUCTION_THEME_ID || vars.SHOPIFY_THEME_ID || '' }}
-      SHOPIFY_PREVIEW_BASE_THEME_ID: ${{ vars.SHOPIFY_PREVIEW_BASE_THEME_ID || vars.SHOPIFY_PRODUCTION_THEME_ID || vars.SHOPIFY_THEME_ID || '' }}
-    secrets:
-      SHOPIFY_THEME_ACCESS_TOKEN: ${{ secrets.SHOPIFY_THEME_ACCESS_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      IAMOTA_ACTIONS_READ_TOKEN: ${{ secrets.IAMOTA_ACTIONS_READ_TOKEN }}
+      SHOPIFY_STORE: ${{ needs.resolve_env.outputs.SHOPIFY_STORE }}
+      SHOPIFY_PRODUCTION_THEME_ID: ${{ needs.resolve_env.outputs.SHOPIFY_PRODUCTION_THEME_ID }}
+      env_vars: ${{ needs.resolve_env.outputs.ENV_VARS }}
+    secrets: inherit
 ```
 
 ### Example: Publish An NPM Package To GitHub Packages

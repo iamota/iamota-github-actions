@@ -38,6 +38,7 @@ Runs internally on this repo's release branches, and is callable by consumer rep
 - `.github/actions/github-pr-comment-add/action.yml`
 - `.github/actions/github-pr-comment-marker-get/action.yml`
 - `.github/actions/github-pr-comment-marker-set/action.yml`
+- `.github/actions/github-pr-preview-request/action.yml`
 - `.github/actions/iamota-helper-checkout/action.yml`
 - `.github/actions/npm-install/action.yml`
 - `.github/actions/shopify-cli-install/action.yml`
@@ -66,6 +67,7 @@ Runs internally on this repo's release branches, and is callable by consumer rep
 - `.github/scripts/github/github-pr-comment-lib.mjs`
 - `.github/scripts/github/github-pr-comment-marker-get.mjs`
 - `.github/scripts/github/github-pr-comment-marker-set.mjs`
+- `.github/scripts/github/github-pr-preview-request.mjs`
 - `.github/scripts/github/github-pr-guard-core.mjs`
 - `.github/scripts/github/github-pr-guard-shopify-locale.mjs`
 - `.github/scripts/github/github-pr-guard-shopify-theme-settings.mjs`
