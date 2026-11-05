@@ -1,0 +1,46 @@
+name: "Claude Plugins Validate"
+description: "Validate a Claude plugin marketplace repo (claude.ai org sync layout) with iamota checks and claude plugin validate"
+inputs:
+    path:
+        description: "Marketplace repository root (contains .claude-plugin/marketplace.json)"
+        default: "."
+    base_ref:
+        description: "Optional git ref to diff against; plugins whose files changed must bump their version. Requires fetch-depth 0."
+        default: ""
+    claude_code_version:
+        description: "@anthropic-ai/claude-code version used for claude plugin validate"
+        default: "latest"
+    run_claude_validate:
+        description: "Also run claude plugin validate --strict on the marketplace and every plugin (true/false)"
+        default: "true"
+runs:
+    using: "composite"
+    steps:
+        - name: iamota plugin checks
+          env:
+              ROOT: ${{ inputs.path }}
+              BASE_REF: ${{ inputs.base_ref }}
+          run: |
+              set -euo pipefail
+              ARGS=("${ROOT}")
+              if [ -n "${BASE_REF}" ]; then
+                  ARGS+=(--base "${BASE_REF}")
+              fi
+              node "${GITHUB_ACTION_PATH}/validate.mjs" "${ARGS[@]}"
+          shell: bash
+
+        - name: claude plugin validate
+          if: inputs.run_claude_validate == 'true'
+          env:
+              ROOT: ${{ inputs.path }}
+              CLAUDE_CODE_VERSION: ${{ inputs.claude_code_version }}
+          run: |
+              set -euo pipefail
+              npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" > /dev/null
+              claude --version
+              cd "${ROOT}"
+              claude plugin validate . --strict
+              for dir in $(node -e 'for (const p of require("./.claude-plugin/marketplace.json").plugins) if (typeof p.source === "string") console.log(p.source)'); do
+                  claude plugin validate "${dir}" --strict
+              done
+          shell: bash

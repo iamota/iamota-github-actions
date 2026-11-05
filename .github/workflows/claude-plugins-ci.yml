@@ -1,0 +1,59 @@
+name: Claude Plugins CI
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        type: string
+        required: false
+        default: "."
+      node_version:
+        type: string
+        required: false
+        # Node baseline — keep in sync with docs/github-actions/node-version.md.
+        default: "24"
+      claude_code_version:
+        type: string
+        required: false
+        default: "latest"
+      require_version_bump:
+        type: string
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iamota-claude-plugins-ci-${{ github.repository }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - id: base
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          REQUIRE_BUMP: ${{ inputs.require_version_bump }}
+        run: |
+          set -euo pipefail
+          if [ "${REQUIRE_BUMP}" = "true" ] && [ -n "${BASE_BRANCH}" ]; then
+            echo "ref=origin/${BASE_BRANCH}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: iamota/iamota-github-actions/.github/actions/claude-plugins-validate@v1
+        with:
+          path: ${{ inputs.path }}
+          base_ref: ${{ steps.base.outputs.ref }}
+          claude_code_version: ${{ inputs.claude_code_version }}
