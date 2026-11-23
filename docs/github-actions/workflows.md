@@ -290,7 +290,7 @@ Notes:
 Purpose:
 
 - Validate a Claude plugin marketplace repository (the layout claude.ai organization sync reads), such as `iamota/iamota-ai-plugins`.
-- Runs the `claude-plugins-validate` action: iamota checks plus `claude plugin validate --strict` on the marketplace and every plugin.
+- Runs the `claude-plugins-validate` action: the `@iamota/claude-plugin-schema` checks plus `claude plugin validate --strict` on the marketplace and every plugin.
 
 Inputs:
 
@@ -304,6 +304,7 @@ Secrets: none
 Notes:
 
 - Checks out with `fetch-depth: 0` so the version-bump check can diff against the PR base branch.
+- Declares `packages: read`: the action installs `@iamota/claude-plugin-schema` from GitHub Packages with the job's `GITHUB_TOKEN` (as `NODE_AUTH_TOKEN`). The calling workflow must grant `packages: read` too.
 - `claude plugin validate` needs no Anthropic credentials.
 
 ## Package Publishing

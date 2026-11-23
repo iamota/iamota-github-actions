@@ -23,6 +23,8 @@ on:
 
 permissions:
   contents: read
+  # claude-plugins-validate installs @iamota/claude-plugin-schema from GitHub Packages.
+  packages: read
 
 concurrency:
   group: iamota-claude-plugins-ci-${{ github.repository }}-${{ github.event.pull_request.number || github.ref || github.run_id }}

@@ -305,13 +305,19 @@ Outputs:
 
 ### `.github/actions/claude-plugins-validate/action.yml`
 
-Validates a Claude plugin marketplace repo for claude.ai organization sync. `validate.mjs` (zero dependencies, runnable locally with `node validate.mjs <repo> [--base <ref>]`) checks:
+Validates a Claude plugin marketplace repo for claude.ai organization sync. The file rules come from [`@iamota/claude-plugin-schema`](https://github.com/iamota/iamota-ai-plugins/tree/main/packages/claude-plugin-schema), published from `iamota-ai-plugins` to GitHub Packages; it is the same package kb-web's editors and checks use, so CI and the editor agree. The action installs it, then `validate.mjs` runs every file in the repo (`git ls-files`) through it:
 
-- `marketplace.json` names, `./` sources that exist, and entry names matching each `plugin.json`
+- `SKILL.md` frontmatter limited to the keys claude.ai accepts (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`), a kebab-case `name` matching its folder, description of 1024 characters or fewer
+- agents with `name` (no `:`) + `description`, no empty `tools` list, `model` as an alias or `inherit`
+- `plugin.json`, `marketplace.json` (names, reserved prefixes, duplicates, `./` sources), `hooks/hooks.json` and `.mcp.json`
+- warnings: a description with no "Use when…" trigger, a skill name that doesn't start with a verb, committed `__pycache__`/`.pyc`
+
+and adds the checks that span files:
+
+- marketplace `./` sources that exist, and entry names matching each `plugin.json`
 - no top-level `bin/` in any plugin (claude.ai rejects those)
-- `SKILL.md` frontmatter limited to the keys claude.ai accepts (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`), `name` matching its folder, description of 1024 characters or fewer
-- agents with `name` + `description`, no empty `tools` list, `model` as an alias or `inherit` (warning)
-- with `base_ref`: plugins whose files changed must bump their version
+- every `skills/<name>/` folder has a `SKILL.md`
+- with `base_ref`: plugins whose files changed must bump their version (compiled Python doesn't count)
 
 Then runs `claude plugin validate --strict` on the marketplace and each plugin.
 
@@ -320,4 +326,10 @@ Inputs:
 - `path` (optional, default `.`)
 - `base_ref` (optional) — enables the version-bump check; needs full history
 - `claude_code_version` (optional, default `latest`)
+- `schema_version` (optional, default `0.1.0`) — the `@iamota/claude-plugin-schema` version to install
+- `token` (optional, default `github.token`) — passed to npm as `NODE_AUTH_TOKEN` to read the package from GitHub Packages
 - `run_claude_validate` (optional `true`/`false`, default `true`)
+
+Permissions: the calling job needs `packages: read` (plus `contents: read`). The package is linked to `iamota-ai-plugins`, so that repo's `GITHUB_TOKEN` can read it; another repo using this action must be granted access under the package's **Manage Actions access**, or pass a `token` with `read:packages`.
+
+Local run: in `iamota-ai-plugins`, `npm ci && npm run build -w @iamota/claude-plugin-schema`, then `node <this repo>/.github/actions/claude-plugins-validate/validate.mjs . [--base origin/main]` (it finds the package in the repo's `node_modules`, or in `CLAUDE_PLUGIN_SCHEMA_DIR`).
