@@ -314,6 +314,30 @@ Notes:
 - Stages **only** the two universal Shopify secrets (`SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`) with `--stage`, so the app restarts once on the following `deploy`. App-specific runtime secrets (Stripe, Google, etc.) persist on the Fly app once set — set them once at provisioning with `fly secrets set`; they do not need re-staging on every deploy.
 - A failed `deploy_shopify` does not roll back `deploy_fly` — the two jobs are independent by default. Add `needs: [deploy_shopify]` in the wrapper to gate Fly on a successful Shopify deploy.
 
+## Claude Plugins
+
+### `.github/workflows/claude-plugins-ci.yml`
+
+Purpose:
+
+- Validate a Claude plugin marketplace repository (the layout claude.ai organization sync reads), such as `iamota/iamota-ai-plugins`.
+- Runs the `claude-plugins-validate` action: the `@iamota/claude-plugin-schema` checks plus `claude plugin validate --strict` on the marketplace and every plugin.
+
+Inputs:
+
+- `path` (optional, default `.`) — marketplace repository root.
+- `node_version` (optional, default `24`).
+- `claude_code_version` (optional, default `latest`).
+- `require_version_bump` (optional, default `true`) — on pull requests, a plugin whose files changed must bump its `plugin.json` version.
+
+Secrets: none
+
+Notes:
+
+- Checks out with `fetch-depth: 0` so the version-bump check can diff against the PR base branch.
+- Declares `packages: read`: the action installs `@iamota/claude-plugin-schema` from GitHub Packages with the job's `GITHUB_TOKEN` (as `NODE_AUTH_TOKEN`). The calling workflow must grant `packages: read` too.
+- `claude plugin validate` needs no Anthropic credentials.
+
 ## Package Publishing
 
 ### `.github/workflows/github-npm-publish.yml`
