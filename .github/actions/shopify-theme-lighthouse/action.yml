@@ -15,7 +15,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: shopify/lighthouse-ci-action@v1
+    - uses: shopify/lighthouse-ci-action@988f0eeb44ad5f298bd47150e5b9b01c27ead975 # v1.4.0
       with:
         access_token: ${{ inputs.access_token }}
         store: ${{ inputs.store }}

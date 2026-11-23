@@ -15,8 +15,12 @@ This guide explains how project repos should consume `iamota/iamota-github-actio
 - `Settings` -> `Actions` -> `General`
 - Allow reusable workflows/actions usage per your policy.
 - Under Workflow permissions:
-  - enable `Read and write permissions`
-  - enable `Allow GitHub Actions to create and approve pull requests` (needed by sync-dev auto-merge flow)
+  - keep the default `Read repository contents and packages permissions` (read-only). Every
+    reusable workflow here declares `permissions: {}` and grants each job only what it needs,
+    so the **calling job** must grant those scopes explicitly (see section 7).
+  - `Allow GitHub Actions to create and approve pull requests` is needed only by
+    `shopify-json-sync-dev.yml` (it opens the sync PR with `GITHUB_TOKEN`). Leave it off in
+    repos that don't use that workflow. See [SECURITY.md](../../SECURITY.md).
 
 ## 2) Configure Secrets and Variables
 
@@ -176,7 +180,10 @@ jobs:
     with:
       branch: ${{ github.ref_name }}
       # config: ${{ github.ref_name }}   # multi-env only
-    secrets: inherit
+    # Pass secrets explicitly, never `secrets: inherit`: the workflow then sees only these.
+    secrets:
+      SHOPIFY_APP_AUTOMATION_TOKEN: ${{ secrets.SHOPIFY_APP_AUTOMATION_TOKEN }}
+      SHOPIFY_API_KEY: ${{ secrets.SHOPIFY_API_KEY }}
 
   deploy_fly:
     uses: iamota/iamota-github-actions/.github/workflows/fly-deploy.yml@v1
@@ -185,7 +192,11 @@ jobs:
       # config: ${{ github.ref_name }}   # multi-env only
       # dockerhub_login: 'true'          # only if hitting Docker Hub pull limits
       # dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
-    secrets: inherit
+    secrets:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      SHOPIFY_API_KEY: ${{ secrets.SHOPIFY_API_KEY }}
+      SHOPIFY_API_SECRET: ${{ secrets.SHOPIFY_API_SECRET }}
+      # DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
 
 Per **GitHub Environment** (one named for each deploy branch), provide the secrets:
@@ -433,9 +444,27 @@ Examples:
 
 ## 8) Version Pinning Strategy
 
-- Use stable tags (`@v1`) for production repositories.
-- Use stable tags (for example `@v1`) for production repositories.
+- `@v1` follows the latest release and is moved by `release-semver-tags.yml`. Repos that
+  deploy to production or publish packages should pin an immutable release tag
+  (`@v1.0.71`) or, strictest, the release's full commit SHA with a comment
+  (`@<40-char sha> # v1.0.71`). Note that the composite actions *inside* these workflows
+  are referenced as `@v1`, so a SHA-pinned workflow still picks up composite changes from
+  later v1 releases (see [SECURITY.md](../../SECURITY.md)).
+- Every third-party action in this repo is pinned to a full commit SHA with a `# vX.Y.Z`
+  comment. Pin third-party actions the same way in your own wrapper workflows, and bump
+  them deliberately (Dependabot with a cooldown, or by hand to a release at least 14 days old).
 - After validating branch changes, cut/update the release tag used by consumers.
+
+## 8a) Passing Secrets
+
+Pass secrets explicitly (`secrets: NAME: ${{ secrets.NAME }}`), never `secrets: inherit`,
+for `fly-deploy.yml`, `shopify-app-deploy.yml`, `github-npm-publish.yml` and the
+`shopify-warn*` workflows: each declares the secrets it reads, and `inherit` would hand it
+every secret the caller can see. The multistore Shopify theme workflows
+(`shopify-theme-*`, `shopify-json-sync-production.yml`) look up per-store secrets by
+computed name (`SHOPIFY_THEME_ACCESS_TOKEN__<STORE>`), which only `secrets: inherit` can
+supply; keep `inherit` there, and keep the caller repo's secrets limited to what those
+workflows need.
 
 ## 9) Remove Legacy Overlapping Workflows
 

@@ -6,8 +6,30 @@ name: GitHub Packages NPM Publish (Canonical)
 # `--access` flag is involved.
 #
 # Auth is the run's own GITHUB_TOKEN — the caller must grant
-# `permissions: packages: write` on the calling job. That replaces the classic
-# PAT with `write:packages` that the old per-repo publish workflows used.
+# `permissions: { contents: read, packages: write }` on the calling job. That
+# replaces the classic PAT with `write:packages` that the old per-repo publish
+# workflows used.
+#
+# Two jobs, so the publish credential never meets the package's code:
+#   build   — unprivileged (contents: read, packages: read). Checks out, installs
+#             with `npm ci --ignore-scripts` (lockfile required), builds, tests,
+#             then `npm pack --ignore-scripts` and uploads the tarball as an
+#             artifact. Dependency and package scripts run only here.
+#   publish — packages: write. No checkout and no install: it downloads the
+#             tarball, checks its sha256 against the build job's, and runs
+#             `npm publish <tarball> --ignore-scripts`. NODE_AUTH_TOKEN is set on
+#             that one step only.
+# Because nothing runs package scripts at publish time, lifecycle hooks such as
+# `prepublishOnly` or `prepack` do NOT run: build with `run_build` (the
+# package's `build` script) instead.
+#
+# Provenance: npm `--provenance` is only supported by registry.npmjs.org, not
+# GitHub Packages, and GitHub artifact attestations for private repositories
+# need GitHub Enterprise Cloud, so neither is enabled here. The tarball's
+# sha256 is recorded in the run summary.
+#
+# Secrets: pass `NPM_PUBLISH_TOKEN` explicitly if you need it at all — never
+# `secrets: inherit`.
 #
 # Typical trigger is a published GitHub Release; the version guard below keeps
 # the release tag and package.json version from drifting apart.
@@ -52,9 +74,14 @@ on:
                 required: false
                 default: ""
             install_command:
+                description: >-
+                    Install command for the unprivileged build job. The default
+                    needs a committed lockfile and runs no dependency scripts.
+                    An override (e.g. `npm install`) is honoured for compatibility
+                    but loses the lockfile pin and script blocking, and warns.
                 type: string
                 required: false
-                default: "npm ci"
+                default: "npm ci --ignore-scripts"
             node_version:
                 type: string
                 required: false
@@ -95,41 +122,43 @@ on:
                 description: >-
                     Optional override token. Leave unset to publish with the
                     run's GITHUB_TOKEN (the normal case). Set only to publish to
-                    a registry the run token cannot reach.
+                    a registry the run token cannot reach. Used only by the
+                    publish step.
                 required: false
 
-permissions:
-    contents: read
-    packages: write
+permissions: {}
 
 concurrency:
     group: iamota-github-npm-publish-${{ github.repository }}-${{ github.ref || github.run_id }}
     cancel-in-progress: false
 
 jobs:
-    publish:
+    build:
         runs-on: ubuntu-latest
-        env:
-            NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+        permissions:
+            contents: read
+            # Lets the install read other private @iamota packages and lets
+            # `npm view` see whether this version is already published.
+            packages: read
+        outputs:
+            name: ${{ steps.pkg.outputs.name }}
+            version: ${{ steps.pkg.outputs.version }}
+            exists: ${{ steps.published.outputs.exists }}
+            tarball: ${{ steps.pack.outputs.tarball }}
+            sha256: ${{ steps.pack.outputs.sha256 }}
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
               with:
                   # Empty resolves to the triggering ref (checkout's own default).
                   ref: ${{ inputs.ref }}
+                  persist-credentials: false
 
             - name: Setup Node for GitHub Packages
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
               with:
                   node-version: ${{ inputs.node_version }}
                   registry-url: ${{ inputs.registry_url }}
                   scope: ${{ inputs.scope }}
-
-            - name: Install npm dependencies
-              uses: iamota/iamota-github-actions/.github/actions/npm-install@v1
-              with:
-                  working_directory: ${{ inputs.working_directory }}
-                  install_command: ${{ inputs.install_command }}
-                  if_package_json: "1"
 
             - name: Resolve package identity
               id: pkg
@@ -196,6 +225,8 @@ jobs:
               if: inputs.skip_if_published
               working-directory: ${{ inputs.working_directory }}
               env:
+                  # Read-only: this job's GITHUB_TOKEN carries packages: read.
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   PKG_NAME: ${{ steps.pkg.outputs.name }}
                   PKG_VERSION: ${{ steps.pkg.outputs.version }}
                   REGISTRY_URL: ${{ inputs.registry_url }}
@@ -209,6 +240,24 @@ jobs:
                   else
                       echo "exists=false" >> "$GITHUB_OUTPUT"
                   fi
+
+            - name: Install npm dependencies
+              if: steps.published.outputs.exists != 'true'
+              working-directory: ${{ inputs.working_directory }}
+              env:
+                  # packages: read token, for private @iamota dependencies only.
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  INSTALL_COMMAND: ${{ inputs.install_command }}
+              run: |
+                  set -euo pipefail
+                  if [[ "${INSTALL_COMMAND}" =~ ^[[:space:]]*npm[[:space:]]+ci([[:space:]]|$) ]] && [ ! -f package-lock.json ] && [ ! -f npm-shrinkwrap.json ]; then
+                      echo "::error::'${INSTALL_COMMAND}' needs a committed package-lock.json. Commit the lockfile (preferred) or pass install_command explicitly."
+                      exit 1
+                  fi
+                  if [[ "${INSTALL_COMMAND}" != *"--ignore-scripts"* ]]; then
+                      echo "::warning::install_command '${INSTALL_COMMAND}' runs dependency install scripts; prefer 'npm ci --ignore-scripts' with a committed lockfile."
+                  fi
+                  bash -c "${INSTALL_COMMAND}"
 
             - name: Run build script when available
               if: inputs.run_build && steps.published.outputs.exists != 'true'
@@ -234,29 +283,95 @@ jobs:
                   fi
                   npm test
 
-            - name: Publish
+            - name: Pack
+              id: pack
               if: steps.published.outputs.exists != 'true'
               working-directory: ${{ inputs.working_directory }}
+              run: |
+                  set -euo pipefail
+                  mkdir -p "${RUNNER_TEMP}/npm-pack"
+                  TARBALL="$(npm pack --ignore-scripts --pack-destination "${RUNNER_TEMP}/npm-pack" | tail -1)"
+                  SHA256="$(sha256sum "${RUNNER_TEMP}/npm-pack/${TARBALL}" | cut -d' ' -f1)"
+                  echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+                  echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+                  echo "Packed ${TARBALL} (sha256 ${SHA256})"
+
+            - name: Upload package tarball
+              if: steps.published.outputs.exists != 'true'
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: npm-package-${{ github.run_id }}-${{ github.run_attempt }}
+                  path: ${{ runner.temp }}/npm-pack/${{ steps.pack.outputs.tarball }}
+                  if-no-files-found: error
+                  retention-days: 3
+
+    publish:
+        needs: [build]
+        if: needs.build.outputs.exists != 'true'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - name: Download package tarball
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  name: npm-package-${{ github.run_id }}-${{ github.run_attempt }}
+                  path: ${{ runner.temp }}/npm-pack
+
+            - name: Verify tarball
               env:
-                  PKG_NAME: ${{ steps.pkg.outputs.name }}
-                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
+                  TARBALL: ${{ needs.build.outputs.tarball }}
+                  EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}
+              run: |
+                  set -euo pipefail
+                  if [[ ! "${TARBALL}" =~ ^[A-Za-z0-9._-]+\.tgz$ ]]; then
+                      echo "::error::Unexpected tarball name '${TARBALL}'."
+                      exit 1
+                  fi
+                  ACTUAL="$(sha256sum "${RUNNER_TEMP}/npm-pack/${TARBALL}" | cut -d' ' -f1)"
+                  if [ "${ACTUAL}" != "${EXPECTED_SHA256}" ]; then
+                      echo "::error::Tarball sha256 ${ACTUAL} does not match the build job's ${EXPECTED_SHA256}."
+                      exit 1
+                  fi
+
+            - name: Setup Node for GitHub Packages
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  registry-url: ${{ inputs.registry_url }}
+                  scope: ${{ inputs.scope }}
+
+            - name: Publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+                  TARBALL: ${{ needs.build.outputs.tarball }}
+                  PKG_NAME: ${{ needs.build.outputs.name }}
+                  PKG_VERSION: ${{ needs.build.outputs.version }}
                   REGISTRY_URL: ${{ inputs.registry_url }}
                   DRY_RUN: ${{ inputs.dry_run }}
               run: |
                   set -euo pipefail
-                  ARGS=(publish --registry "${REGISTRY_URL}")
+                  ARGS=(publish "${RUNNER_TEMP}/npm-pack/${TARBALL}" --ignore-scripts --registry "${REGISTRY_URL}")
                   if [ "${DRY_RUN}" = "true" ]; then
                       ARGS+=(--dry-run)
-                      echo "Dry run — packing ${PKG_NAME}@${PKG_VERSION} without publishing."
+                      echo "Dry run — validating ${PKG_NAME}@${PKG_VERSION} without publishing."
                   fi
                   npm "${ARGS[@]}"
 
+    summary:
+        needs: [build, publish]
+        if: always()
+        runs-on: ubuntu-latest
+        permissions: {}
+        steps:
             - name: Publish summary
-              if: always()
               env:
-                  PKG_NAME: ${{ steps.pkg.outputs.name }}
-                  PKG_VERSION: ${{ steps.pkg.outputs.version }}
-                  ALREADY_PUBLISHED: ${{ steps.published.outputs.exists }}
+                  PKG_NAME: ${{ needs.build.outputs.name }}
+                  PKG_VERSION: ${{ needs.build.outputs.version }}
+                  ALREADY_PUBLISHED: ${{ needs.build.outputs.exists }}
+                  PUBLISH_RESULT: ${{ needs.publish.result }}
+                  SHA256: ${{ needs.build.outputs.sha256 }}
                   REGISTRY_URL: ${{ inputs.registry_url }}
                   DRY_RUN: ${{ inputs.dry_run }}
               run: |
@@ -266,8 +381,13 @@ jobs:
                       echo ""
                       echo "- Package: \`${PKG_NAME:-unresolved}@${PKG_VERSION:-unresolved}\`"
                       echo "- Registry: \`${REGISTRY_URL}\`"
+                      if [ -n "${SHA256}" ]; then
+                          echo "- Tarball sha256: \`${SHA256}\`"
+                      fi
                       if [ "${ALREADY_PUBLISHED}" = "true" ]; then
                           echo "- Result: skipped (version already published)"
+                      elif [ "${PUBLISH_RESULT}" != "success" ]; then
+                          echo "- Result: ${PUBLISH_RESULT:-not run}"
                       elif [ "${DRY_RUN}" = "true" ]; then
                           echo "- Result: dry run (nothing published)"
                       else

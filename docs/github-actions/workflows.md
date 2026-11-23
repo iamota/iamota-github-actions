@@ -301,8 +301,9 @@ Inputs:
 - `remote_only` (optional, default `true`) — build on Fly's remote builder (no local Docker daemon).
 - `dockerhub_login` (optional, default `false`) — add a Docker Hub login step; set only when remote builds hit Docker Hub's anonymous pull rate limit.
 - `dockerhub_username` (optional) — pair with the `DOCKERHUB_TOKEN` secret.
+- `flyctl_version` (optional, default pinned, currently `0.4.118`) — flyctl CLI version; never `latest`.
 
-Secrets:
+Secrets (pass explicitly, never `secrets: inherit`; each is exposed only to the step that uses it):
 
 - `FLY_API_TOKEN` (required) — Fly deploy token scoped to the app.
 - `SHOPIFY_API_KEY` (optional) — staged as a Fly secret for OAuth.
@@ -358,7 +359,7 @@ Inputs:
 - `working_directory` (optional, default `.`)
 - `ref` (optional, default empty) — git ref to check out and publish. Empty uses the triggering ref. Set it when an upstream job created the commit to publish (e.g. the tag from `release-semver-tags`).
 - `expected_version` (optional, default empty) — when set, package.json `version` must equal it (leading `v` optional). Asserts the version an upstream job computed actually landed in the checkout.
-- `install_command` (optional, default `npm ci`)
+- `install_command` (optional, default `npm ci --ignore-scripts`) — runs in the unprivileged build job. The default requires a committed lockfile. An override such as `npm install` still works but warns: it loses the lockfile pin and runs dependency install scripts.
 - `node_version` (optional, default `24` — see [node-version.md](node-version.md))
 - `run_test` (optional, default `true`) — runs `npm test`; skipped when the package has no test script.
 - `run_build` (optional, default `false`) — runs `npm run build`; skipped when the package has no build script.
@@ -368,13 +369,16 @@ Inputs:
 
 Secrets:
 
-- `NPM_PUBLISH_TOKEN` (optional) — override token. Leave unset for the normal case; the run's `GITHUB_TOKEN` authenticates the publish. Set it only to reach a registry the run token cannot.
+- `NPM_PUBLISH_TOKEN` (optional) — override token. Leave unset for the normal case; the run's `GITHUB_TOKEN` authenticates the publish. Set it only to reach a registry the run token cannot. Pass it explicitly, never via `secrets: inherit`.
 
 Notes:
 
 - The caller **must** grant `permissions: packages: write` (plus `contents: read`) on the calling job — that is what replaces the classic PAT with `write:packages` used by older per-repo publish workflows.
 - The scope guard runs before any publish attempt, so a package renamed out of `@iamota` fails loudly rather than resolving to a different registry.
 - Re-running a release is safe: the already-published check short-circuits before build, test, and publish.
+- Two jobs: `build` (contents: read, packages: read) checks out, installs, builds, tests and `npm pack --ignore-scripts`es the tarball; `publish` (packages: write) has no checkout or install, verifies the tarball's sha256 against the build job's and runs `npm publish <tarball> --ignore-scripts`, with `NODE_AUTH_TOKEN` on that step only. Package code never runs while the write token exists.
+- Because publish runs no lifecycle scripts, `prepublishOnly`/`prepack`/`prepare` hooks do not run. Use `run_build: true` (the package's `build` script) instead.
+- No provenance: npm `--provenance` is supported only by registry.npmjs.org, not GitHub Packages, and artifact attestations for private repositories need GitHub Enterprise Cloud. The tarball sha256 is in the run summary.
 
 ## Internal Validation
 

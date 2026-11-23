@@ -24,10 +24,7 @@ on:
                 options: ["error", "warning", "info", "style"]
                 default: "error"
 
-permissions:
-    contents: read
-    pull-requests: write
-    issues: write
+permissions: {}
 
 # Pin once so the installer download and the lint run stay in lockstep.
 env:
@@ -36,9 +33,13 @@ env:
 jobs:
     shopify-cli-compatibility:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         steps:
-            - uses: actions/checkout@v5
-            - uses: actions/setup-node@v6
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
               with:
                   node-version: "24"
             - name: Test Shopify CLI JSON compatibility and version selection
@@ -54,8 +55,14 @@ jobs:
         if: >-
             (github.event.inputs.actionlint_mode || vars.ACTIONLINT_MODE || 'true') != 'false'
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+            issues: write
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
 
             # actionlint ships as a Go CLI, not a composite action, so there is
             # no `uses:` form. Pull a pinned release via the official installer.
@@ -253,7 +260,7 @@ jobs:
 
             - name: Sync actionlint PR comment
               if: github.event_name == 'pull_request'
-              uses: actions/github-script@v8
+              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
               env:
                   ACTIONLINT_COMMENT_PATH: ${{ steps.report.outputs.comment_path }}
               with:
@@ -295,9 +302,13 @@ jobs:
 
     node-check:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         steps:
-            - uses: actions/checkout@v5
-            - uses: actions/setup-node@v6
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
               with:
                   # Node baseline — keep in sync with docs/github-actions/node-version.md.
                   node-version: "24"

@@ -31,7 +31,7 @@ runs:
         - name: Restore node_modules cache
           if: inputs.cache_key != ''
           id: nm_restore
-          uses: actions/cache/restore@v5
+          uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
           with:
               path: ${{ inputs.cache_path }}
               key: ${{ inputs.cache_key }}
@@ -86,7 +86,7 @@ runs:
 
         - name: Setup Node for fallback install
           if: steps.verify.outputs.needs_install == 'true'
-          uses: actions/setup-node@v6
+          uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
           with:
               node-version: ${{ inputs.node_version }}
               cache: ${{ steps.npm_dep_path.outputs.path != '' && 'npm' || '' }}
