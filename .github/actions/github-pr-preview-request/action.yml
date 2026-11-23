@@ -2,7 +2,8 @@ name: "GitHub PR Preview Request"
 description: >-
     Decide what a theme preview run should do for the triggering pull_request or
     issue_comment event (preview | cleanup | help | reply | skip), handling the
-    /preview command, commenter permission, closed and fork PRs. Read-only.
+    /preview command, commenter permission, closed and fork PRs. Read-only
+    unless acknowledge is true.
 inputs:
     mode:
         description: "auto (preview on every PR push) or on_demand (only on /preview)"
@@ -12,6 +13,13 @@ inputs:
         description: "Comment command that requests previews"
         required: false
         default: "/preview"
+    acknowledge:
+        description: >-
+            "true" reacts with eyes on a /preview comment that will build or delete
+            previews, so the commenter sees it was received before later jobs start.
+            Needs pull-requests: write.
+        required: false
+        default: "false"
     token:
         description: "Token that can read the repo's PRs, comments and collaborators"
         required: false
@@ -55,3 +63,11 @@ runs:
               INPUT_MODE: ${{ inputs.mode }}
               INPUT_COMMAND: ${{ inputs.command }}
           run: node "${GITHUB_ACTION_PATH}/../../scripts/github/github-pr-preview-request.mjs"
+
+        - name: Acknowledge preview command
+          if: inputs.acknowledge == 'true' && steps.run.outputs.comment_id != '' && (steps.run.outputs.action == 'preview' || steps.run.outputs.action == 'cleanup')
+          shell: bash
+          env:
+              GH_TOKEN: ${{ inputs.token }}
+              COMMENT_ID: ${{ steps.run.outputs.comment_id }}
+          run: gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=eyes --silent || true

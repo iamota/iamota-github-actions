@@ -291,6 +291,7 @@ jobs:
         uses: iamota/iamota-github-actions/.github/actions/github-pr-preview-request@v1
         with:
           mode: ${{ vars.PREVIEW_MODE || 'on_demand' }}
+          acknowledge: "true"
 
   resolve_env:
     needs: [request]

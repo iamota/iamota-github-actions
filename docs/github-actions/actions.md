@@ -35,12 +35,13 @@ Outputs:
 
 ### `.github/actions/github-pr-preview-request/action.yml`
 
-Decides what a theme preview run should do for the triggering `pull_request` or `issue_comment` event. Read-only: it posts nothing.
+Decides what a theme preview run should do for the triggering `pull_request` or `issue_comment` event. It posts nothing unless `acknowledge` is `true`.
 
 Inputs:
 
 - `mode` (optional; `auto` or `on_demand`, default `auto`)
 - `command` (optional; default `/preview`)
+- `acknowledge` (optional; default `false`). When `true`, reacts 👀 on a `/preview` comment that will build or delete previews. Wrappers set it so the reaction appears in the first job rather than after `resolve_env`. Needs `pull-requests: write`.
 - `token` (optional; default `github.token`)
 
 Outputs:
