@@ -337,6 +337,57 @@ Inputs:
 - `name` (required)
 - `path` (required)
 
+## AWS Lambda Helpers
+
+Used by `aws-lambda-deploy.yml`; usable on their own in a custom workflow.
+
+### `.github/actions/aws-lambda-discover/action.yml`
+
+Builds the deploy matrix from `<functions_dir>/*` and resolves the aliases for a branch.
+
+Inputs:
+
+- `functions_dir` (optional, default `functions`)
+- `functions` (optional) — space-separated subset; fails if a named folder is missing
+- `branch` (required) — `dev` → `dev`; `production`/`prod` → `prod production`; anything else needs `aliases`
+- `aliases` (optional) — overrides the branch mapping
+
+Outputs:
+
+- `matrix` — JSON array of `{ "name", "path" }` (`[]` when empty)
+- `aliases` — space-separated
+
+### `.github/actions/aws-lambda-package/action.yml`
+
+Copies shared helpers into a function folder, installs its dependencies and zips it into `$RUNNER_TEMP`.
+
+Inputs:
+
+- `function_path` (required)
+- `function_name` (required)
+- `common_dir` (optional, default `common`)
+- `install_command` (optional, default `npm ci --no-audit --no-fund`) — skipped when the folder has no `package.json`; a `package.json` without a committed `package-lock.json` fails
+
+Outputs:
+
+- `zip_file`
+
+### `.github/actions/aws-lambda-publish/action.yml`
+
+Updates an existing function's code, sets its runtime if it differs, publishes a version and creates or moves aliases to it. Expects AWS credentials and region already configured. Writes the alias moves to the run summary.
+
+Inputs:
+
+- `function_name` (required)
+- `zip_file` (required)
+- `aliases` (required) — space-separated
+- `lambda_runtime` (optional) — empty leaves the runtime alone
+- `description` (optional) — version description; pass the commit SHA
+
+Outputs:
+
+- `version`
+
 ## Repo Checkout Helper
 
 ### `.github/actions/iamota-helper-checkout/action.yml`

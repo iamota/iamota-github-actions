@@ -211,6 +211,44 @@ Per **GitHub Environment** (one named for each deploy branch), provide the secre
 App-specific Fly runtime secrets (Stripe, Google, etc.) persist on the Fly app — set them
 once with `fly secrets set`; they are not re-staged on every deploy.
 
+### Example: AWS Lambda Deploy
+
+For a `<client>-lambda` repo: `functions/<FunctionName>/` (each with a committed
+`package-lock.json`) and shared helpers in `common/`. Create the functions and their
+`:dev`/`:prod` aliases first with iamota-kit's `tools/aws` scripts; this workflow only ships code.
+
+```yaml
+name: Deploy AWS Lambda Functions
+
+on:
+  push:
+    branches: ["dev", "production"]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    permissions:
+      contents: read
+      id-token: write   # required by the workflow (OIDC), even when using keys
+    uses: iamota/iamota-github-actions/.github/workflows/aws-lambda-deploy.yml@v1
+    with:
+      branch: ${{ github.ref_name }}
+      aws_role_arn: ${{ vars.AWS_DEPLOY_ROLE_ARN }}   # preferred: GitHub OIDC, no stored keys
+      # test_command: node --test test/*.test.js
+    # Only when not using OIDC; pass explicitly, never `secrets: inherit`.
+    # secrets:
+    #   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+```
+
+Per **GitHub Environment** (`dev` and `production`), provide:
+
+- `AWS_DEPLOY_ROLE_ARN` *(variable)* — the role GitHub OIDC assumes (preferred). Its trust policy allows `token.actions.githubusercontent.com` for this repo and environment.
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` *(secrets)* — only when OIDC isn't set up; an IAM user limited to the repo's function ARNs.
+- `AWS_REGION` *(variable, optional)* — defaults to `us-west-2`.
+
 ### Example: JSON Sync Production
 
 ```yaml
@@ -441,6 +479,7 @@ Examples:
 - Sync workflows need `contents: write`
 - PR-commenting workflows need `pull-requests: write`
 - `github-npm-publish.yml` needs `packages: write`
+- `aws-lambda-deploy.yml` needs `id-token: write` (plus `contents: read`)
 
 ## 8) Version Pinning Strategy
 
@@ -458,7 +497,7 @@ Examples:
 ## 8a) Passing Secrets
 
 Pass secrets explicitly (`secrets: NAME: ${{ secrets.NAME }}`), never `secrets: inherit`,
-for `fly-deploy.yml`, `shopify-app-deploy.yml`, `github-npm-publish.yml` and the
+for `aws-lambda-deploy.yml`, `fly-deploy.yml`, `shopify-app-deploy.yml`, `github-npm-publish.yml` and the
 `shopify-warn*` workflows: each declares the secrets it reads, and `inherit` would hand it
 every secret the caller can see. The multistore Shopify theme workflows
 (`shopify-theme-*`, `shopify-json-sync-production.yml`) look up per-store secrets by

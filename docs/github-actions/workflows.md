@@ -315,6 +315,42 @@ Notes:
 - Stages **only** the two universal Shopify secrets (`SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`) with `--stage`, so the app restarts once on the following `deploy`. App-specific runtime secrets (Stripe, Google, etc.) persist on the Fly app once set — set them once at provisioning with `fly secrets set`; they do not need re-staging on every deploy.
 - A failed `deploy_shopify` does not roll back `deploy_fly` — the two jobs are independent by default. Add `needs: [deploy_shopify]` in the wrapper to gate Fly on a successful Shopify deploy.
 
+## AWS Deploy Workflows
+
+### `.github/workflows/aws-lambda-deploy.yml`
+
+Purpose:
+
+- Deploy every function in a `<client>-lambda` repo (`functions/<FunctionName>/`, shared helpers in `common/`) to AWS Lambda, one matrix job per function.
+- Per function: copy `common/` in as `<function>/common`, install, zip, `update-function-code`, set the runtime on `$LATEST` if it differs, `publish-version` (described by the commit SHA, pinned with `--code-sha256`), then create or move the branch's aliases.
+
+Inputs:
+
+- `branch` (required) — `github.ref_name`. Pins the GitHub Environment and picks the default aliases: `dev` → `:dev`; `production`/`prod` → `:prod` and `:production`.
+- `aliases` (optional) — space-separated aliases overriding that mapping (needed for any other branch name).
+- `functions_dir` (optional, default `functions`) — one subfolder per function, named exactly as the Lambda function.
+- `functions` (optional) — space-separated subset to deploy; default all.
+- `common_dir` (optional, default `common`) — shared helpers copied into each function; skipped when empty or missing.
+- `install_command` (optional, default `npm ci --no-audit --no-fund`) — run in each function folder. A function with a `package.json` must commit its `package-lock.json`.
+- `test_command` (optional) — run once at the repo root before anything deploys (e.g. `node --test test/*.test.js`); a failure stops every deploy.
+- `lambda_runtime` (optional, default `nodejs24.x`) — empty to leave each function's runtime alone.
+- `node_version` (optional, default `24`).
+- `aws_region` (optional) — defaults to `vars.AWS_REGION`, then `us-west-2`.
+- `aws_role_arn` (optional) — role assumed through GitHub OIDC. Preferred over access keys.
+
+Secrets (pass explicitly, never `secrets: inherit`; omit both when using `aws_role_arn`):
+
+- `AWS_ACCESS_KEY_ID` (optional)
+- `AWS_SECRET_ACCESS_KEY` (optional)
+
+Notes:
+
+- The calling job must grant `contents: read` and `id-token: write` (the deploy job requests `id-token` for OIDC even when keys are used).
+- Only ships code. Functions, aliases, queues, routes and roles are created beforehand by iamota-kit's `tools/aws` scripts; a missing function fails the job with a pointer to them.
+- Runs queue per repo and branch instead of cancelling, so a deploy is never stopped halfway through moving aliases. `fail-fast` is off: one failing function doesn't stop the others.
+- Each job writes the alias moves (previous → new version) and a rollback command to the run summary. Versions are never deleted; roll back by pointing the alias at the previous one.
+- Deploy identity permissions: `lambda:GetFunction`, `UpdateFunctionCode`, `GetFunctionConfiguration`, `UpdateFunctionConfiguration` (runtime), `PublishVersion`, `GetAlias`, `CreateAlias`, `UpdateAlias` on the repo's function ARNs.
+
 ## Claude Plugins
 
 ### `.github/workflows/claude-plugins-ci.yml`

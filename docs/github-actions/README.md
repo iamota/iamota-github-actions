@@ -6,6 +6,7 @@ This folder is the source of truth for shared automation maintained in `iamota-g
 
 ### Reusable Workflows
 
+- `.github/workflows/aws-lambda-deploy.yml`
 - `.github/workflows/fly-deploy.yml`
 - `.github/workflows/github-npm-publish.yml`
 - `.github/workflows/github-warn-merge-conflicts.yml`
@@ -33,6 +34,9 @@ Runs internally on this repo's release branches, and is callable by consumer rep
 
 ### Composite Actions
 
+- `.github/actions/aws-lambda-discover/action.yml`
+- `.github/actions/aws-lambda-package/action.yml`
+- `.github/actions/aws-lambda-publish/action.yml`
 - `.github/actions/aws-s3-upload/action.yml`
 - `.github/actions/github-artifact-upload/action.yml`
 - `.github/actions/github-pr-comment-add/action.yml`

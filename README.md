@@ -1,6 +1,6 @@
 # iamota-github-actions
 
-Centralized reusable GitHub Actions workflows, composite actions, and helper scripts used across iamota Shopify/theme repositories.
+Centralized reusable GitHub Actions workflows, composite actions, and helper scripts used across iamota repositories: Shopify themes and apps, Fly.io apps, AWS Lambda repos and Claude plugins.
 
 ## Docs
 

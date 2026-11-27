@@ -1,0 +1,69 @@
+name: "AWS Lambda Discover"
+description: "Build the deploy matrix from <functions_dir>/* and resolve the aliases for a branch"
+inputs:
+    functions_dir:
+        description: "Folder with one subfolder per function (subfolder name = Lambda function name)"
+        required: false
+        default: "functions"
+    functions:
+        description: "Optional space-separated subset of function names"
+        required: false
+        default: ""
+    branch:
+        description: "Branch being deployed; picks the default aliases"
+        required: true
+    aliases:
+        description: "Space-separated aliases; overrides the branch mapping when set"
+        required: false
+        default: ""
+outputs:
+    matrix:
+        description: 'JSON array of {"name","path"}; "[]" when there is nothing to deploy'
+        value: ${{ steps.discover.outputs.matrix }}
+    aliases:
+        description: "Space-separated aliases to move"
+        value: ${{ steps.discover.outputs.aliases }}
+runs:
+    using: "composite"
+    steps:
+        - id: discover
+          shell: bash
+          env:
+              FUNCTIONS_DIR: ${{ inputs.functions_dir }}
+              FUNCTIONS: ${{ inputs.functions }}
+              BRANCH: ${{ inputs.branch }}
+              ALIASES: ${{ inputs.aliases }}
+          run: |
+              set -euo pipefail
+              shopt -s nullglob
+
+              if [ -n "${ALIASES}" ]; then
+                  RESOLVED="${ALIASES}"
+              else
+                  case "${BRANCH}" in
+                      dev)             RESOLVED="dev" ;;
+                      production|prod) RESOLVED="prod production" ;;
+                      *) echo "::error::No default aliases for branch '${BRANCH}'; pass the aliases input."; exit 1 ;;
+                  esac
+              fi
+
+              NAMES=()
+              for d in "${FUNCTIONS_DIR%/}"/*/; do
+                  NAMES+=("$(basename "${d%/}")")
+              done
+              if [ -n "${FUNCTIONS}" ]; then
+                  read -r -a WANTED <<< "${FUNCTIONS}"
+                  for w in "${WANTED[@]}"; do
+                      if [ ! -d "${FUNCTIONS_DIR%/}/${w}" ]; then
+                          echo "::error::Function folder not found: ${FUNCTIONS_DIR%/}/${w}"; exit 1
+                      fi
+                  done
+                  NAMES=("${WANTED[@]}")
+              fi
+
+              MATRIX="$(printf '%s\n' "${NAMES[@]}" | jq -Rnc --arg dir "${FUNCTIONS_DIR%/}" \
+                  '[inputs | select(length > 0) | {name: ., path: ($dir + "/" + .)}]')"
+              echo "Functions: ${NAMES[*]:-<none>}"
+              echo "Aliases  : ${RESOLVED}"
+              echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+              echo "aliases=${RESOLVED}" >> "$GITHUB_OUTPUT"
