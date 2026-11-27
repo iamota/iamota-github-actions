@@ -34,6 +34,7 @@ These set the default that flows into everything else:
 - `.github/workflows/shopify-app-ci.yml` — `node_version` input default
 - `.github/workflows/shopify-app-deploy.yml` — `node_version` input default
 - `.github/workflows/github-npm-publish.yml` — `node_version` input default
+- `.github/workflows/aws-lambda-deploy.yml` — `node_version` input default (the `lambda_runtime` default, `nodejs24.x`, moves with it)
 
 ### Hardcoded `setup-node` sites (theme + housekeeping workflows)
 

@@ -1,0 +1,199 @@
+name: AWS Lambda Deploy (Canonical)
+
+# Deploys every function in a `<client>-lambda` repo to AWS Lambda, one matrix job
+# per function: copy the shared `common/` folder in, install, zip, update the code,
+# publish a version (described by the commit SHA) and move the branch's aliases to it.
+#
+# Branch-per-environment: the caller passes `branch` (github.ref_name). It pins the
+# GitHub Environment for secrets and picks the aliases:
+#   dev        → :dev
+#   production → :prod and :production
+# Override with `aliases` for any other mapping. Roll back by pointing an alias at
+# the previous version; this workflow never deletes a version.
+#
+# Infrastructure (functions, aliases, queues, routes, roles) is created beforehand by
+# iamota-kit's tools/aws scripts. This workflow only ships code, and fails if the
+# function doesn't exist yet.
+#
+# Credentials: prefer OIDC (`aws_role_arn`, no stored keys). Otherwise pass
+# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY explicitly (never `secrets: inherit`).
+# The calling job must grant `contents: read` and `id-token: write`.
+
+on:
+    workflow_call:
+        inputs:
+            branch:
+                description: "Branch being deployed (github.ref_name); selects the GitHub Environment and default aliases."
+                type: string
+                required: true
+            aliases:
+                description: >-
+                    Space-separated aliases to move to the new version. Leave empty
+                    for the default mapping (dev → dev; production/prod → prod production).
+                type: string
+                required: false
+                default: ""
+            functions_dir:
+                description: "Folder holding one subfolder per function, each named exactly as its Lambda function."
+                type: string
+                required: false
+                default: "functions"
+            functions:
+                description: "Optional space-separated function names to deploy; default all in functions_dir."
+                type: string
+                required: false
+                default: ""
+            common_dir:
+                description: "Shared helpers copied into each function as <function>/common before install. Empty to skip."
+                type: string
+                required: false
+                default: "common"
+            install_command:
+                description: "Run inside each function folder; a committed package-lock.json is required."
+                type: string
+                required: false
+                default: "npm ci --no-audit --no-fund"
+            test_command:
+                description: "Optional command run once at the repo root before any deploy (e.g. node --test test/*.test.js)."
+                type: string
+                required: false
+                default: ""
+            lambda_runtime:
+                description: >-
+                    Runtime set on $LATEST before publishing, so only the aliases being
+                    deployed move to it. Empty to leave each function's runtime alone.
+                type: string
+                required: false
+                default: "nodejs24.x"
+            node_version:
+                type: string
+                required: false
+                # Node baseline — keep in sync with docs/github-actions/node-version.md.
+                default: "24"
+            aws_region:
+                description: "Defaults to vars.AWS_REGION, then us-west-2."
+                type: string
+                required: false
+                default: ""
+            aws_role_arn:
+                description: "IAM role to assume through GitHub OIDC. Preferred over access keys."
+                type: string
+                required: false
+                default: ""
+        secrets:
+            AWS_ACCESS_KEY_ID:
+                required: false
+            AWS_SECRET_ACCESS_KEY:
+                required: false
+
+permissions: {}
+
+# Queue rather than cancel: a cancelled run can leave some functions' aliases moved and others not.
+concurrency:
+    group: iamota-aws-lambda-deploy-${{ github.repository }}-${{ inputs.branch }}
+    cancel-in-progress: false
+
+jobs:
+    test:
+        if: ${{ inputs.test_command != '' }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+              with:
+                  node-version: ${{ inputs.node_version }}
+            - name: Test
+              env:
+                  TEST_COMMAND: ${{ inputs.test_command }}
+              run: |
+                  set -euo pipefail
+                  bash -c "${TEST_COMMAND}"
+
+    discover:
+        needs: test
+        # Run when tests passed or were skipped (no test_command), never after a failure.
+        if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        outputs:
+            matrix: ${{ steps.discover.outputs.matrix }}
+            aliases: ${{ steps.discover.outputs.aliases }}
+        steps:
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
+            - id: discover
+              uses: iamota/iamota-github-actions/.github/actions/aws-lambda-discover@v1
+              with:
+                  functions_dir: ${{ inputs.functions_dir }}
+                  functions: ${{ inputs.functions }}
+                  branch: ${{ inputs.branch }}
+                  aliases: ${{ inputs.aliases }}
+
+    deploy:
+        name: Deploy ${{ matrix.fn.name }}
+        needs: discover
+        if: ${{ !cancelled() && needs.discover.result == 'success' && needs.discover.outputs.matrix != '[]' }}
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.branch }}
+        permissions:
+            contents: read
+            id-token: write
+        strategy:
+            fail-fast: false
+            matrix:
+                fn: ${{ fromJson(needs.discover.outputs.matrix) }}
+        steps:
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+              with:
+                  persist-credentials: false
+
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+              with:
+                  node-version: ${{ inputs.node_version }}
+                  cache: npm
+                  cache-dependency-path: ${{ matrix.fn.path }}/package-lock.json
+
+            - id: package
+              uses: iamota/iamota-github-actions/.github/actions/aws-lambda-package@v1
+              with:
+                  function_path: ${{ matrix.fn.path }}
+                  function_name: ${{ matrix.fn.name }}
+                  common_dir: ${{ inputs.common_dir }}
+                  install_command: ${{ inputs.install_command }}
+
+            - name: Resolve AWS region
+              id: region
+              env:
+                  INPUT_REGION: ${{ inputs.aws_region }}
+                  VAR_REGION: ${{ vars.AWS_REGION }}
+              run: echo "region=${INPUT_REGION:-${VAR_REGION:-us-west-2}}" >> "$GITHUB_OUTPUT"
+
+            - name: Configure AWS credentials (OIDC)
+              if: ${{ inputs.aws_role_arn != '' }}
+              uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+              with:
+                  role-to-assume: ${{ inputs.aws_role_arn }}
+                  role-session-name: lambda-deploy-${{ github.run_id }}
+                  aws-region: ${{ steps.region.outputs.region }}
+
+            - name: Configure AWS credentials (access keys)
+              if: ${{ inputs.aws_role_arn == '' }}
+              uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ steps.region.outputs.region }}
+
+            - uses: iamota/iamota-github-actions/.github/actions/aws-lambda-publish@v1
+              with:
+                  function_name: ${{ matrix.fn.name }}
+                  zip_file: ${{ steps.package.outputs.zip_file }}
+                  aliases: ${{ needs.discover.outputs.aliases }}
+                  lambda_runtime: ${{ inputs.lambda_runtime }}
+                  description: ${{ github.sha }}

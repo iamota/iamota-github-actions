@@ -1,0 +1,55 @@
+name: "AWS Lambda Package"
+description: "Copy shared helpers into a function folder, install its dependencies and zip it"
+inputs:
+    function_path:
+        description: "The function's folder (e.g. functions/RC-Webhook-order-processed)"
+        required: true
+    function_name:
+        description: "Lambda function name; names the zip"
+        required: true
+    common_dir:
+        description: "Shared helpers copied in as <function_path>/common; empty or missing folder to skip"
+        required: false
+        default: "common"
+    install_command:
+        description: "Install command run inside the function folder"
+        required: false
+        default: "npm ci --no-audit --no-fund"
+outputs:
+    zip_file:
+        description: "Path to the built zip"
+        value: ${{ steps.package.outputs.zip_file }}
+runs:
+    using: "composite"
+    steps:
+        - id: package
+          shell: bash
+          env:
+              FN_PATH: ${{ inputs.function_path }}
+              FN_NAME: ${{ inputs.function_name }}
+              COMMON_DIR: ${{ inputs.common_dir }}
+              INSTALL_COMMAND: ${{ inputs.install_command }}
+          run: |
+              set -euo pipefail
+              CODE_DIR="${FN_PATH%/}"
+
+              if [ -f "${CODE_DIR}/package.json" ] && [ ! -f "${CODE_DIR}/package-lock.json" ]; then
+                  echo "::error::Missing ${CODE_DIR}/package-lock.json. Run 'npm install' in that folder and commit it."
+                  exit 1
+              fi
+
+              if [ -n "${COMMON_DIR}" ] && [ -d "${COMMON_DIR}" ]; then
+                  mkdir -p "${CODE_DIR}/common"
+                  cp -a "${COMMON_DIR%/}/." "${CODE_DIR}/common/"
+                  echo "Copied ${COMMON_DIR}/ into ${CODE_DIR}/common/"
+              fi
+
+              if [ -f "${CODE_DIR}/package.json" ]; then
+                  (cd "${CODE_DIR}" && bash -c "${INSTALL_COMMAND}")
+              fi
+
+              ZIP_FILE="${RUNNER_TEMP}/${FN_NAME}.zip"
+              rm -f "${ZIP_FILE}"
+              (cd "${CODE_DIR}" && zip -qr "${ZIP_FILE}" . -x ".git/*" "*.DS_Store" "*/node_modules/.cache/*")
+              echo "Built ${ZIP_FILE} ($(du -h "${ZIP_FILE}" | cut -f1))"
+              echo "zip_file=${ZIP_FILE}" >> "$GITHUB_OUTPUT"

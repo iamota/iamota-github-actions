@@ -1,0 +1,92 @@
+name: "AWS Lambda Publish"
+description: "Update a function's code, optionally set its runtime, publish a version and move aliases to it"
+inputs:
+    function_name:
+        description: "Lambda function name (must already exist)"
+        required: true
+    zip_file:
+        description: "Zip to upload"
+        required: true
+    aliases:
+        description: "Space-separated aliases to point at the new version (created if missing)"
+        required: true
+    lambda_runtime:
+        description: "Runtime to set on $LATEST before publishing; empty to leave it alone"
+        required: false
+        default: ""
+    description:
+        description: "Version description; use the commit SHA"
+        required: false
+        default: ""
+outputs:
+    version:
+        description: "The published version number"
+        value: ${{ steps.publish.outputs.version }}
+runs:
+    using: "composite"
+    steps:
+        - id: publish
+          shell: bash
+          env:
+              FN_NAME: ${{ inputs.function_name }}
+              ZIP_FILE: ${{ inputs.zip_file }}
+              ALIASES: ${{ inputs.aliases }}
+              LAMBDA_RUNTIME: ${{ inputs.lambda_runtime }}
+              VERSION_DESCRIPTION: ${{ inputs.description }}
+          run: |
+              set -euo pipefail
+              ROWS="${RUNNER_TEMP:-/tmp}/lambda-summary-${FN_NAME}.md"
+              : > "${ROWS}"
+              read -r -a TARGET_ALIASES <<< "${ALIASES}"
+              [ "${#TARGET_ALIASES[@]}" -gt 0 ] || { echo "::error::No aliases given"; exit 1; }
+
+              if ! aws lambda get-function --function-name "${FN_NAME}" >/dev/null 2>&1; then
+                  echo "::error::Lambda function '${FN_NAME}' doesn't exist (or these credentials can't see it). Create it first with iamota-kit tools/aws."
+                  exit 1
+              fi
+
+              CODE_SHA="$(aws lambda update-function-code \
+                  --function-name "${FN_NAME}" \
+                  --zip-file "fileb://${ZIP_FILE}" \
+                  --query 'CodeSha256' --output text)"
+              aws lambda wait function-updated-v2 --function-name "${FN_NAME}"
+
+              if [ -n "${LAMBDA_RUNTIME}" ]; then
+                  CURRENT_RUNTIME="$(aws lambda get-function-configuration --function-name "${FN_NAME}" --query 'Runtime' --output text)"
+                  if [ "${CURRENT_RUNTIME}" != "${LAMBDA_RUNTIME}" ]; then
+                      echo "Runtime: ${CURRENT_RUNTIME} → ${LAMBDA_RUNTIME}"
+                      aws lambda update-function-configuration --function-name "${FN_NAME}" --runtime "${LAMBDA_RUNTIME}" >/dev/null
+                      aws lambda wait function-updated-v2 --function-name "${FN_NAME}"
+                  fi
+              fi
+
+              # --code-sha256 makes the publish fail if something else changed the code in between.
+              VERSION="$(aws lambda publish-version \
+                  --function-name "${FN_NAME}" \
+                  --code-sha256 "${CODE_SHA}" \
+                  --description "${VERSION_DESCRIPTION}" \
+                  --query 'Version' --output text)"
+
+              for alias_name in "${TARGET_ALIASES[@]}"; do
+                  PREVIOUS="$(aws lambda get-alias --function-name "${FN_NAME}" --name "${alias_name}" --query 'FunctionVersion' --output text 2>/dev/null || true)"
+                  if [ -n "${PREVIOUS}" ]; then
+                      aws lambda update-alias --function-name "${FN_NAME}" --name "${alias_name}" --function-version "${VERSION}" >/dev/null
+                      echo "Alias :${alias_name} ${PREVIOUS} → ${VERSION}"
+                  else
+                      aws lambda create-alias --function-name "${FN_NAME}" --name "${alias_name}" --function-version "${VERSION}" --description "Created by CI" >/dev/null
+                      echo "Alias :${alias_name} created → ${VERSION}"
+                  fi
+                  echo "| \`${FN_NAME}\` | :${alias_name} | ${PREVIOUS:-new} → ${VERSION} | ${VERSION_DESCRIPTION:0:7} |" >> "${ROWS}"
+              done
+
+              {
+                  echo "### ${FN_NAME}"
+                  echo ""
+                  echo "| Function | Alias | Version | Commit |"
+                  echo "| - | - | - | - |"
+                  cat "${ROWS}"
+                  echo ""
+                  echo "Roll back: \`aws lambda update-alias --function-name ${FN_NAME} --name <alias> --function-version <previous>\`"
+              } >> "${GITHUB_STEP_SUMMARY}"
+              rm -f "${ROWS}"
+              echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
